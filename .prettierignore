@@ -1,0 +1,13 @@
+node_modules/
+dist/
+.vite/
+.playwright-mcp/
+artifacts/
+playwright-report/
+test-results/
+coverage/
+.cache/
+public/
+src/assets/
+src/types/generated/
+pnpm-lock.yaml

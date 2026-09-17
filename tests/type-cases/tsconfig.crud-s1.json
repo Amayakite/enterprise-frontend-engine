@@ -1,0 +1,4 @@
+{
+  "extends": "../../tsconfig.json",
+  "include": ["crud-s1.ts", "vue-shim.d.ts", "../../src/types/**/*.d.ts"]
+}

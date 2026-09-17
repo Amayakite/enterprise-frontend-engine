@@ -1,0 +1,4 @@
+{
+  "extends": "../../tsconfig.json",
+  "include": ["crud-page.ts", "CrudPageSlots.vue", "../../src/types/**/*.d.ts"]
+}

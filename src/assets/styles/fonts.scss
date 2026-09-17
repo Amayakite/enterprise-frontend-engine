@@ -1,0 +1,29 @@
+/**
+ * 应用字体入口。
+ *
+ * Noto Sans SC 的 UI 子集覆盖当前源码中的中英文、数字与常用标点；接口返回和用户录入的
+ * 罕见字符会自动回退到系统中文字体。字体使用 `optional`，慢网首屏不会等待下载或替换文字。
+ * 字体许可证见 public/fonts/OFL.txt。
+ */
+
+@font-face {
+  font-family: "Noto Sans SC";
+  font-style: normal;
+  font-weight: 100 900;
+  font-display: optional;
+  src: url("/fonts/noto-sans-sc-ui.woff2") format("woff2");
+}
+
+:root {
+  --app-font-sans:
+    "Noto Sans SC", "Microsoft YaHei UI", "Microsoft YaHei", "PingFang SC", system-ui, sans-serif;
+  --app-font-mono: "Cascadia Mono", "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+}
+
+body,
+button,
+input,
+textarea,
+select {
+  font-family: var(--app-font-sans);
+}

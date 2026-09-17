@@ -1,0 +1,13 @@
+/**
+ * 布局 Mixins
+ */
+
+@use "variables" as *;
+
+@mixin app-main-height {
+  height: calc(100vh - $navbar-height);
+}
+
+@mixin sidebar-scroll-height-with-logo {
+  height: calc(100vh - $navbar-height);
+}

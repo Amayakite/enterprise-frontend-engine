@@ -1,0 +1,47 @@
+import type { CrudNavigation } from "./types";
+import type { BusinessEditorOptions } from "./presentation";
+
+/** 标准路由页的声明；只存业务约定，不持有登录状态或 Vue Router 实例。 */
+export interface BusinessPageOptions<Organization extends string = string> {
+  /** 新增策略；默认 tab，非标签模式须提供页面 loader。 */
+  add?: BusinessEditorOptions;
+  /** 编辑策略；与新增独立选择 tab/dialog/drawer。 */
+  edit?: BusinessEditorOptions;
+  /** 模块列表绝对路径；新增/编辑/详情默认位于其 add、edit/:id、detail/:id。 */
+  basePath: string;
+  /** 当前组织来源；Mock 可以填固定值，正式项目应提供读取当前组织的函数。 */
+  organizationId: Organization | (() => Organization);
+  /** 列偏好结构版本；不兼容变更时递增，省略为 1。 */
+  preferenceVersion?: string;
+  /** 表单与详情栅格列数；默认 3，允许 1/2/3。 */
+  columns?: 1 | 2 | 3;
+  /** 开发样例提示；省略不显示，不据此判断后端是否正式上线。 */
+  notice?: string;
+  /** create 导航意图的引导效果；默认 halo，spotlight 背景变暗，false 仅短说明。 */
+  guideMode?: "halo" | "spotlight" | false;
+}
+
+/**
+ * 标准路由映射；用于一个模块的所有页面，不在页面重复拼路径。
+ * @param basePath 列表路径，例如 /base/customer。
+ * @returns 编码后的 add/edit/detail 路径函数，ID 0 不会丢失。
+ * @remarks 仅构造字符串，不导航、不读取全局 route。
+ */
+export function createBusinessPaths(basePath: string) {
+  const base = basePath.replace(/\/+$/, "");
+  if (!base.startsWith("/") || base.includes("?") || base.includes("#"))
+    throw new Error("模块 basePath 必须是无 query/hash 的绝对路由路径");
+  return {
+    /** 模块列表地址。 */
+    list: base,
+    /** 新增地址；没有实体 ID。 */
+    add: `${base}/add`,
+    /** 编辑地址；路径段使用 encodeURIComponent。 */
+    edit: (id: string | number) => `${base}/edit/${encodeURIComponent(id)}`,
+    /** 详情地址；保存回填后可使用该地址。 */
+    detail: (id: string | number) => `${base}/detail/${encodeURIComponent(id)}`,
+  };
+}
+
+/** 页面只覆写有差异的导航命令，其余使用公共路径。 */
+export type BusinessNavigationOverrides = Partial<CrudNavigation<string>>;

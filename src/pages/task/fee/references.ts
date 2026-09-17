@@ -1,0 +1,5 @@
+import { createPartyReference, inventoryReference } from "@/api/master-data/reference";
+
+export const principalPartyReference = createPartyReference("委托方");
+export const providerPartyReference = createPartyReference("服务方");
+export { inventoryReference };

@@ -1,0 +1,93 @@
+# 用户数据存储、列偏好与本机草稿
+
+本说明维护公共存储的接入与限制。业务模块不直接访问 IndexedDB/localStorage。当前没有正式后端用户数据端点：列偏好支持注入远端适配器，草稿恢复目前仅在本机生效，不代表已实现跨端同步。
+
+## 1. 公共入口与 Key
+
+- `src/utils/user-data/index.ts`：异步 read/write/remove、用户清理、容量和 TTL、可读 Key、远端 adapter 合同。
+- `src/utils/user-data/preferences.ts`：列设置远端检查会话，只保存有界时间戳，不保存表格行或页面实例。
+- `useCrudColumns`：沿用列白名单归一化，连接本地优先和远端同步。
+- `useCrudDraft/useCrudDraftRestorePrompt/useCrudForm/MyCrudForm`：草稿防抖、恢复、首次漫游式聚焦引导、状态提示及提交保护。
+- `useCrudTableChild/MyCrudChildTable/useRowDraft`：子表独立版本与字段白名单、活动行快照和恢复。
+
+模块沿用唯一 `config.key`。新模块可用 `base/trm` 等可读逻辑路径，不用磁盘路径或当前路由 URL。已有 customer、task-fee 的 key 保持不变，以免偏好失联。公共 `createUserDataKey` 对身份与用途进行编码，保留 string/number ID 差异；主模块逻辑路径允许分段可读，不允许业务手拼缓存键。
+
+列 identity 由 `user/module/version/scope?` 组成。customer 和任务费用已传 scopeKey，隔离组织与权限范围；旧 localStorage 列设置会兼容读取。当前列配置版本体现在 `columns:<version>` 用途键中，存储记录另有 schemaVersion。将来修改 Key 或身份合同须明确迁移，不直接删除旧配置。
+
+## 2. 存储降级与内存边界
+
+| 数据   | 首选      | 降级                        | 提示                     |
+| ------ | --------- | --------------------------- | ------------------------ |
+| 列偏好 | IndexedDB | localStorage → 内存         | 内存时提示刷新后可能丢失 |
+| 草稿   | IndexedDB | 仅内存，不转存 localStorage | 明确提示仅本次运行保留   |
+
+原生 IndexedDB 已足够承载当前简单键值事务，因此没有新增数据库依赖。检查真实操作错误，不仅判断 API 存在；数据库不可用时统一降级。单记录上限 512 KiB，持久层每个存储层最多 100 条，内存最多 32 条且 2 MiB；达到限额拒绝写入并提示，不静默淘汰草稿。草稿默认 7 天到期，容量是上限而非预分配。旧会话内存副本不提供跨刷新保证。
+
+草稿只在变更后约 1 秒取白名单快照，使用串行写入，不轮询、不保存历史整单。子表变更订阅不逐字遍历整表；恢复时用稳定键 Map 匹配基线行。卸载清理定时器与订阅，列同步检查最多保留 100 条时间戳。
+
+IndexedDB 在事务中进行 revision 比较与写入；同一版本并发写只允许一个成功。localStorage 降级只用于偏好，不承诺跨标签原子 CAS。浏览器禁止存储、空间不足、崩溃和清理站点数据都可能导致草稿不可恢复，不能当作服务器备份。
+
+## 3. 草稿接入
+
+在主 `config.ts` 的 form 配置显式开启；下面是 customer 的部分字段示意，完整白名单见实际配置：
+
+```ts
+draft: {
+  version: 1,
+  fields: ["customerName", "shortName", "customerType", "remark"],
+  getEntityVersion: (entity) => entity.version,
+},
+```
+
+每个子表在自己的 config 声明，例如联系人：
+
+```ts
+draft: {
+  version: 1,
+  fields: ["id", "name", "position", "phone", "email", "primary"],
+},
+```
+
+独立 add/edit 页面或可选共用宿主创建 controller 时，只补一次身份和现有模块 key；以下为装配片段，`user/context/config` 沿用页面上下文，`draftInstanceKey` 在 setup 时捕获该实例的 route.fullPath：
+
+```ts
+const controller = useCrudForm(config.form!, {
+  context: () => context.value,
+  navigation,
+  initialTarget: target(props.id),
+  invalidateViewKey: config.key,
+  draftIdentity: () => ({
+    userId: user.userInfo.userId,
+    tenantId: context.value.organizationId,
+    instanceKey: draftInstanceKey,
+  }),
+});
+const contacts = useCrudTableChild(controller, "contacts", {
+  draft: customerContactsConfig.draft,
+});
+```
+
+未登录或缺少合法身份时不得以公用账号键开启正式业务草稿。新增用 instanceKey 区分路由实例，编辑按实体 ID；同一路径同时打开的浏览器窗口竞争同一草稿会报告冲突，不互相覆盖。业务需要多个独立新增单据时，在新增路由携带唯一草稿实例参数。子表白名单必须包含稳定键字段，不能从行下标猜键。未配置 draft 的模块不启用落盘。
+
+子表配置版本、已确认行、活动行和新增行身份一起存储；恢复不调用提交或业务校验，半填数据保持为未提交草稿。行内、dialog、drawer 沿用原编辑呈现，取消恢复的新行仍会删除该未确认行。主字段、子行恢复时跳过当前只读字段。正式保存仍走现有权限、参照、字段和整单校验。
+
+## 4. 用户流程与异常
+
+- 切换系统标签继续用 KeepAlive，不弹恢复提示；刷新重新进入才检查本机草稿。
+- 有候选草稿时停止自动写入并限制编辑；编辑页首次发现候选会以遮罩高亮草稿提示条，恢复或丢弃仍由该提示条处理。关闭引导后不会在 KeepAlive 切换时重复打断，默认值不会覆盖旧草稿。
+- 恢复后保留 dirty，绝不自动提交。版本不兼容时只允许查看旧草稿/丢弃，不自动覆盖当前服务器记录。
+- 关闭有未保存更改的页面时可保留草稿离开或丢弃草稿离开；关闭确认框的关闭按钮/取消关闭动作则继续编辑。批量关闭尚未完成时不会提前删除草稿，撤回许可同时撤回丢弃意图。
+- 正式提交前写入 pending 保护标记；明确拒绝后回到 editing；请求结果未知或写入已提交但回填未完成，重新进入不能作为普通草稿恢复并重复写入。
+- 服务器版本变化或缺少可比较版本时，编辑草稿不自动恢复。当前没有跨端草稿合并或提交状态查询端点，需要核实业务提交结果，不能通过清理浏览器数据当作重试方案。
+- 保存成功回填后清除原草稿，并随新编辑目标重新绑定 Key。清理失败会提示，不能认为旧草稿已经消失。
+- 存储失败可以重试；草稿启用时提交保护标记无法写入会阻止该次提交，避免留下可重复提交的旧草稿。
+
+白名单不等于加密。customer 为开发 Mock 验证接入，包含联系人和地址；正式业务上线前必须审定可落盘字段。密码、令牌、附件二进制和带凭证临时链接不要落盘。退出账号清理该账号草稿并使待执行旧写失效，其他账号及列偏好不一起删除。
+
+## 5. 列设置与未来后端
+
+`userDataStore.setRemoteAdapter(adapter)` 是统一远端入口。真实适配器位于对应 API 模块并负责认证、错误码和服务端原子版本检查；不能信任客户端 Key 作为鉴权依据。草稿不自动使用该适配器同步，以免把编辑中的本机数据直接覆盖远端；未来草稿远端策略须独立实现冲突选择与提交状态核实，业务白名单无需迁入 API。
+
+列设置先应用本地缓存，再于当前会话首次使用或 5 分钟检查期到达后的激活时读取后端；不是每次列表查询都请求配置，也不后台轮询。用户保存后本地立即生效并尝试远端提交；失败保留待同步标记和重试入口。迟到响应不能覆盖用户刚编辑的配置，退出会话后旧响应不能回写。无 adapter 时只使用本机存储，不产生虚构请求。
+
+后端仍须补齐 preference 的 read/write/remove、服务端修订号和版本冲突协议。当前测试适配器验证的是前端同步行为，不代表真实多端联调已完成。Excel 解析、校验和导入执行归后端，前端只呈现上传进度和处理结果，不在此存储层实现 Excel 导入。

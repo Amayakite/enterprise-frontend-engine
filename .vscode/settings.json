@@ -1,0 +1,24 @@
+{
+  "typescript.tsdk": "./node_modules/typescript/lib",
+  "typescript.enablePromptUseWorkspaceTsdk": true,
+  "npm.packageManager": "pnpm",
+  "editor.defaultFormatter": "esbenp.prettier-vscode",
+  "editor.formatOnSave": true,
+  "prettier.requireConfig": true,
+  "prettier.useEditorConfig": true,
+  "scss.lint.unknownAtRules": "ignore",
+  "files.exclude": {
+    "**/node_modules": true,
+    "dist": true,
+    ".vite": true,
+    ".playwright-mcp": true,
+    "src/types/generated": true
+  },
+  "search.exclude": {
+    "**/node_modules": true,
+    "dist": true,
+    ".vite": true,
+    ".playwright-mcp": true,
+    "src/types/generated": true
+  }
+}

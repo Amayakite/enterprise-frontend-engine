@@ -1,0 +1,4 @@
+{
+  "extends": "../../tsconfig.json",
+  "include": ["crud-s3.ts", "../../src/types/**/*.d.ts"]
+}

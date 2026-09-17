@@ -1,0 +1,63 @@
+# Dependencies
+node_modules/
+
+# Build output
+dist/
+dist-ssr/
+stats.html
+
+# Local env files
+*.local
+.env.local
+.env.*.local
+.env
+.env.*
+!.env.development
+!.env.production
+!.env.example
+!.env.*.example
+
+# Editor directories and files
+.idea/
+.vscode/*
+!.vscode/extensions.json
+!.vscode/settings.json
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Vite cache
+.vite/
+
+# Lock files (use pnpm)
+package-lock.json
+yarn.lock
+
+# Local history
+.history
+
+# Browser verification output
+.playwright-mcp/
+artifacts/
+playwright-report/
+test-results/
+coverage/
+
+# Logs and local caches
+*.log
+.pnpm-store/
+*.tsbuildinfo
+.cache/
+*.tmp
+*.swp
+*.swo
+
+# Local credentials (never commit private keys)
+*.key
+*.p12
+*.pfx

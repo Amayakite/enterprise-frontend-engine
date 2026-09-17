@@ -1,0 +1,4 @@
+{
+  "extends": "../../tsconfig.json",
+  "include": ["business-module.ts", "../../src/types/**/*.d.ts"]
+}

@@ -1,0 +1,4 @@
+# 使用预编译的文件监听模块；不运行这两个非必需的安装脚本。
+allowBuilds:
+  "@parcel/watcher": false
+  es5-ext: false
