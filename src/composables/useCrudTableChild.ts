@@ -35,7 +35,6 @@ export function useCrudTableChild<
   type Row = Model[K] extends readonly (infer Item extends object)[] ? Item : never;
   const locked = ref(false);
   // K 已被调用签名限制为对象数组；条件类型在泛型实现体内无法反向缩窄。
-  const value = () => cloneReadonlyModel<Model>(controller.state.model)[key] as Row[];
   const binding: CrudTableBinding<Row> = {
     get rows() {
       return controller.state.model[key as keyof typeof controller.state.model] as DeepReadonly<
@@ -113,7 +112,7 @@ export function useCrudTableChild<
           if (issue.rowKey !== undefined && issue.rowField)
             await port.focus(issue.rowKey, issue.rowField);
           else {
-            const first = value()[0];
+            const first = binding.rows[0];
             if (first) await port.focus("", "");
           }
         },

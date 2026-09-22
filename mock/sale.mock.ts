@@ -32,7 +32,6 @@ const schema = {
     operators: FIELD_QUERY_OPERATORS.boolean,
   },
 } as const satisfies QuerySchema;
-let sequence = 1;
 export default defineMock([
   {
     url: "pilot/sales/search",
@@ -93,7 +92,7 @@ export default defineMock([
         if (saleRows.some((row) => row.code === payload.code)) return failure("组织编码已存在");
         const row = {
           ...payload,
-          id: "sale-new-" + sequence++,
+          id: `sale-new-${crypto.randomUUID()}`,
           organizationId: "org-a",
           version: 0,
         };

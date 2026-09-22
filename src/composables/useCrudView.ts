@@ -1,3 +1,4 @@
+import { computed } from "vue";
 import { crudFormDisabledReason } from "@/components/business/crud/form-presentation";
 import { cloneReadonlyModel } from "@/components/business/fields/model";
 import { useCrudChange } from "./useCrudChange";
@@ -11,7 +12,7 @@ import type {
   CrudFormView,
   CrudDetailView,
 } from "@/components/business/crud/crud-view";
-import { useCrudPage } from "./useCrudPage";
+import { useCrudRuntime } from "./useCrudRuntime";
 
 /** 将同一控制器状态投射为 getter，不复制模型；解构返回的 state 对象仍能追踪更新。 */
 function projectState<A extends object, B extends object>(read: () => A, extra: B): A & B {
@@ -71,7 +72,7 @@ export function useCrudView<
 ): CrudListView<T, S> | CrudFormView<T, S> | CrudDetailView<T, S> {
   if (options.view === "list") {
     const { beforeQuery, afterQuery } = options.hooks ?? {};
-    const source = useCrudPage(module, {
+    const source = useCrudRuntime(module, {
       ...options,
       hooks: {
         beforeQuery: beforeQuery ? (input) => beforeQuery(hookInput(input)) : undefined,
@@ -119,13 +120,18 @@ export function useCrudView<
   }
   if (options.view === "detail") {
     const { beforeOpen, afterOpen } = options.hooks ?? {};
-    const source = useCrudPage(module, {
+    const source = useCrudRuntime(module, {
       ...options,
       hooks: {
         beforeOpen: beforeOpen ? (input) => beforeOpen(hookInput(input)) : undefined,
         afterOpen: afterOpen ? (input) => afterOpen(hookInput(input)) : undefined,
       },
     });
+    const descriptionModel = computed(() =>
+      source.detail.state.model
+        ? cloneReadonlyModel<T["Model"]>(source.detail.state.model)
+        : undefined
+    );
     return {
       state: projectState(() => source.detail.state, {
         custom: source.state,
@@ -174,7 +180,7 @@ export function useCrudView<
             fields,
             context,
             columns,
-            modelValue: cloneReadonlyModel<T["Model"]>(source.detail.state.model),
+            modelValue: descriptionModel.value!,
           };
         },
         host: source.host,
@@ -203,7 +209,7 @@ export function useCrudView<
   function createForm() {
     if (formOptions.view === "add") {
       const beforeOpen = formOptions.hooks?.beforeOpen;
-      return useCrudPage(module, {
+      return useCrudRuntime(module, {
         ...formOptions,
         hooks: {
           ...hooks,
@@ -212,7 +218,7 @@ export function useCrudView<
       });
     }
     const beforeOpen = formOptions.hooks?.beforeOpen;
-    return useCrudPage(module, {
+    return useCrudRuntime(module, {
       ...formOptions,
       hooks: {
         ...hooks,

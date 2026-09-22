@@ -16,7 +16,7 @@ import { createRequestChannel } from "@/utils/request-channel";
  * const changes = useCrudChange(source, options.hooks?.change);
  */
 export function useCrudChange<T extends BusinessModuleContract, S extends object>(
-  source: CrudFormPage<T, S>,
+  source: Pick<CrudFormPage<T, S>, "form" | "bindings" | "state">,
   callback: CrudViewFormHooks<T, S, "add">["change"]
 ) {
   const pending = ref(false);

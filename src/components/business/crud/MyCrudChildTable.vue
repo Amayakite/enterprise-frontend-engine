@@ -144,7 +144,8 @@ watch(() => props.binding.rows, notifyDraft);
 const hasDraft = ref(false);
 const pageNum = ref(1),
   pageSize = ref(props.pageSize);
-const rows = computed(() => cloneReadonlyModel<Row[]>(props.binding.rows));
+const sourceRows = computed(() => props.binding.rows);
+const rows = computed(() => cloneReadonlyModel<Row[]>(sourceRows.value));
 const paginated = computed(() => rows.value.length > props.pageSize);
 const pageRows = computed(() =>
   paginated.value

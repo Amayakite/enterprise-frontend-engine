@@ -1,5 +1,10 @@
-import { computed, shallowRef, watch } from "vue";
-import { cloneModel, sameModelValue, readonlyModel } from "@/components/business/fields/model";
+import { computed, shallowRef, watch, type DeepReadonly } from "vue";
+import {
+  cloneModel,
+  cloneReadonlyModel,
+  sameModelValue,
+  readonlyModel,
+} from "@/components/business/fields/model";
 import { compileLinks } from "@/components/business/fields/links";
 import type {
   ChangeReason,
@@ -16,7 +21,7 @@ export function useFormModel<M extends object, C>(
     /**
      * 受控字段/表单值；更新通过对应回调提交，保持声明类型。
      */
-    modelValue: M;
+    modelValue: M | DeepReadonly<M>;
 
     /**
      * 当前业务环境；传组织/权限范围等数据，不在公共组件写死客户业务值。
@@ -51,8 +56,10 @@ export function useFormModel<M extends object, C>(
     ) => void;
   }
 ) {
-  const model = shallowRef<M>(cloneModel(props.modelValue));
-  const snapshot = shallowRef<M>(cloneModel(props.modelValue));
+  const model = shallowRef<M>(cloneReadonlyModel<M>(props.modelValue));
+  const snapshot = shallowRef<M>(cloneReadonlyModel<M>(props.modelValue));
+  // 发布模型与内部模型各自拥有可变字段；普通输入仅复制 changes，保留其余分支。
+  let published = cloneReadonlyModel<M>(props.modelValue);
   const version = shallowRef(0);
   const entityVersion = shallowRef(0);
   const env = computed<FieldEnvironment<M, C>>(() => ({
@@ -64,9 +71,13 @@ export function useFormModel<M extends object, C>(
   // 初始化也检查图；错误配置不得等用户第一次输入才暴露。
   watch(applyLinks, () => {}, { immediate: true });
   function emitModel(next: M, patch: FormPatch<M>) {
-    model.value = cloneModel(next);
+    model.value = next;
+    published =
+      patch.reason === "hydrate" || patch.reason === "reset"
+        ? cloneModel(next)
+        : { ...published, ...cloneModel(patch.changes) };
     version.value++;
-    publish(cloneModel(next), patch);
+    publish(published, patch);
   }
   const pendingChanges = new Map<
     FieldKey<M>,
@@ -94,12 +105,7 @@ export function useFormModel<M extends object, C>(
     });
   }
   function applyPatch(patch: Partial<M>, reason: ChangeReason = "external", field?: FieldKey<M>) {
-    const result = applyLinks.value(
-      env.value,
-      props.createInitialModel(),
-      cloneModel(patch),
-      reason
-    );
+    const result = applyLinks.value(env.value, props.createInitialModel, cloneModel(patch), reason);
     if (Object.keys(result.changes).length) {
       if (field && (reason === "user" || reason === "dependency") && changes?.enabled()) {
         const pending = pendingChanges.get(field) ?? {
@@ -116,16 +122,19 @@ export function useFormModel<M extends object, C>(
       emitModel(result.model, { changes: result.changes, reason, field });
     }
   }
-  function hydrate(next: M) {
+  function hydrate(next: M | DeepReadonly<M>) {
     pendingChanges.clear();
     entityVersion.value++;
-    snapshot.value = cloneModel(next);
-    emitModel(next, { changes: cloneModel(next), reason: "hydrate" });
+    snapshot.value = cloneReadonlyModel<M>(next);
+    emitModel(cloneReadonlyModel<M>(next), {
+      changes: cloneReadonlyModel<M>(next),
+      reason: "hydrate",
+    });
   }
   function reset() {
     pendingChanges.clear();
     entityVersion.value++;
-    emitModel(snapshot.value, { changes: cloneModel(snapshot.value), reason: "reset" });
+    emitModel(cloneModel(snapshot.value), { changes: cloneModel(snapshot.value), reason: "reset" });
   }
   let entityKey = props.formKey;
   watch(
@@ -140,8 +149,12 @@ export function useFormModel<M extends object, C>(
       // 同步回写（包括父级浅拷贝）不重跑联动；深监听同时捕获父级原位修改。
       if (sameModelValue(next, model.value)) return;
       const patch: Partial<M> = {};
-      for (const key of Object.keys(next) as FieldKey<M>[])
-        if (!sameModelValue(next[key], model.value[key])) patch[key] = cloneModel(next[key]);
+      for (const key of Object.keys(next) as FieldKey<M>[]) {
+        // DeepReadonly 的条件映射在泛型处不能反推键；仅恢复同一模型字段的对应关系。
+        const value = next[key as keyof typeof next] as M[typeof key] | DeepReadonly<M[typeof key]>;
+        if (!sameModelValue(value, model.value[key]))
+          patch[key] = cloneReadonlyModel<M[typeof key]>(value);
+      }
       applyPatch(patch, "external");
     },
     { deep: true }

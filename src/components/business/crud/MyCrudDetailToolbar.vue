@@ -2,13 +2,13 @@
   <div>
     <div class="page-toolbar">
       <div class="page-toolbar__left">
-        <template v-for="action in actions" :key="action.key">
+        <template v-for="action in actionViews" :key="action.key">
           <ActionButton
-            v-if="controller.actionAvailability(action.key).visible"
+            v-if="action.availability.visible"
             :label="action.label"
             :tone="action.tone"
             :link="false"
-            :disabled-reason="controller.actionAvailability(action.key).reason"
+            :disabled-reason="action.availability.reason"
             :loading="controller.busyActionKey === action.key"
             @click="controller.runAction(action.key)"
           />
@@ -41,7 +41,7 @@
   </div>
 </template>
 <script setup lang="ts" generic="Model extends object, Entity, Id extends string | number">
-import { ref } from "vue";
+import { computed, ref } from "vue";
 import ActionButton from "../ActionButton.vue";
 import MyFeedback from "../feedback/MyFeedback.vue";
 import type { CrudDetailProps } from "./form-presentation";
@@ -54,6 +54,12 @@ const props = defineProps<
   }
 >();
 defineSlots<{ /** 附加详情业务操作。 */ actions?: () => unknown }>();
+const actionViews = computed(() =>
+  (props.actions ?? []).map((action) => ({
+    ...action,
+    availability: props.controller.actionAvailability(action.key),
+  }))
+);
 const navigationError = ref("");
 async function leave() {
   navigationError.value = "";

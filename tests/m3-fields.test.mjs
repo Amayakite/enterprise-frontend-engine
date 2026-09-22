@@ -339,3 +339,60 @@ test("参照确认在 ID、映射及同步依赖清空后仅通知一次，主�
   assert.equal(confirmed[1].reason, "dependency");
   ctx.close();
 });
+
+test("字段增量更新保持未变子表引用，发布模型和重置基线仍与内部模型隔离", async () => {
+  const ctx = mount({ ...initial(), custom: { tags: ["初始"] } });
+  try {
+    const internal = ctx.state.model.value.custom;
+    ctx.state.applyPatch({ note: "第一次" }, "user", "note");
+    await flush();
+    const published = ctx.props.modelValue.custom;
+    assert.equal(ctx.state.model.value.custom, internal);
+    assert.notEqual(published, internal);
+    ctx.state.applyPatch({ note: "第二次" }, "user", "note");
+    await flush();
+    assert.equal(ctx.state.model.value.custom, internal);
+    assert.equal(ctx.props.modelValue.custom, published);
+    // 受控宿主的原位修改不能同步污染内部模型，但仍按既有深监听合同回写。
+    published.tags.push("外部");
+    assert.deepEqual(internal.tags, ["初始"]);
+    await flush();
+    assert.deepEqual(ctx.state.model.value.custom.tags, ["初始", "外部"]);
+    ctx.state.reset();
+    await flush();
+    assert.deepEqual(ctx.state.model.value.custom.tags, ["初始"]);
+  } finally {
+    ctx.close();
+  }
+});
+
+test("普通输入不调用联动默认值工厂，clear 才读取一次且回调不能污染未变分支", () => {
+  let reads = 0;
+  const model = { source: 0, dependent: "old", children: [{ name: "safe" }] };
+  const initial = () => {
+    reads++;
+    return { ...model, dependent: "" };
+  };
+  const plain = compileLinks([])(
+    { model, context: {}, mode: "add" },
+    initial,
+    { source: 1 },
+    "user"
+  );
+  assert.equal(reads, 0);
+  assert.equal(plain.model.children, model.children);
+  const linked = compileLinks([
+    {
+      watch: ["source"],
+      writes: ["dependent"],
+      clear: ["dependent"],
+      apply: ({ model }) => {
+        model.children[0].name = "changed";
+        return {};
+      },
+    },
+  ])({ model, context: {}, mode: "add" }, initial, { source: 2 }, "user");
+  assert.equal(reads, 1);
+  assert.equal(linked.model.dependent, "");
+  assert.equal(model.children[0].name, "safe");
+});

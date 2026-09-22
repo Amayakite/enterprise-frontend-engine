@@ -41,6 +41,7 @@
 </template>
 
 <script setup lang="ts" generic="M extends object, C = undefined">
+import type { DeepReadonly } from "vue";
 import type { FormInstance } from "element-plus";
 import { focusFieldControl } from "@/utils/dom";
 import MyFormField from "./MyFormField.vue";
@@ -63,10 +64,10 @@ import { useFormModel } from "./useFormModel";
 import { useFieldDictionaries } from "@/composables/useFieldDictionaries";
 const props = defineProps<{
   /**
-   * 受控表单模型（v-model）；组件只通过事件回传不可变更新结果。
+   * 受控表单模型，接受普通对象或控制器只读模型；组件不修改输入，通过事件回传更新结果。
    * @example `<MyForm v-model="form" ... />`
    */
-  modelValue: M;
+  modelValue: M | DeepReadonly<M>;
   /** 用户确认后通知；文本 change、参照回填及同步 links 完成后触发。省略不追踪快照。
    * @example
    * <MyForm :change="onFieldChange" />
@@ -120,13 +121,13 @@ const props = defineProps<{
 }>();
 const emit = defineEmits<{
   /**
-   * 表单模型变更（v-model），始终为完整模型。
+   * 表单模型变更（v-model），始终为完整模型；未变分支可复用上次发布引用，非独立历史快照。
    * @example `<MyForm v-model="form" />`
    */
   "update:modelValue": [model: M];
   /**
-   * 本次变更的最小字段补丁，供宿主实现草稿或派生计算。
-   * @example `<MyForm @patch="({ amount }) => updateTax(amount)" />`
+   * 本次变更的最小字段补丁；CRUD 宿主用 changes 回写，避免替换未修改的子表。
+   * @example `<MyForm @patch="({ changes }) => controller.patch(changes)" />`
    */
   patch: [patch: FormPatch<M>];
 }>();

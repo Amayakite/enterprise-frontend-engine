@@ -8,7 +8,7 @@ import { cloneReadonlyModel } from "../fields/model";
 import type { AggregateBinding } from "./aggregate";
 import { compileModuleFields } from "./module-fields";
 import type { ModuleField } from "./module-fields";
-import { defineCrudConfig } from "./config";
+import { defineCrudConfig, validateCrudKeys } from "./config";
 import type { CrudListConfig, CrudFormConfig, CrudDetailConfig, CrudNavigation } from "./types";
 
 /**
@@ -260,66 +260,99 @@ export function defineBusinessModule<T extends BusinessModuleContract>() {
         throw new Error(`子表 ${key} 重复，不能覆盖同一个字段`);
     }
     const sections = children.map((child) => ({ key: child.modelKey, label: child.title }));
+    const listBase: List<T> = {
+      ...config.views.list,
+      actions: undefined,
+      fields: compiled.list,
+      columns: compiled.columns,
+      query: { schema: compiled.query, initial: queryInitial },
+      toQuery: (request, context) =>
+        config.views.list.toQuery(
+          automatic
+            ? { ...request, where: automatic.expand(request.where) as typeof request.where }
+            : request,
+          context
+        ),
+      request: config.api.list,
+    };
+    const createForm = (mode: "add" | "edit"): Form<T> => ({
+      ...config.views.form,
+      fields: compiled[mode],
+      sections,
+      childKeys: children.map((child) => child.modelKey),
+      createInitial: model.create,
+      load: config.api.detail,
+      toModel: model.fromRecord,
+      toCreate: model.toCreate,
+      toUpdate: model.toUpdate,
+      create: config.api.create,
+      update: config.api.update,
+      getKey: model.getKey,
+      resolveSaved: model.resolveSaved,
+      validate: async (input) => {
+        const model = cloneReadonlyModel<T["Model"]>(input.model);
+        const issues = children.flatMap((child) => child.validate(model));
+        const master = await config.views.form.validate?.(input);
+        if (master && !master.valid) issues.push(...master.issues);
+        return issues.length || (master && !master.valid)
+          ? { valid: false, issues }
+          : { valid: true };
+      },
+    });
+    const detailBase: Detail<T> = {
+      summary: config.views.detail?.summary,
+      beforeOpen: config.views.detail?.beforeOpen,
+      afterOpen: config.views.detail?.afterOpen,
+      load: config.api.detail,
+      toModel: model.fromRecord,
+      fields: compiled.detail,
+      tabs: sections,
+    };
+    const forms = { add: createForm("add"), edit: createForm("edit") };
+    // 与实例无关的合同只检查一次；动作工厂保留到对应场景首次读取时执行。
+    defineCrudConfig({ key: config.meta.key, list: listBase, form: forms.add, detail: detailBase });
+    defineCrudConfig({ key: config.meta.key, form: forms.edit });
     /**
-     * 装配当前页面的合同；不创建 controller、不加载数据。
-     * @param navigation 当前路由页的导航函数。
-     * @param mode 表单场景，默认 add；编辑页必须传 edit，并随缓存实例固定。
+     * 按需装配当前页面合同；同一 runtime 的场景配置复用，不创建 controller 或请求。
+     * @param navigation 当前路由实例的导航函数，仅对应场景动作工厂会读取。
+     * @param mode 表单场景，默认 add；编辑页传 edit。
+     * @returns 独立表单配置及延迟装配的列表、详情；静态字段配置只读复用。
      * @example
-     * `const config = customerModule.createRuntime(navigation, "edit");`
+     * const runtime = customerModule.createRuntime(navigation, "edit");
      */
     const createRuntime = (navigation: CrudNavigation<T["Id"]>, mode: "add" | "edit" = "add") => {
-      const list: List<T> = {
-        ...config.views.list,
-        fields: compiled.list,
-        columns: compiled.columns,
-        query: { schema: compiled.query, initial: queryInitial },
-        toQuery: (request, context) =>
-          config.views.list.toQuery(
-            automatic
-              ? { ...request, where: automatic.expand(request.where) as typeof request.where }
-              : request,
-            context
-          ),
-        request: config.api.list,
-        actions: config.views.list.actions?.(navigation),
-      };
-      const form: Form<T> = {
-        ...config.views.form,
-        fields: compiled[mode],
-        sections,
-        childKeys: children.map((child) => child.modelKey),
-        createInitial: model.create,
-        load: config.api.detail,
-        toModel: model.fromRecord,
-        toCreate: model.toCreate,
-        toUpdate: model.toUpdate,
-        create: config.api.create,
-        update: config.api.update,
-        getKey: model.getKey,
-        resolveSaved: model.resolveSaved,
-        validate: async (input) => {
-          const model = cloneReadonlyModel<T["Model"]>(input.model);
-          const issues = children.flatMap((child) => child.validate(model));
-          const master = await config.views.form.validate?.(input);
-          if (master && !master.valid) issues.push(...master.issues);
-          return issues.length || (master && !master.valid)
-            ? { valid: false, issues }
-            : { valid: true };
+      let list: List<T> | undefined;
+      let detail: Detail<T> | undefined;
+      const form: Form<T> = { ...forms[mode] };
+      return {
+        key: config.meta.key,
+        navigation,
+        form,
+        get list(): List<T> {
+          if (!list) {
+            const actions = config.views.list.actions?.(navigation);
+            validateCrudKeys(
+              config.meta.key,
+              (actions ?? []).map((action) => action.key),
+              "动作 key"
+            );
+            list = { ...listBase, actions };
+          }
+          return list;
+        },
+        get detail(): Detail<T> {
+          if (!detail) {
+            const actions = config.views.detail?.actions?.(navigation);
+            validateCrudKeys(
+              config.meta.key,
+              (actions ?? []).map((action) => action.key),
+              "详情动作 key"
+            );
+            detail = { ...detailBase, actions };
+          }
+          return detail;
         },
       };
-      const detail: Detail<T> = {
-        summary: config.views.detail?.summary,
-        beforeOpen: config.views.detail?.beforeOpen,
-        afterOpen: config.views.detail?.afterOpen,
-        load: config.api.detail,
-        toModel: model.fromRecord,
-        fields: compiled.detail,
-        tabs: sections,
-        actions: config.views.detail?.actions?.(navigation),
-      };
-      // 复用既有运行时诊断，但保留此标准模块已具备的能力类型，无需 config.form!。
-      defineCrudConfig({ key: config.meta.key, list, form, detail, navigation });
-      return { key: config.meta.key, list, form, detail, navigation };
     };
     // 仅参与推导，不创建运行时状态。
     const marker: {

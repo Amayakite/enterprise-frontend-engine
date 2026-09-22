@@ -10,7 +10,12 @@ import {
   ref,
   watch,
 } from "vue";
-import { cloneModel, cloneReadonlyModel, sameModelValue } from "@/components/business/fields/model";
+import {
+  cloneModel,
+  cloneReadonlyModel,
+  readonlyModel,
+  sameModelValue,
+} from "@/components/business/fields/model";
 import { createRequestChannel } from "@/utils/request-channel";
 import { crudPermission } from "./useCrudActions";
 import { invalidateView } from "./useViewInvalidation";
@@ -193,7 +198,7 @@ export function useCrudForm<
     phase.value === "committing" ||
     phase.value === "validating" ||
     phase.value === "loading";
-  const snapshot = <T>(value: T) => readonly(shallowRef(cloneModel(value))).value;
+  const snapshot = readonlyModel;
   const message = (cause: unknown) => (cause instanceof Error ? cause.message : "操作失败，请重试");
   function lock(value: boolean) {
     children.forEach((child) => child.lock(value));
@@ -237,7 +242,7 @@ export function useCrudForm<
     try {
       const guard = await config.beforeClose?.(
         { dirty: dirty.value, target: cloneModel(target.value) },
-        { context: snapshot(options.context()), signal: new AbortController().signal }
+        { context: snapshot<C>(options.context()), signal: new AbortController().signal }
       );
       if (guard && !guard.proceed) {
         error.value = guard.reason;
@@ -343,7 +348,7 @@ export function useCrudForm<
       const input = {
         target: cloneModel(next),
         signal: run.signal,
-        context: snapshot(options.context()),
+        context: snapshot<C>(options.context()),
       };
       const defaults = config.beforeOpen ? await config.beforeOpen(input) : undefined;
       if (!alive || !run.isCurrent()) return false;
@@ -490,7 +495,7 @@ export function useCrudForm<
         baseline: snapshot(baseline.value),
         target: cloneModel(target.value),
         signal: run.signal,
-        context: snapshot(options.context()),
+        context: snapshot<C>(options.context()),
       };
       const valid = () => current() && revision === version;
       const results: CrudValidation<Model>[] = [];

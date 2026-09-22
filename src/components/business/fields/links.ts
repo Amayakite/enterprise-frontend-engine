@@ -1,7 +1,15 @@
 import { cloneModel, sameModelValue } from "./model";
 import type { ChangeReason, FieldEnvironment, FieldKey, FieldLink } from "./types";
 
-/** 编译并校验字段联动依赖，返回可复用执行器；检测非法依赖以避免反复循环更新。 */
+/**
+ * 编译并校验字段联动依赖，返回同步增量执行器；非法依赖在编译时抛错。
+ * @param links 字段写入规则；每次事务按依赖顺序执行，apply 收到隔离模型，不修改输入。
+ * @returns 执行器接收环境、默认模型或默认模型工厂、补丁及原因；返回新根对象和变化字段。
+ * 默认模型工厂仅在 clear 规则实际触发时调用一次。未变分支复用输入引用，需独立快照时显式克隆。
+ * @example
+ * const apply = compileLinks(links);
+ * const next = apply(env, createInitialModel, { name: "新名称" }, "user");
+ */
 export function compileLinks<M, C>(links: readonly FieldLink<M, C>[]) {
   const edges = new Map<FieldKey<M>, Set<FieldKey<M>>>();
   for (const link of links) {
@@ -32,12 +40,12 @@ export function compileLinks<M, C>(links: readonly FieldLink<M, C>[]) {
   );
   return (
     env: FieldEnvironment<M, C>,
-    initial: M,
+    initial: M | (() => M),
     patch: Partial<M>,
     reason: ChangeReason
   ): {
     /**
-     * 当前页面模型；表单字段与联动使用它，不等同于后端保存 DTO。
+     * 当前页面的新根模型；变化字段已克隆，未变化分支复用输入引用，不等同于保存 DTO。
      */
     model: M;
     /**
@@ -45,7 +53,9 @@ export function compileLinks<M, C>(links: readonly FieldLink<M, C>[]) {
      */
     changes: Partial<M>;
   } => {
-    const model = cloneModel(env.model) as M;
+    // 只替换声明写入的字段；未变分支共享只读输入，业务 apply 仍接收隔离快照。
+    const model = { ...env.model } as M;
+    let defaults: M | undefined;
     const changes: Partial<M> = {};
     const changed = new Set<FieldKey<M>>();
     const writers = new Map<FieldKey<M>, unknown>();
@@ -75,7 +85,10 @@ export function compileLinks<M, C>(links: readonly FieldLink<M, C>[]) {
           if (!link.writes.includes(key)) throw new Error(`联动未声明写字段：${key}`);
           write(key, mapped[key] as M[FieldKey<M>], true);
         }
-        for (const key of link.clear ?? []) write(key, initial[key], true);
+        for (const key of link.clear ?? []) {
+          defaults ??= typeof initial === "function" ? (initial as () => M)() : initial;
+          write(key, defaults[key], true);
+        }
       }
     }
     return { model, changes };

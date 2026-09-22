@@ -62,7 +62,7 @@
                 :label="action.label"
                 :tone="action.tone"
                 :icon="action.icon ?? Operation"
-                :disabled-reason="controller.actionAvailability(action.key).reason"
+                :disabled-reason="action.availability.reason"
                 :loading="controller.state.busyActionKey === action.key"
                 @click="controller.runAction(action.key)"
               />
@@ -188,7 +188,7 @@
         </template>
         <template
           v-if="navigation?.detail || navigation?.edit || rowActions.length"
-          #actions="{ rowKey }"
+          #actions="{ row, rowKey }"
         >
           <el-button
             v-if="navigation?.detail"
@@ -204,13 +204,11 @@
             label="编辑"
             tone="primary"
             :disabled="busy"
-            :disabled-reason="editDisabledReason(rowKey)"
+            :disabled-reason="editDisabledReason(row)"
             @click="navigate(() => navigation!.edit!(rowKey))"
           />
           <el-dropdown
-            v-if="
-              rowActions.some((action) => controller.actionAvailability(action.key, rowKey).visible)
-            "
+            v-if="rowActionViews.get(rowKey)?.some((action) => action.availability.visible)"
             :disabled="busy"
             trigger="click"
             @command="controller.runAction($event, rowKey)"
@@ -218,19 +216,15 @@
             <el-button link type="primary" :disabled="busy">更多</el-button>
             <template #dropdown>
               <el-dropdown-menu>
-                <template v-for="action in rowActions" :key="action.key">
+                <template v-for="action in rowActionViews.get(rowKey)" :key="action.key">
                   <el-dropdown-item
-                    v-if="controller.actionAvailability(action.key, rowKey).visible"
+                    v-if="action.availability.visible"
                     :command="action.key"
-                    :disabled="!!controller.actionAvailability(action.key, rowKey).reason"
+                    :disabled="!!action.availability.reason"
                   >
-                    <span :title="controller.actionAvailability(action.key, rowKey).reason">
+                    <span :title="action.availability.reason">
                       {{ action.label
-                      }}{{
-                        controller.actionAvailability(action.key, rowKey).reason
-                          ? `（${controller.actionAvailability(action.key, rowKey).reason}）`
-                          : ""
-                      }}
+                      }}{{ action.availability.reason ? `（${action.availability.reason}）` : "" }}
                     </span>
                   </el-dropdown-item>
                 </template>
@@ -373,13 +367,28 @@ const busy = computed(
     props.controller.state.loading || !!props.controller.state.busyActionKey || !!props.batch?.busy
 );
 const toolbarActions = computed(() =>
-  (props.config.actions ?? []).filter(
-    (action) =>
-      action.location === "toolbar" && props.controller.actionAvailability(action.key).visible
-  )
+  (props.config.actions ?? [])
+    .filter((action) => action.location === "toolbar")
+    .map((action) => ({ ...action, availability: props.controller.actionAvailability(action.key) }))
+    .filter((action) => action.availability.visible)
 );
 const rowActions = computed(() =>
   (props.config.actions ?? []).filter((action) => action.location === "row")
+);
+const rowActionViews = computed(
+  () =>
+    new Map(
+      rows.value.map((row) => {
+        const key = props.config.getKey(row);
+        return [
+          key,
+          rowActions.value.map((action) => ({
+            ...action,
+            availability: props.controller.actionAvailability(action.key, key),
+          })),
+        ];
+      })
+    )
 );
 const selection = computed(() =>
   props.config.selection && props.config.selection !== "none"
@@ -458,15 +467,10 @@ function onColumnResize(value: { key: Extract<keyof Row, string>; width: number 
 function onPagination(value: { page: number; limit: number }) {
   return props.controller.setPage(value.page, value.limit);
 }
-function editDisabledReason(rowKey: Id) {
-  if (!props.config.editDisabledReason) return;
-  const row = props.controller.state.rows.find(
-    (item) => props.config.getKey(cloneReadonlyModel<Row>(item)) === rowKey
-  );
-  return row
-    ? props.config.editDisabledReason?.(cloneReadonlyModel<Row>(row), props.context)
-    : "记录已变化";
+function editDisabledReason(row: Readonly<Row>) {
+  return props.config.editDisabledReason?.(cloneReadonlyModel<Row>(row), props.context);
 }
+
 const columnSlot = (key: Extract<keyof Row, string>) =>
   `column-${key}` as Exclude<keyof typeof slots, "toolbar-left" | "toolbar-right">;
 const querySlots = computed(() =>

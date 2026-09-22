@@ -25,6 +25,35 @@ const sale = (await import("../mock/sale.mock.ts")).default;
 const { saleRows } = await import("../mock/sale-data.ts");
 const { saleReference } = await import("../src/pages/base/sale/references.ts");
 
+test("独立加载的 Mock 端点共享新增销售组织，客户保存可解析其名称", async () => {
+  const independent = await import(
+    new URL("../mock/sale-data.ts?consumer=customer", import.meta.url).href
+  );
+  const { createCustomerSeeds, validateCustomerPayload, materializeCustomer } =
+    await import("../mock/customer-data.ts");
+  const record = {
+    id: "sale-shared-test",
+    code: "SALE-SHARED",
+    name: "跨端点共享组织",
+    active: true,
+    remark: "",
+    organizationId: "org-a",
+    version: 0,
+  };
+  saleRows.push(record);
+  try {
+    assert.equal(
+      independent.saleRows.find((row) => row.id === record.id),
+      record
+    );
+    const payload = { ...createCustomerSeeds()[0], saleId: record.id };
+    assert.equal(validateCustomerPayload(payload), undefined);
+    assert.equal(materializeCustomer(payload, "customer-shared", "C-SHARED").saleName, record.name);
+  } finally {
+    saleRows.splice(saleRows.indexOf(record), 1);
+  }
+});
+
 function endpoint(url, method) {
   const result = sale.find((item) => item.url === url && item.method.includes(method));
   assert.ok(result, `${method} ${url} 不存在`);

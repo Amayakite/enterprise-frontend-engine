@@ -22,7 +22,7 @@ globalThis.__pageBase = () => ({
 });
 registerHooks({
   resolve(specifier, context, next) {
-    if (specifier === "./useBusinessPage" && context.parentURL?.endsWith("/useCrudPage.ts"))
+    if (specifier === "./useBusinessPage" && context.parentURL?.endsWith("/useCrudRuntime.ts"))
       return {
         url: "data:text/javascript,export const useBusinessPage = () => globalThis.__pageBase()",
         shortCircuit: true,
@@ -545,7 +545,7 @@ test("同一编辑实体整体回填不清级联值，后续用户修改仍联�
           context: {},
           links: [{ watch: ["province"], writes: ["city"], apply: () => ({ city: null }) }],
         },
-        (model) => controller.patch(model),
+        (_model, patch) => controller.patch(patch.changes),
         { enabled: () => true, emit: (event) => events.push(event) }
       );
       return () => h("div");
@@ -572,4 +572,96 @@ test("同一编辑实体整体回填不清级联值，后续用户修改仍联�
   assert.equal(events.length, 1);
   app.unmount();
   view.close();
+});
+
+test("主字段补丁经过表单和控制器后保持子表引用，保存仍包含完整子表", async () => {
+  const { useFormModel } = await import("../src/components/business/MyForm/useFormModel.ts");
+  const view = mount(
+    { view: "add" },
+    { form: { createInitial: () => ({ name: "", lines: [{ value: 1 }] }) } }
+  );
+  await ready(view);
+  const controller = view.page.form;
+  let fields;
+  const app = renderer.createApp({
+    setup() {
+      fields = useFormModel(
+        {
+          get modelValue() {
+            return controller.state.model;
+          },
+          context: {},
+          createInitialModel: () => ({ name: "", lines: [] }),
+        },
+        (_model, patch) => controller.patch(patch.changes)
+      );
+      return () => h("div");
+    },
+  });
+  app.mount({});
+  try {
+    const rows = controller.state.model.lines;
+    fields.applyPatch({ name: "changed" }, "user", "name");
+    await flush();
+    assert.equal(controller.state.model.lines, rows);
+    assert.equal(controller.state.dirty, true);
+    await controller.save();
+    assert.deepEqual(view.events.find((event) => event[0] === "write")[1].lines, [{ value: 1 }]);
+  } finally {
+    app.unmount();
+    view.close();
+  }
+});
+
+test("动作状态只读取一次上下文，点击执行仍重新校验最新条件", async () => {
+  const { useCrudActions } = await import("../src/composables/useCrudActions.ts");
+  let actions,
+    reads = 0,
+    writes = 0,
+    allowed = true;
+  const action = {
+    key: "update",
+    label: "更新",
+    location: "row",
+    disabledReason: () => (allowed ? undefined : "已锁定"),
+    execute: async () => {
+      writes++;
+      return { kind: "success", message: "完成", refresh: "none" };
+    },
+  };
+  const app = renderer.createApp({
+    setup() {
+      actions = useCrudActions({
+        actions: [action],
+        context: () => ({ selectedRows: [], selectedKeys: [], context: {} }),
+        row: (key, signal) => {
+          reads++;
+          return {
+            row: { id: key },
+            rowKey: key,
+            signal,
+            context: {},
+            selectedRows: [],
+            selectedKeys: [],
+          };
+        },
+        revision: () => 0,
+        session: () => 0,
+        disabled: () => false,
+        refresh: async () => {},
+      });
+      return () => h("div");
+    },
+  });
+  app.mount({});
+  try {
+    assert.equal(actions.availability(action, 0).visible, true);
+    assert.equal(reads, 1);
+    allowed = false;
+    await actions.run("update", 0);
+    assert.equal(reads, 2);
+    assert.equal(writes, 0);
+  } finally {
+    app.unmount();
+  }
 });

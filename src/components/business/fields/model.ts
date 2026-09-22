@@ -2,7 +2,7 @@ import { readonly, shallowRef } from "vue";
 import type { DeepReadonly } from "vue";
 
 /** 将只读公共视图复制为独立可编辑值；断言仅恢复克隆后的可变性。 */
-export function cloneReadonlyModel<T>(value: DeepReadonly<T>): T {
+export function cloneReadonlyModel<T>(value: T | DeepReadonly<T>): T {
   return cloneModel(value) as T;
 }
 
@@ -41,6 +41,10 @@ export function sameModelValue(left: unknown, right: unknown): boolean {
  * @example
  * `const input = readonlyModel(model);`
  */
-export function readonlyModel<T>(value: T): DeepReadonly<T> {
-  return readonly(shallowRef(cloneModel(value))).value;
+export function readonlyModel<T>(value: T): DeepReadonly<T>;
+/** 接受已有深只读输入；显式泛型保留原模型合同，不叠加 DeepReadonly。 */
+export function readonlyModel<T>(value: DeepReadonly<T>): DeepReadonly<T>;
+/** 快照实现；克隆后再施加只读代理，不共享输入的可变对象。 */
+export function readonlyModel<T>(value: T | DeepReadonly<T>): DeepReadonly<T> {
+  return readonly(shallowRef(cloneReadonlyModel<T>(value))).value;
 }

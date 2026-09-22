@@ -2,7 +2,21 @@ import type { QuerySchema } from "@/components/business/search/types";
 import type { CrudConfig } from "./types";
 
 /**
- * 定义并在开发期校验一个模块的 CRUD 总配置。
+ * 校验配置键非空且唯一；静态字段在模块定义时检查，动态动作在实例装配时检查。
+ * @param owner 模块稳定 key，用于错误定位。
+ * @param values 当前配置的键列表；不修改输入。
+ * @param label 配置名称，用于错误提示。
+ * @throws 存在空白或重复 key 时抛错。
+ * @example
+ * validateCrudKeys("base.customer", actions.map(action => action.key), "动作 key");
+ */
+export function validateCrudKeys(owner: string, values: readonly string[], label: string) {
+  if (values.some((value) => !value.trim()) || new Set(values).size !== values.length)
+    throw new Error(`${owner}：${label}为空或重复`);
+}
+
+/**
+ * 定义并校验一个模块的 CRUD 总配置。
  *
  * @typeParam Row 列表行类型。
  * @typeParam Entity 服务端详情实体。
@@ -41,8 +55,7 @@ export function defineCrudConfig<
 ) {
   if (!config.key.trim()) throw new Error("CRUD 模块 key 不能为空");
   const unique = (values: readonly string[], label: string) => {
-    if (values.some((value) => !value.trim()) || new Set(values).size !== values.length)
-      throw new Error(`${config.key}：${label}为空或重复`);
+    validateCrudKeys(config.key, values, label);
   };
   const functions = (value: object, keys: readonly string[]) => {
     for (const key of keys)

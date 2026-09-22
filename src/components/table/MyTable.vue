@@ -483,7 +483,18 @@ const environment = (model: Readonly<Row>): FieldEnvironment<Row, C> => ({
   context: props.context,
   mode: "edit",
 });
-const fieldFor = (key: FieldKey<Row>) => props.fields?.find((field) => field.key === key);
+const fieldsByKey = computed(() => new Map(props.fields?.map((field) => [field.key, field])));
+const fieldFor = (key: FieldKey<Row>) => fieldsByKey.value.get(key);
+const editableFields = computed(() => {
+  const row = draft.session.value?.draft;
+  return new Map(
+    row
+      ? normalizeFields(props.fields ?? [], environment(row))
+          .filter((entry) => entry.form?.visible && !entry.form.readonly)
+          .map((entry) => [entry.field.key, entry.field])
+      : []
+  );
+});
 function fixedRequired(key: FieldKey<Row>) {
   if (!props.edit) return false;
   const form = fieldFor(key)?.form;
@@ -506,12 +517,9 @@ function dynamicRequired(key: FieldKey<Row>, row: Readonly<Row>) {
   return form?.visible && form.required;
 }
 function editableField(key: FieldKey<Row>) {
-  const row = draft.session.value?.draft;
-  if (!row) return;
-  return normalizeFields(props.fields ?? [], environment(row)).find(
-    (entry) => entry.field.key === key && entry.form?.visible && !entry.form.readonly
-  )?.field;
+  return editableFields.value.get(key);
 }
+
 function changeValue(
   key: FieldKey<Row>,
   value: Row[FieldKey<Row>],

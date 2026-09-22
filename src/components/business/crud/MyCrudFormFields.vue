@@ -5,14 +5,14 @@
     :change="change"
     :fields="fields"
     :context="context"
-    :create-initial-model="() => model"
+    :create-initial-model="() => cloneReadonlyModel<Model>(model)"
     :mode="target.mode"
     :readonly="blocked"
     :form-key="hydrationKey"
     :links="links"
     :columns="columns"
     :density="density"
-    @update:model-value="controller.patch"
+    @patch="onPatch"
   >
     <template v-if="$slots.default" #default="layout"><slot v-bind="layout" /></template>
     <template
@@ -34,6 +34,7 @@
 <script setup lang="ts" generic="Model extends object, Entity, Id extends string | number, C">
 import { computed, ref, onBeforeUnmount } from "vue";
 import MyForm from "../MyForm/index.vue";
+import type { FormPatch } from "../fields/types";
 import { cloneReadonlyModel } from "../fields/model";
 import type { MyFormExpose, FieldKey, FormFieldBinding } from "../fields/types";
 import type { CrudFormSlots, CrudTarget } from "./types";
@@ -62,7 +63,10 @@ const form = ref<MyFormExpose<Model>>();
 const hydrationKey = computed(() =>
   JSON.stringify([props.entityKey, props.controller.state.hydrationRevision])
 );
-const model = computed(() => cloneReadonlyModel<Model>(props.controller.state.model));
+const model = computed(() => props.controller.state.model);
+function onPatch(patch: FormPatch<Model>) {
+  props.controller.patch(patch.changes);
+}
 const target = computed(() => cloneReadonlyModel<CrudTarget<Id>>(props.controller.state.target));
 const blocked = computed(() => !!crudFormDisabledReason(props.controller, props.readonlyReason));
 const fieldSlot = (key: FieldKey<Model>) =>

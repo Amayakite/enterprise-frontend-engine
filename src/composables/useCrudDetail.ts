@@ -1,4 +1,4 @@
-import { onBeforeUnmount, readonly, shallowRef, watch, type DeepReadonly } from "vue";
+import { computed, onBeforeUnmount, readonly, shallowRef, watch, type DeepReadonly } from "vue";
 import { cloneModel, readonlyModel } from "@/components/business/fields/model";
 import { createRequestChannel } from "@/utils/request-channel";
 import type { CrudDetailConfig, CrudDetailController } from "@/components/business/crud/types";
@@ -54,11 +54,16 @@ export function useCrudDetail<Entity, Model, Id extends string | number, C>(
       };
     }
   }
-  const actions = useCrudActions({
+  const actionContext = computed(() => readonlyModel<C>(context()));
+  const entity = computed(() => state.value.entity);
+  const actionEntity = computed(() =>
+    entity.value === null ? null : readonlyModel<Entity>(entity.value)
+  );
+  const actions = useCrudActions<Entity, Id, C>({
     actions: config.actions ?? [],
     context: (signal) => ({
       signal,
-      context: cloneModel(context()),
+      context: actionContext.value,
       selectedRows: [],
       selectedKeys: [],
     }),
@@ -66,11 +71,11 @@ export function useCrudDetail<Entity, Model, Id extends string | number, C>(
       state.value.id === id && state.value.entity !== null
         ? {
             signal,
-            context: cloneModel(context()),
+            context: actionContext.value,
             selectedRows: [],
             selectedKeys: [],
             rowKey: id,
-            row: readonly(shallowRef(cloneModel(state.value.entity))).value,
+            row: actionEntity.value!,
           }
         : undefined,
     disabled: () => state.value.phase !== "ready",

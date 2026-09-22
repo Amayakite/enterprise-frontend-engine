@@ -43,24 +43,18 @@ export function useCrudActions<Row, Id extends string | number, C>(options: {
   const abort = new AbortController();
   function availability(action: CrudAction<Row, Id, C>, key?: Id, ownLock = false) {
     if (!crudPermission(action.permission)) return { visible: false, reason: "无操作权限" };
-    const context =
-      action.location === "row"
-        ? key === undefined
-          ? undefined
-          : options.row(key, abort.signal)
-        : options.context(abort.signal);
-    if (!context) return { visible: false, reason: "记录已变化" };
     const evaluate = <T>(
       entry: { visible?: (value: T) => boolean; disabledReason?: (value: T) => string | undefined },
-      value: T
-    ) => ({
-      visible: entry.visible?.(value) ?? true,
-      reason: entry.disabledReason?.(value),
-    });
+      value: T | undefined
+    ) =>
+      value === undefined
+        ? undefined
+        : { visible: entry.visible?.(value) ?? true, reason: entry.disabledReason?.(value) };
     const view =
       action.location === "row"
-        ? evaluate(action, options.row(key!, abort.signal)!)
+        ? evaluate(action, key === undefined ? undefined : options.row(key, abort.signal))
         : evaluate(action, options.context(abort.signal));
+    if (!view) return { visible: false, reason: "记录已变化" };
     return {
       visible: view.visible,
       reason: options.disabled()
