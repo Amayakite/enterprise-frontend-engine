@@ -23,6 +23,9 @@
 
 ## 参照导航与最简模块
 
+- [后端接口契约草案](./backend-contract-draft.md)：客户/销售组织当前 DTO、请求示例及联调前待确认事项。
+- 命名查询方案见 [用户数据指南](./user-data-guide.md#命名查询方案)；开发验收入口与测试分层见 [CRUD 指南](./crud-development-guide.md#开发验收与验证分层)。
+
 - [Sale 最简标准模块](./sale-example.md)：无子表四页 CRUD、客户参照跳转配置及开发权限预览入口。
 
 - 参照导航、局部回写见[组件指南](./business-components-guide.md#参照查看与前往新增)；页面意图、CSS 光圈与 SVG 遮罩见 [CRUD 指南](./crud-development-guide.md#页面意图与新增引导)。以当前源码合同为准。

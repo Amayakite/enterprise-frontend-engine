@@ -322,6 +322,11 @@ export interface CrudListConfig<
   pageSize?: number;
   /** 初始排序；字段必须是后端允许排序的字段。 */
   initialSort?: TableSort<Row>;
+  /** 本机命名查询方案；省略时关闭。由统一页面提供账号/模块/范围身份。
+   * @example
+   * `queryPresets: { version: 1 }`
+   */
+  queryPresets?: import("../search/query-presets").QueryPresetOptions;
   /** 是否启用行选择，默认 none。 */
   selection?: "none" | "single" | "multiple";
   /** 工具栏或行级动作配置。 */
@@ -651,6 +656,8 @@ export interface CrudListState<Row, Id extends string | number, S extends QueryS
 }
 /** 公共列表控制器；供 MyCrudList 和页面插槽使用，业务只调用公开命令。 */
 export interface CrudListController<Row, Id extends string | number, S extends QuerySchema> {
+  /** 本机查询方案端口；仅配置 queryPresets 且装配存储身份后提供。 */
+  readonly presets?: import("../search/query-presets").QueryPresetController;
   /**
    * 控制器只读响应式状态；模板可读取，业务更新必须通过公开方法，不能直接赋值。
    */

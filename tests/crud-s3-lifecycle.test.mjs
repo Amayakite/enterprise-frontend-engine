@@ -116,6 +116,60 @@ const listConfig = (overrides = {}) => ({
 const defaultContext = () => ({ org: "a" });
 const clone = (value) => JSON.parse(JSON.stringify(value));
 
+test("命名方案在首次查询前加载默认条件，换组织不串方案，失效默认阻止自动全量查询", async () => {
+  const context = ref({ org: "preset-a" });
+  const requests = [];
+  const preference = () => ({
+    user: "list-preset-integration",
+    module: "test.preset",
+    version: "1",
+    scope: context.value.org,
+  });
+  const config = (version) =>
+    listConfig({
+      columns: [{ key: "name", label: "名称", sortable: true }],
+      queryPresets: { version },
+      request: async (value) => {
+        requests.push(value);
+        return { list: [], total: 0 };
+      },
+    });
+  const settle = async () => {
+    for (let i = 0; i < 30; i++) await flush();
+  };
+  const first = mount(() => useCrudList(config(1), () => context.value, { preference }));
+  await settle();
+  assert.equal(requests.length, 1);
+  const draft = createQueryDraft(schema, empty);
+  draft.quick[0].value = "指定条件";
+  first.state.setDraft(draft);
+  await first.state.applyQuery();
+  await first.state.setSort({ key: "name", order: "desc" });
+  assert.equal(await first.state.presets.save("默认方案"), true);
+  await first.state.presets.setDefault(first.state.presets.items[0].id);
+  first.close();
+  requests.length = 0;
+  const second = mount(() => useCrudList(config(1), () => context.value, { preference }));
+  await settle();
+  assert.equal(requests.length, 1);
+  assert.equal(requests[0].where.children[0].value, "指定条件");
+  assert.deepEqual(requests[0].sort, { key: "name", order: "desc" });
+  context.value = { org: "preset-b" };
+  await settle();
+  assert.equal(requests.length, 2);
+  assert.equal(requests[1].where, null);
+  assert.equal(second.state.presets.items.length, 0);
+  second.close();
+  requests.length = 0;
+  context.value = { org: "preset-a" };
+  const incompatible = mount(() => useCrudList(config(2), () => context.value, { preference }));
+  await settle();
+  assert.equal(requests.length, 0);
+  assert.match(incompatible.state.presets.error, /升级/);
+  assert.equal(incompatible.state.state.loading, false);
+  incompatible.close();
+});
+
 test("S3 列表首次只读一次；草稿不使已应用视图失效，0 与字符串 ID 区分", async () => {
   let requests = 0,
     appliedChanges = 0;

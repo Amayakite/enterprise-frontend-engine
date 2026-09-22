@@ -130,6 +130,7 @@
               <el-button link :icon="Delete" :disabled="loading" @click="clear">清空条件</el-button>
             </div>
             <span v-else class="query-panel__status">当前未设置筛选条件</span>
+            <slot name="filter-extra" :close="closeFilter" />
           </div>
         </el-popover>
         <el-tooltip v-if="compact" content="刷新当前查询">
@@ -330,6 +331,14 @@ const slots = defineSlots<
   {
     "commands-start"?: () => unknown;
     "commands-end"?: () => unknown;
+    /** 筛选弹层内的附加子项；仅 compact 显示。close 关闭弹层，不改变查询草稿。
+     * @example
+     * `<template #filter-extra="{ close }"><QueryPresets @navigate="close" ... /></template>`
+     */
+    "filter-extra"?: (context: {
+      /** 打开独立管理窗口或应用方案后调用；不销毁持久化弹层内的组件状态。 */
+      close: () => void;
+    }) => unknown;
   } & {
     [K in Extract<keyof S, string> as `query-${K}`]?: (value: {
       draft: QueryDraft<S>;
@@ -364,6 +373,9 @@ const inlineSearch = computed(() => {
 });
 const issues = shallowRef<readonly QueryIssue[]>([]);
 const filterOpen = ref(false);
+function closeFilter() {
+  filterOpen.value = false;
+}
 const normalOpen = ref(false),
   advancedOpen = ref(false);
 const root = ref<HTMLElement>(),

@@ -1,5 +1,6 @@
 <template>
   <div class="page-container">
+    <PresentationChecks />
     <el-alert
       title="S3 装配实验：Mock 仅在开发服务进程内保留，重启重置；真实后端尚未联调。"
       type="info"
@@ -129,6 +130,7 @@
   </div>
 </template>
 <script setup lang="ts">
+import PresentationChecks from "./PresentationChecks.vue";
 import { computed, reactive, ref } from "vue";
 import { useCrudList } from "@/composables/useCrudList";
 import { useCrudForm } from "@/composables/useCrudForm";

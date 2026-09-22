@@ -83,10 +83,16 @@
           />
         </el-tooltip>
       </template>
+      <template v-if="controller.presets" #filter-extra="{ close }">
+        <QueryPresets :controller="controller.presets" :disabled="busy" @navigate="close" />
+      </template>
       <template v-for="key in querySlots" :key="key" #[key]>
         <slot :name="key" :draft="controller.state.draft" :set-draft="controller.setDraft" />
       </template>
     </QueryPanel>
+    <MyFeedback v-if="controller.presets?.error" :message="controller.presets.error" tone="warning">
+      <el-button link @click="controller.presets.reload">重试读取方案</el-button>
+    </MyFeedback>
     <MyFeedback
       v-if="pageIntent.intent.value"
       :message="intentMessage"
@@ -282,6 +288,7 @@ import { diagnoseCrudSlots } from "./config";
 import { cloneReadonlyModel } from "@/components/business/fields/model";
 import { createQueryDraft } from "@/components/business/search/model";
 import QueryPanel from "@/components/business/search/QueryPanel.vue";
+import QueryPresets from "@/components/business/search/QueryPresets.vue";
 import MyTable from "@/components/table/MyTable.vue";
 import Pagination from "@/components/common/Pagination.vue";
 import ActionButton from "@/components/business/ActionButton.vue";

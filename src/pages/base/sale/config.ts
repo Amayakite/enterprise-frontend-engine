@@ -107,6 +107,7 @@ export const saleModule = defineBusinessModule<SaleContract>()({
       summary: { titleField: "name", descriptionFields: ["code"], statusFields: ["active"] },
     },
     list: {
+      queryPresets: { version: 1 },
       getKey: (row) => row.id,
       scope: (context) => ({
         key: context.scopeKey,

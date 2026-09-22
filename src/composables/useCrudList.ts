@@ -8,8 +8,10 @@ import {
   type DeepReadonly,
 } from "vue";
 import { useSearchQuery } from "./useSearchQuery";
+import { useQueryPresets } from "./useQueryPresets";
+import type { CrudColumnIdentity } from "./useCrudColumns";
 import { useCrudActions } from "./useCrudActions";
-import { cloneModel, readonlyModel } from "@/components/business/fields/model";
+import { cloneModel, cloneReadonlyModel, readonlyModel } from "@/components/business/fields/model";
 import { serializeStableKey } from "@/utils/identity";
 import { applyQueryDraft, createQueryDraft } from "@/components/business/search/model";
 import { viewInvalidationRevision } from "./useViewInvalidation";
@@ -38,35 +40,72 @@ export function useCrudList<
 >(
   config: CrudListConfig<Row, Id, S, Scope, QueryDTO, C>,
   context: () => DeepReadonly<C>,
-  options: { invalidationKey?: string; disabled?: () => boolean } = {}
+  options: {
+    /** KeepAlive 失效通知的稳定模块 key；省略时不订阅通知。 */
+    invalidationKey?: string;
+    /** 返回批量动作等外部忙碌状态；省略时不额外禁用。 */
+    disabled?: () => boolean;
+    /** 命名方案存储身份；启用 queryPresets 时必须提供，复用公共用户/范围隔离。 */
+    preference?: () => CrudColumnIdentity;
+  } = {}
 ) {
-  const query = useSearchQuery<Row, S, Scope, TableSort<Row>>({
-    schema: config.query.schema,
-    initial: config.query.initial,
-    initialSort: config.initialSort,
-    pageSize: config.pageSize,
-    scope: () => config.scope(context()),
-    request: async (request, run) => {
-      const snapshot = cloneModel(context());
-      const dto = config.toQuery(request, snapshot);
-      const input = { ...run, context: snapshot };
-      const guard = config.beforeQuery
-        ? await config.beforeQuery(readonlyModel(dto), input)
-        : undefined;
-      run.signal.throwIfAborted();
-      if (guard && !guard.proceed) throw new Error(guard.reason);
-      const result = await config.request(dto, input);
-      run.signal.throwIfAborted();
-      if (Array.isArray(result.list)) {
-        const keys = result.list.map((row) => serializeStableKey(config.getKey(row)));
-        if (new Set(keys).size !== keys.length) throw new Error("列表返回了重复的行键");
-      }
-      if (config.afterQuery) await config.afterQuery(readonlyModel(result), input);
-      run.signal.throwIfAborted();
-      return result;
+  const query = useSearchQuery<Row, S, Scope, TableSort<Row>>(
+    {
+      schema: config.query.schema,
+      initial: config.query.initial,
+      initialSort: config.initialSort,
+      pageSize: config.pageSize,
+      scope: () => config.scope(context()),
+      request: async (request, run) => {
+        const snapshot = cloneModel(context());
+        const dto = config.toQuery(request, snapshot);
+        const input = { ...run, context: snapshot };
+        const guard = config.beforeQuery
+          ? await config.beforeQuery(readonlyModel(dto), input)
+          : undefined;
+        run.signal.throwIfAborted();
+        if (guard && !guard.proceed) throw new Error(guard.reason);
+        const result = await config.request(dto, input);
+        run.signal.throwIfAborted();
+        if (Array.isArray(result.list)) {
+          const keys = result.list.map((row) => serializeStableKey(config.getKey(row)));
+          if (new Set(keys).size !== keys.length) throw new Error("列表返回了重复的行键");
+        }
+        if (config.afterQuery) await config.afterQuery(readonlyModel(result), input);
+        run.signal.throwIfAborted();
+        return result;
+      },
     },
-  });
+    {
+      scopeChanged: () => {
+        void initializeQuery();
+      },
+    }
+  );
   const draft = shallowRef(createQueryDraft(config.query.schema, config.query.initial));
+  const presets =
+    config.queryPresets && options.preference
+      ? useQueryPresets<Row, S>({
+          config: config.queryPresets,
+          schema: config.query.schema,
+          sortKeys: config.columns.filter((column) => column.sortable).map((column) => column.key),
+          identity: options.preference,
+          snapshot: () => ({
+            query: cloneReadonlyModel<typeof config.query.initial>(query.applied.value),
+            sort: cloneReadonlyModel<TableSort<Row> | null>(query.sort.value),
+          }),
+          apply: async (snapshot) => {
+            draft.value = createQueryDraft(config.query.schema, snapshot.query);
+            return query.apply(snapshot.query, snapshot.sort);
+          },
+        })
+      : undefined;
+  let initializeRun = 0;
+  async function initializeQuery() {
+    const run = ++initializeRun;
+    if (presets && (await presets.initialize())) return;
+    if (run === initializeRun) await query.refresh();
+  }
   const selectedKeys = shallowRef<Id[]>([]);
   const queryError = shallowRef<string | null>(null);
   let selectionRevision = 0;
@@ -85,6 +124,8 @@ export function useCrudList<
     () => query.scope.value.key,
     () => {
       draft.value = createQueryDraft(config.query.schema, config.query.initial);
+      clearSelection();
+      queryError.value = null;
     },
     { flush: "sync" }
   );
@@ -122,7 +163,7 @@ export function useCrudList<
     },
     revision: () => `${query.revision}:${selectionRevision}:${query.scope.value.key}`,
     session: () => query.scope.value.key,
-    disabled: () => query.loading.value || !!options.disabled?.(),
+    disabled: () => query.loading.value || !!presets?.controller.busy || !!options.disabled?.(),
     refresh: async (strategy) => {
       if (strategy === "first-page" && query.pageNum.value !== 1) await query.setPage(1);
       else await query.refresh();
@@ -145,7 +186,7 @@ export function useCrudList<
       return query.total.value;
     },
     get loading() {
-      return query.loading.value;
+      return query.loading.value || !!presets?.controller.busy;
     },
     get busyActionKey() {
       return actions.busyKey.value;
@@ -177,7 +218,7 @@ export function useCrudList<
   let invalidationRefreshRun = 0;
   onMounted(() => {
     mounted = true;
-    void query.refresh();
+    void initializeQuery();
   });
   onActivated(() => {
     if (!mounted) return;
@@ -200,6 +241,7 @@ export function useCrudList<
     })();
   });
   const controller: CrudListController<Row, Id, S> = {
+    presets: presets?.controller,
     // Vue 的 DeepReadonly 对未实例化泛型不满足幂等推导；运行时仍深只读。
     get state() {
       return readonly(state) as CrudListController<Row, Id, S>["state"];
@@ -222,19 +264,25 @@ export function useCrudList<
         return false;
       }
       queryError.value = null;
+      presets?.clearActive();
       return query.apply(result.applied);
     },
     async resetQuery() {
       draft.value = createQueryDraft(config.query.schema, config.query.initial);
       queryError.value = null;
+      presets?.clearActive();
       await query.reset();
     },
     refresh: query.refresh,
     setPage: query.setPage,
-    setSort: query.setSort,
+    setSort: (value) => {
+      presets?.clearActive();
+      return query.setSort(value);
+    },
     select(keys) {
       if (
         query.loading.value ||
+        presets?.controller.busy ||
         actions.busyKey.value ||
         options.disabled?.() ||
         !config.selection ||

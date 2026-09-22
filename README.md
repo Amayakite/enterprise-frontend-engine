@@ -26,11 +26,18 @@ pnpm dev
 
 ```bash
 pnpm type-check  # TypeScript / Vue 类型检查
+pnpm test:quick  # 日常反馈：行为、结构与文档断言，不启动完整 TS/Vue 编译
+pnpm test:contracts # 类型正反例、语言服务悬停及混合合同测试
 pnpm test        # 合同与行为测试（限制并发，降低内存占用）
 pnpm build       # 类型检查后打包至 dist
 pnpm preview     # 预览构建产物，不启动 Mock
 pnpm format      # 手动格式化全部文件
 ```
+
+日常修改先运行相关测试或 `pnpm test:quick`，类型变更再运行 `pnpm type-check` 与
+`pnpm test:contracts`；提交前仍跑完整 `pnpm test` 和构建。两组测试没有交集，合起来就是完整集，
+不删除原有断言。`node scripts/run-tests.mjs quick --list` 可查看分组；新增创建 TypeScript/Vue
+程序或语言服务的测试需登记到 `scripts/test-groups.mjs`，分组自检会防止混入快组。
 
 ## 开发入口
 
@@ -81,6 +88,8 @@ VITE_APP_VUE_DEVTOOLS=true # 需要组件树/更新时间线排查时才开启
 ```
 
 修改环境变量后重启开发服务。当前响应协议为 `{ code, data, msg }`、分页为 `{ list, total }`，尚未适配新的正式后端；应从 API 层、请求层、菜单转换和权限映射统一适配，不能让页面依赖完整后端路径。
+
+与后端确认接口时使用 [接口契约草案](./docs/backend-contract-draft.md)，其中区分当前 Mock 合同与待确认协议。
 
 ## 构建与部署
 

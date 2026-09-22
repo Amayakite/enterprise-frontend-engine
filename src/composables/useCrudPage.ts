@@ -178,6 +178,7 @@ export function useCrudPage<
     const list = useCrudList(listConfig, () => context.value, {
       invalidationKey: config.key,
       disabled: () => lock.value,
+      preference: () => base.preference.value,
     });
     const batch = options.batch
       ? useBatchActions({

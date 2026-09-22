@@ -403,6 +403,7 @@ export const customerModule = defineBusinessModule<CustomerContract>()({
   views: {
     /** 列表的固定范围、排序与行操作。 */
     list: {
+      queryPresets: { version: 1 },
       getKey: (row) => row.id,
       scope: (context) => ({
         key: `${context.scopeKey}:customer`,

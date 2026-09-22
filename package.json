@@ -9,7 +9,9 @@
     "build": "vue-tsc --noEmit && vite build",
     "preview": "vite preview",
     "type-check": "vue-tsc --noEmit",
-    "test": "node --test --test-concurrency=2 tests/*.test.mjs",
+    "test": "node scripts/run-tests.mjs all",
+    "test:quick": "node scripts/run-tests.mjs quick",
+    "test:contracts": "node scripts/run-tests.mjs contracts",
     "format": "prettier --write ."
   },
   "dependencies": {

@@ -22,6 +22,7 @@ import type {
  * @typeParam Scope 固定查询范围类型。
  * @typeParam Sort 排序结构，默认使用 QueryPageRequest 的排序类型。
  * @param source 查询配置和请求实现。
+ * @param options 范围变化时的刷新覆盖；默认立即请求，可先读取本机默认查询方案。
  * @returns 只读状态与 refresh/apply/reset/setPage/setSort 动作。
  * @remarks 不包含 CRUD 动作、行选择或表单；宿主显式首次调用 refresh。范围变化会取消旧请求、
  * 重置条件并自动刷新，迟到响应不会覆盖新范围数据。
@@ -37,7 +38,13 @@ export function useSearchQuery<
   S extends QuerySchema,
   Scope,
   Sort = QueryPageRequest<S, Scope>["sort"],
->(source: SearchQuerySource<Row, S, Scope, Sort>) {
+>(
+  source: SearchQuerySource<Row, S, Scope, Sort>,
+  options: {
+    /** 范围重置后接管刷新；省略时立即刷新，用于先读取该范围默认方案。 */
+    scopeChanged?: () => void;
+  } = {}
+) {
   const defaults = cloneModel(source.initial ?? emptyAppliedQuery<S>());
   const initial = applyQueryDraft(source.schema, createQueryDraft(source.schema, defaults));
   if (!initial.valid)
@@ -91,13 +98,14 @@ export function useSearchQuery<
     }
   }
   const refresh = () => load(true);
-  async function apply(value: AppliedQuery<S>) {
+  async function apply(value: AppliedQuery<S>, nextSort?: Sort | null) {
     const parsed = applyQueryDraft(source.schema, createQueryDraft(source.schema, value));
     if (!parsed.valid) {
       error.value = parsed.issues.map((issue) => issue.message).join("；");
       return false;
     }
     applied.value = parsed.applied;
+    if (nextSort !== undefined) sort.value = cloneModel(nextSort);
     pageNum.value = 1;
     revision++;
     await refresh();
@@ -133,11 +141,17 @@ export function useSearchQuery<
     () => [scope.value.key, JSON.stringify(scope.value.value)],
     () => {
       channel.cancel();
+      // 新范围的默认方案可能异步读取或失效；不能继续展示旧范围数据或遗留 loading。
+      rows.value = [];
+      total.value = 0;
+      loading.value = false;
+      error.value = "";
       revision++;
       applied.value = cloneModel(initial.applied);
       pageNum.value = 1;
       sort.value = cloneModel(source.initialSort ?? null);
-      void refresh();
+      if (options.scopeChanged) options.scopeChanged();
+      else void refresh();
     }
   );
   onBeforeUnmount(() => {

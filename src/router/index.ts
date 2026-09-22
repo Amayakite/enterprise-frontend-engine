@@ -35,7 +35,7 @@ export const constantRoutes: RouteRecordRaw[] = [
               path: "crud",
               name: "CrudLab",
               component: () => import("@/pages/component-lab/crud/index.vue"),
-              meta: { title: "CRUD 装配实验", hidden: true },
+              meta: { title: "CRUD 装配实验", hidden: true, keepAlive: true },
             },
             {
               path: "interaction",
