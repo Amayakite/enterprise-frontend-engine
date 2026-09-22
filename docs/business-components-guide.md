@@ -80,9 +80,9 @@ const navigation: ReferenceNavigation<CustomerRecord, string> = {
 };
 ```
 
-目标在 `src/router/business-targets.ts` 显式登记，登记仅提供路径，不授予菜单、读取或新增权限。
+目标在 `src/router/business-targets.ts` 显式登记，登记提供轻量页面声明，不授予菜单、读取或新增权限。
 `view(id, row)` 接收原始类型 ID 和已解析记录，返回目标请求；有 id 且目标支持 detail 时进入详情，
-否则进入列表。`create` 是目标 key，始终到列表引导，不自动打开新增表单、不自动保存。
+否则进入列表。`create` 是目标 key，按目标 `page.presentation` 直接打开新增页面、弹窗或抽屉；不自动保存。
 `createLabel` 省略时使用“前往新增”。单选右侧、多选各标签及字段只读展示均有查看入口；
 只读禁用修改但仍允许查看。解析失败保留原 ID、展示局部错误与重试，不编造名称或导航。
 已解析但不可重新选择的历史记录仍可展示/查看，保存校验仍检查 selectable。
@@ -92,7 +92,8 @@ const navigation: ReferenceNavigation<CustomerRecord, string> = {
 `QueryPanel.focus()` 是公共焦点入口，不访问 Element Plus 私有 DOM。
 跳转失败显示局部轻提示。参照页 KeepAlive 停用时隐藏浮层，返回时恢复原搜索和待确认选择；
 未启用 KeepAlive 的来源仅依赖原有草稿机制，不新增跨页表单存储，不承诺恢复未保存内容。
-返回不自动选择刚新增记录，用户重新查询后自行确认。
+默认返回不自动选择；配置 `createdId: (id) => id` 后，通过原 source.resolve、可选性和 beforeCommit 校验选入新记录。数值 ID 应在此显式转换并校验；返回 null 放弃回写。来源已卸载、范围或选择已变化时不覆盖。
+展示配置、返回通道和容器层数见 [CRUD 统一展示](./crud-development-guide.md#新增编辑详情的统一展示与跨模块打开)。
 
 声明 source.query 的参照使用与列表相同的紧凑查询栏：输入框内搜索，“筛选”展开普通/高级查询和重置；
 配置过的前往新增入口使用右侧带跳转图标的描边按钮。Sale 和实验页客户参照复用所属模块的派生 schema。

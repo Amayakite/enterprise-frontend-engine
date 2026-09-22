@@ -1,10 +1,7 @@
 <!-- 客户详情：读取生命周期、动作插槽、本地子表筛选和只读联系卡片。 -->
 <template>
   <div class="page-container crud-page">
-    <MyFeedback v-if="state.notice" :message="state.notice" />
     <MyFeedback v-if="state.invalidReason" :message="state.invalidReason" tone="error" />
-
-    <el-text type="info">本页已完成 {{ state.custom.loadCount }} 次资料读取</el-text>
 
     <MyCrudDetail v-if="!state.invalidReason" v-bind="bindings.detail">
       <template #actions>
@@ -37,11 +34,15 @@
         <CustomerAddresses :rows="state.model?.addresses ?? []" />
       </template>
       <template #footer="{ state: detailState }">
-        <el-text v-if="detailState.model">
-          客户编号：{{ detailState.model.customerCode }}；当前版本：{{
-            detailState.entity?.version
-          }}
-        </el-text>
+        <div class="customer-detail-footer">
+          <el-text v-if="detailState.model" type="info">
+            记录版本：{{ detailState.entity?.version }}
+          </el-text>
+          <details v-if="state.notice">
+            <summary>开发 Mock 说明</summary>
+            <MyFeedback :message="state.notice" />
+          </details>
+        </div>
       </template>
     </MyCrudDetail>
 
@@ -122,3 +123,19 @@ function onEdit() {
   return actions.edit();
 }
 </script>
+
+<style scoped>
+.customer-detail-footer {
+  display: flex;
+  align-items: start;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: 13px;
+  color: var(--el-text-color-secondary);
+}
+.customer-detail-footer summary {
+  cursor: pointer;
+  margin-bottom: 4px;
+}
+</style>

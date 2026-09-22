@@ -129,10 +129,7 @@ export function useCrudPage<
     ]);
   }
   function hostBinding(refresh: () => Promise<void>): CrudViewEnvironment["host"] {
-    const enabled = [module.page?.add?.mode, module.page?.edit?.mode].some(
-      (mode) => mode === "dialog" || mode === "drawer"
-    );
-    return enabled ? { presentation: base.presentation, afterSave: refresh } : undefined;
+    return { presentation: base.presentation, afterSave: refresh };
   }
   function children<E, I extends string | number>(
     read: () => DeepReadonly<T["Model"]>,
@@ -326,11 +323,19 @@ export function useCrudPage<
             controller: detail,
             fields: config.detail.fields,
             tabs: config.detail.tabs,
+            summary: config.detail.summary,
             actions: config.detail.actions,
             context: context.value,
             back: navigation.close,
             columns: base.columns,
+            layout: base.layout,
+            entityLabel: base.entityLabel,
             host: detailHost,
+            edit,
+            canEdit: crudPermission(config.form.permissions?.update) && detail.state.id !== null,
+            editReason: detail.state.model
+              ? config.form.readonlyReason?.(detail.state.model, context.value)
+              : undefined,
           };
         },
       },
@@ -370,10 +375,13 @@ export function useCrudPage<
               controller: detail,
               fields: config.detail.fields,
               tabs: config.detail.tabs,
+              summary: config.detail.summary,
               actions: config.detail.actions,
               context: context.value,
               back: navigation.close,
               columns: base.columns,
+              layout: base.layout,
+              entityLabel: base.entityLabel,
               host: detailHost,
             },
             forwarded
@@ -458,7 +466,9 @@ export function useCrudPage<
     draftIdentity: base.draftIdentity,
   });
   const views = children(() => form.state.model, form);
+  const formHost = hostBinding(async () => {});
   const formProps = {
+    host: formHost,
     controller: form,
     fields: formConfig.fields,
     sections: formConfig.sections,
@@ -467,6 +477,8 @@ export function useCrudPage<
       return context.value;
     },
     columns: base.columns,
+    layout: base.layout,
+    entityLabel: base.entityLabel,
     get readonlyReason() {
       return form.readonlyReason;
     },
@@ -496,7 +508,7 @@ export function useCrudPage<
           ? "编辑缺少记录 ID，请返回列表重新打开"
           : undefined;
     },
-    host: undefined,
+    host: formHost,
     child(key) {
       const binding = views.get(key)?.binding;
       if (!binding) throw new Error("子表未配置视图绑定：" + key);

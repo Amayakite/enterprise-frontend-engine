@@ -1,17 +1,26 @@
 <!-- 客户新增：准备默认值与选项、条件校验、提交守卫，以及可编辑字段插槽。 -->
 <template>
   <div class="page-container crud-page">
-    <ReferencePermissionPreview v-if="ReferencePermissionPreview" />
     <MyFeedback v-if="state.invalidReason" :message="state.invalidReason" />
 
     <MyCrudForm v-if="!state.invalidReason" v-bind="bindings.form">
       <template #header>
-        <MyFeedback v-if="state.notice" :message="state.notice" />
+        <details class="customer-example-options">
+          <summary>开发示例选项与说明</summary>
+          <div class="customer-example-options__body">
+            <ReferencePermissionPreview v-if="ReferencePermissionPreview" />
+            <MyFeedback v-if="state.notice" :message="state.notice" />
 
-        <el-space wrap>
-          <el-tag v-if="state.custom.initialized" type="success" effect="plain">资料已准备</el-tag>
-          <el-checkbox v-model="state.custom.requirePhone">本次新增必须填写联系电话</el-checkbox>
-        </el-space>
+            <el-space wrap>
+              <el-tag v-if="state.custom.initialized" type="success" effect="plain">
+                资料已准备
+              </el-tag>
+              <el-checkbox v-model="state.custom.requirePhone">
+                本次新增必须填写联系电话
+              </el-checkbox>
+            </el-space>
+          </div>
+        </details>
 
         <el-text v-if="state.custom.changeSummary" type="info">
           {{ state.custom.changeSummary }}
@@ -164,3 +173,18 @@ function applyRemarkTemplate(update: (value: string) => void, commit: () => void
   commit();
 }
 </script>
+<style scoped>
+.customer-example-options {
+  color: var(--el-text-color-secondary);
+  font-size: 13px;
+}
+.customer-example-options summary {
+  cursor: pointer;
+  width: fit-content;
+}
+.customer-example-options__body {
+  display: grid;
+  gap: 12px;
+  padding-top: 12px;
+}
+</style>

@@ -1,3 +1,4 @@
+import { businessRouteComponent } from "@/router/business-targets";
 import type { RouteRecordRaw } from "vue-router";
 import { constantRoutes } from "@/router";
 import { store } from "@/stores";
@@ -147,6 +148,7 @@ function resolveComponent(componentPath: string) {
     .replace(/^\/+/, "")
     .replace(/\.vue$/i, "");
   return (
+    businessRouteComponent(normalized) ||
     modules[`/src/pages/${normalized}.vue`] ||
     modules[`/src/pages/${normalized}/index.vue`] ||
     modules[`/src/pages/error/404.vue`]

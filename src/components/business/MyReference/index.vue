@@ -469,8 +469,27 @@ function viewRelated(row: Readonly<Row>) {
   if (target) void navigator.open(target);
 }
 function createRelated() {
-  if (!props.readonly && props.navigation?.create)
-    void navigator.open({ target: props.navigation.create, action: "create" });
+  if (props.readonly || !props.navigation?.create) return;
+  const scope = props.scopeKey;
+  const source = props.source;
+  const selection = JSON.stringify(props.modelValue);
+  const parseId = props.navigation.createdId;
+  void navigator.open({ target: props.navigation.create, action: "create" }, async (savedId) => {
+    // 来源范围或用户选择已经改变时，不用新建结果覆盖新状态。
+    if (
+      !parseId ||
+      props.readonly ||
+      props.scopeKey !== scope ||
+      props.source !== source ||
+      JSON.stringify(props.modelValue) !== selection
+    )
+      return;
+    const id = parseId(savedId);
+    if (id === null) return;
+    const ids = props.multiple ? [...state.committedIds.value, id] : [id];
+    if (!(await state.commitIds(ids)))
+      throw new Error("记录已保存，但未能选入来源字段，请返回后重新选择");
+  });
 }
 function adjustSearch() {
   if (props.source.query) queryPanel.value?.focus();

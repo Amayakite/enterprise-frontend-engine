@@ -195,7 +195,7 @@ export interface BusinessModuleConfig<T extends BusinessModuleContract> {
       | "getKey"
     >;
     /** 详情页额外策略；省略仍派生详情字段与子表页签。 */
-    detail?: Pick<Detail<T>, "beforeOpen" | "afterOpen"> & {
+    detail?: Pick<Detail<T>, "beforeOpen" | "afterOpen" | "summary"> & {
       /** 根据本页面导航生成详情动作；通常复用列表动作，仅覆盖删除后的跳转。 */
       actions?: (navigation: CrudNavigation<T["Id"]>) => Detail<T>["actions"];
     };
@@ -308,6 +308,7 @@ export function defineBusinessModule<T extends BusinessModuleContract>() {
         },
       };
       const detail: Detail<T> = {
+        summary: config.views.detail?.summary,
         beforeOpen: config.views.detail?.beforeOpen,
         afterOpen: config.views.detail?.afterOpen,
         load: config.api.detail,

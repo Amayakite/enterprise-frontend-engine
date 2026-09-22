@@ -15,7 +15,7 @@ import { createGeographyReference } from "@/api/master-data/reference";
 import type { TableHeaderGroup } from "@/components/table/types";
 import { customerContactsConfig } from "./children/contacts/config";
 import { customerAddressesConfig } from "./children/addresses/config";
-import { customerTarget } from "@/router/business-targets";
+import { customerPage } from "./page";
 import { customerReferences, customerProvinceSource } from "./references";
 import { saleReference } from "@/pages/base/sale/references";
 
@@ -103,15 +103,8 @@ export const customerModule = defineBusinessModule<CustomerContract>()({
   batch: { field: "batchID" },
   /** 页面约定集中维护；各路由通过 useBusinessPage 获得导航、scope 和草稿身份。 */
   page: {
-    basePath: customerTarget.list,
-    guideMode: "spotlight",
-    /** 默认新标签；改为 dialog/drawer 即复用同一新增页。 */
-    add: { mode: "tab", component: () => import("./add.vue") },
-    /** 编辑可独立选择形态，不影响 /edit/:id 深链。 */
-    edit: { mode: "tab", component: () => import("./edit.vue") },
-    organizationId: "org-a",
+    ...customerPage,
     preferenceVersion: "3",
-    columns: 3,
     notice: "当前使用开发进程内存 Mock；保存可读回，但重启服务后会恢复种子数据。",
   },
   /** 2. 接口适配：读取返回页面模型，写入仍走现有 Mock 整单协议。 */
@@ -155,10 +148,11 @@ export const customerModule = defineBusinessModule<CustomerContract>()({
         navigation: {
           view: (id) => ({ target: "sale", id }),
           create: "sale",
+          createdId: (id) => id,
           createLabel: "前往新增销售组织",
         },
       }),
-      scenes: { detail: true },
+      scenes: { detail: { group: "基本信息" } },
     },
     {
       key: "customerName",
@@ -203,13 +197,13 @@ export const customerModule = defineBusinessModule<CustomerContract>()({
     },
     {
       key: "creditCode",
-      scenes: { detail: true, query: { normal: true, advanced: true, keyword: true } },
+      scenes: { detail: { span: 3 }, query: { normal: true, advanced: true, keyword: true } },
       label: "统一社会信用代码",
       type: "text",
       help: "选填；填写时必须是 18 位大写字母或数字",
       formatHint: "统一社会信用代码",
       form: {
-        span: 2,
+        span: 1,
         rules: { pattern: /^[A-Z0-9]{18}$/, message: "请输入 18 位大写字母或数字" },
       },
       props: { placeholder: "请输入 18 位统一社会信用代码", maxlength: 18 },
@@ -272,7 +266,7 @@ export const customerModule = defineBusinessModule<CustomerContract>()({
     },
     {
       key: "address",
-      scenes: { detail: { span: 3 } },
+      scenes: { detail: { span: 2 } },
       label: "详细地址",
       type: "text",
       form: { span: 2, required: true },
@@ -288,7 +282,7 @@ export const customerModule = defineBusinessModule<CustomerContract>()({
     },
     {
       key: "remark",
-      scenes: { detail: { span: 3 } },
+      scenes: { detail: { span: 3, group: "其他信息" } },
       label: "备注",
       type: "textarea",
       form: { group: "其他信息", span: 3 },
@@ -300,7 +294,12 @@ export const customerModule = defineBusinessModule<CustomerContract>()({
       type: "text",
       scenes: { detail: { order: 0.5 }, query: { normal: true, advanced: true, keyword: true } },
     },
-    { key: "provinceName", label: "省份", type: "text", scenes: { detail: { order: 4.1 } } },
+    {
+      key: "provinceName",
+      label: "省份",
+      type: "text",
+      scenes: { detail: { order: 4.1, group: "区域与联系" } },
+    },
     {
       key: "cityName",
       label: "城市",
@@ -450,6 +449,11 @@ export const customerModule = defineBusinessModule<CustomerContract>()({
     },
     /** 详情复用相同行命令；只有删除成功后需关闭当前详情，不能刷新已删除实体。 */
     detail: {
+      summary: {
+        titleField: "customerName",
+        descriptionFields: ["customerCode"],
+        statusFields: ["status"],
+      },
       actions: (navigation) =>
         customerRowActions.map((action) =>
           action.key === "delete"

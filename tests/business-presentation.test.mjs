@@ -47,15 +47,10 @@ test("非路由模式缺少 loader 明确报错，不悄悄退回其他打开方
   scope.stop();
 });
 
-test("嵌入宿主保存时先完成刷新，再仅关闭原编辑实例", () => {
-  const source = readFileSync("src/components/business/crud/MyBusinessPageHost.vue", "utf8");
-  const capture = source.indexOf("const editor = current.value;");
-  const afterSave = source.indexOf("await props.afterSave?.();");
-  const guardedClose = source.indexOf(
-    "if (editor && current.value === editor) await editor.context.saved(id);"
+test("嵌入页面上下文固定于实例，刷新完成后交由原实例保存端口关闭", () => {
+  const source = readFileSync("src/components/business/crud/MyBusinessPageContent.vue", "utf8");
+  assert.ok(source.indexOf("const editor = props.editor") >= 0);
+  assert.ok(
+    source.indexOf("await props.afterSave?.();") < source.indexOf("await editor.context.saved(id);")
   );
-
-  assert.ok(capture >= 0, "必须在异步后置动作前固定当前编辑实例");
-  assert.ok(afterSave > capture, "afterSave 必须先于关闭执行");
-  assert.ok(guardedClose > afterSave, "后置动作完成后只能关闭仍为原实例的编辑器");
 });

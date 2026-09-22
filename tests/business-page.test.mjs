@@ -2,7 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import fs from "node:fs";
 import { registerHooks } from "node:module";
-import { reactive, effectScope } from "vue";
+import { reactive, createRenderer, h } from "vue";
 import "./reference-harness.mjs";
 
 // 此测试检查工厂传给组件的公开 props；不声称覆盖浏览器 DOM 或 SFC 渲染。
@@ -10,7 +10,7 @@ registerHooks({
   resolve(specifier, context, next) {
     if (specifier === "vue-router")
       return {
-        url: "data:text/javascript,export const useRoute=()=>globalThis.__businessPageTest.route;export const useRouter=()=>globalThis.__businessPageTest.router;",
+        url: "data:text/javascript,export const routerKey=Symbol();export const routeLocationKey=Symbol();export const isNavigationFailure=()=>false;export const useRoute=()=>globalThis.__businessPageTest.route;export const useRouter=()=>globalThis.__businessPageTest.router;",
         shortCircuit: true,
       };
     if (specifier === "@/stores/tags-view")
@@ -32,13 +32,54 @@ registerHooks({
   },
 });
 
+const { routerKey, routeLocationKey } = await import("vue-router");
+const renderer = createRenderer({
+  createElement: () => ({}),
+  createText: () => ({}),
+  createComment: () => ({}),
+  insert() {},
+  remove() {},
+  setText() {},
+  setElementText() {},
+  patchProp() {},
+  parentNode: () => null,
+  nextSibling: () => null,
+});
+function pageScope() {
+  const apps = [];
+  return {
+    run(factory) {
+      let result;
+      const app = renderer.createApp({
+        setup() {
+          result = factory();
+          return () => h("div");
+        },
+      });
+      app.provide(routerKey, globalThis.__businessPageTest.router);
+      app.provide(routeLocationKey, globalThis.__businessPageTest.route);
+      app.mount({});
+      apps.push(app);
+      return result;
+    },
+    stop() {
+      for (const app of apps) app.unmount();
+    },
+  };
+}
 const { createBusinessPaths } = await import("../src/components/business/crud/page.ts");
 const { createQueryReference } = await import("../src/components/business/search/reference.ts");
 const { useBusinessPage } = await import("../src/composables/useBusinessPage.ts");
 
 test("页面固定实体身份，组织/权限范围响应更新，导航可单独覆盖", async () => {
   const calls = [];
-  const route = reactive({ params: { id: "C001" }, fullPath: "/base/customer/edit/C001" });
+  const route = reactive({
+    params: { id: "C001" },
+    query: {},
+    hash: "",
+    path: "/base/customer/edit/C001",
+    fullPath: "/base/customer/edit/C001",
+  });
   const user = reactive({ userInfo: { userId: 0, perms: ["read"] } });
   globalThis.__businessPageTest = {
     route,
@@ -50,12 +91,16 @@ test("页面固定实体身份，组织/权限范围响应更新，导航可单�
       },
     },
     router: {
+      resolve: (value) => ({
+        fullPath: typeof value === "string" ? value : value.path,
+        matched: [{}],
+      }),
       push: async (path) => calls.push(["push", path]),
       replace: async (path) => calls.push(["replace", path]),
     },
   };
   const organization = reactive({ id: "org-a" });
-  const scope = effectScope();
+  const scope = pageScope();
   try {
     const page = scope.run(() =>
       useBusinessPage({
@@ -79,7 +124,7 @@ test("页面固定实体身份，组织/权限范围响应更新，导航可单�
     await page.navigation.saved("C001");
     await page.navigation.close();
     assert.deepEqual(calls, [
-      ["replace", "/base/customer/detail/C001"],
+      ["close", "/base/customer/edit/C001", "/base/customer/detail/C001"],
       ["close", "/base/customer/edit/C001", "/base/customer"],
     ]);
     const custom = scope.run(() =>
@@ -98,7 +143,7 @@ test("页面固定实体身份，组织/权限范围响应更新，导航可单�
     await custom.navigation.add();
     assert.deepEqual(calls.slice(-2), [
       ["custom", "C003"],
-      ["push", "/base/customer/add"],
+      ["push", { path: "/base/customer/add", query: undefined }],
     ]);
   } finally {
     scope.stop();

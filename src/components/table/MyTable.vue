@@ -485,6 +485,7 @@ const environment = (model: Readonly<Row>): FieldEnvironment<Row, C> => ({
 });
 const fieldFor = (key: FieldKey<Row>) => props.fields?.find((field) => field.key === key);
 function fixedRequired(key: FieldKey<Row>) {
+  if (!props.edit) return false;
   const form = fieldFor(key)?.form;
   return (
     !!form &&
@@ -498,6 +499,7 @@ function headerHelp(key: FieldKey<Row>) {
   return field ? fieldHelpText(field) : "";
 }
 function dynamicRequired(key: FieldKey<Row>, row: Readonly<Row>) {
+  if (!props.edit) return false;
   const field = fieldFor(key);
   if (!field?.form || fixedRequired(key)) return false;
   const form = normalizeFields([field], environment(row))[0]?.form;

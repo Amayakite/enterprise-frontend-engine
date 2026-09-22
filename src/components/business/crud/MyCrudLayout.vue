@@ -1,5 +1,11 @@
 <template>
-  <section class="crud-layout">
+  <section
+    class="crud-layout"
+    :class="[
+      layout && `crud-layout--${layout.preset}`,
+      { 'crud-layout--embedded': layout && embedded },
+    ]"
+  >
     <div v-if="$slots.toolbar" class="crud-layout__toolbar"><slot name="toolbar" /></div>
     <div class="crud-layout__body">
       <main class="crud-layout__main"><slot /></main>
@@ -9,6 +15,17 @@
   </section>
 </template>
 <script setup lang="ts">
+import { inject } from "vue";
+import type { CrudLayoutOptions } from "./layout";
+import { embeddedEditorKey } from "./presentation";
+defineProps<{
+  /** 内容布局；省略保持满高旧布局。simple 紧凑字段，structured 分区；两者铺满可用高度。
+   * @example
+   * `<MyCrudLayout :layout="{ preset: 'simple' }" />`
+   */
+  layout?: CrudLayoutOptions;
+}>();
+const embedded = inject(embeddedEditorKey, undefined);
 defineSlots<{
   /** 固定顶部工具栏；省略不占空间。 */ toolbar?: () => unknown;
   /** 可滚动正文；加载时用 v-show 保留字段和子表登记。 */ default?: () => unknown;
@@ -58,6 +75,38 @@ defineSlots<{
   flex-wrap: wrap;
   justify-content: flex-end;
   gap: 10px;
+}
+.crud-layout--simple,
+.crud-layout--structured {
+  padding: 24px 28px;
+  gap: 24px;
+}
+.crud-layout--simple .crud-layout__toolbar,
+.crud-layout--structured .crud-layout__toolbar {
+  padding-bottom: 18px;
+  border-bottom: 1px solid var(--el-border-color-lighter);
+}
+.crud-layout--simple .crud-layout__footer,
+.crud-layout--structured .crud-layout__footer {
+  display: block;
+  padding-top: 16px;
+  border-top: 1px solid var(--el-border-color-lighter);
+}
+.crud-layout--embedded {
+  max-width: none;
+  border: 0;
+  border-radius: 0;
+  padding: 4px;
+}
+@media (max-width: 767px) {
+  .crud-layout--simple,
+  .crud-layout--structured {
+    padding: 16px;
+    gap: 16px;
+  }
+  .crud-layout--embedded {
+    padding: 0;
+  }
 }
 @media (max-width: 767px) {
   .crud-layout__body {

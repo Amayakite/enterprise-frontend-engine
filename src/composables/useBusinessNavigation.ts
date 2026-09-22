@@ -1,3 +1,4 @@
+import { useBusinessOpen } from "./useBusinessOpen";
 import { inject, nextTick, onActivated, onBeforeUnmount, ref } from "vue";
 import {
   routerKey,
@@ -19,6 +20,7 @@ import { navigationMailbox, stripNavigationQuery } from "@/router/navigation-int
 export function useBusinessNavigation(focus?: () => void) {
   const router = inject(routerKey, undefined);
   const route = inject(routeLocationKey, undefined);
+  const { openBusiness } = useBusinessOpen();
   const busy = ref(false);
   const error = ref("");
   let alive = true;
@@ -33,7 +35,7 @@ export function useBusinessNavigation(focus?: () => void) {
       if (alive) focus?.();
     }
   });
-  async function open(request: BusinessNavigationRequest) {
+  async function open(request: BusinessNavigationRequest, saved?: (id: string) => Promise<void>) {
     if (busy.value) return false;
     if (!router || !route) {
       error.value = "当前宿主没有配置页面导航";
@@ -48,6 +50,34 @@ export function useBusinessNavigation(focus?: () => void) {
     if (action === "create" && !target.add) {
       error.value = "目标页面不支持新增";
       return false;
+    }
+    if (action === "create" || request.id !== undefined) {
+      busy.value = true;
+      error.value = "";
+      try {
+        const opened = await openBusiness({
+          target: target.key,
+          view: action === "create" ? "add" : "detail",
+          id: request.id,
+          mode: request.mode,
+          completion: "return-to-source",
+          onSaved: async (id) => {
+            if (alive) {
+              await saved?.(id);
+              await nextTick();
+              focus?.();
+            }
+          },
+        });
+        if (!opened) error.value = "页面未打开，请继续当前操作";
+        returning = opened;
+        return opened;
+      } catch (cause) {
+        if (alive) error.value = cause instanceof Error ? cause.message : "页面打开失败，请重试";
+        return false;
+      } finally {
+        busy.value = false;
+      }
     }
     const path =
       action === "view" && request.id !== undefined && target.detail

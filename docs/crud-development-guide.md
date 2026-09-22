@@ -297,7 +297,8 @@ const list = useCrudList(config.list!, () => context.value, { invalidationKey: c
 
 跨页面业务入口使用 `useBusinessNavigation().open({ target, action, id? })`，不拼接任意 URL。
 目标元信息集中在 `router/business-targets.ts`，模块 `page.basePath` 可复用目标 list。
-create 到目标 index，view 到详情或列表；不自动触发业务动作。
+create 直接打开新增，view 打开详情或列表，按统一展示策略处理（见第 6 节）；不自动提交业务数据。
+下面的列表意图与光圈保留给旧链接和显式列表引导入口，新参照流程不绕经列表。
 守卫在动态路由生成后校验并移除 `__navTarget/__navAction/__navToken`，保留其他业务 query。
 页面、标签及 KeepAlive 只看到规范 fullPath，草稿身份不增加随机参数。
 意图邮箱只存短期导航元信息，最多 16 条、5 分钟懒过期、token 一次消费；退出账号清空，不落盘。
@@ -610,33 +611,102 @@ views: {
 直接调用 Element Plus 的独立提示暂不批量替换，后续按模块迁移到同一入口，避免一次改动
 所有业务的确认和异常处理语义。
 
-### 新增/修改的标签页、弹窗、抽屉
+### 新增、编辑、详情的统一展示与跨模块打开
 
-在模块 page 配置选择入口形态，默认 tab。add/edit 独立设置，直接 URL 深链依然是路由页：
+模块 `page.presentation` 统一声明 `tab / dialog / drawer`，`add/edit/detail` 只写特例。
+优先级为本次调用覆盖、场景覆盖、模块默认、系统 `tab`。`width` 也按同样顺序继承。
+旧的 `page.add/edit` 继续兼容，新模块使用统一声明。
+
+```ts
+// pages/base/sale/page.ts：轻量声明，不导入 config、API 或字段。
+export const salePage: BusinessPageOptions<"org-a"> = {
+  basePath: "/base/sale",
+  organizationId: "org-a",
+  presentation: {
+    mode: "drawer",
+    detail: { mode: "tab" },
+  },
+  components: {
+    add: () => import("./add.vue"),
+    edit: () => import("./edit.vue"),
+    detail: () => import("./detail.vue"),
+  },
+};
+// config.ts 的 page 引用 salePage；business-targets 登记同一声明。
+```
+
+轻量 `page.ts` 是为路由/跨模块入口共享声明而拆出；业务字段、权限、API、子表仍由
+`config.ts` 汇总。三个 loader 各写一次，菜单路由解析与容器复用它们，不为登记导航加载
+目标字段、接口或表单实例。直接访问 add/edit/detail URL 始终呈现正常路由页。
+
+标准 `MyCrudList/MyCrudForm/MyCrudDetail` 都自动挂载一个空闲时不渲染内容的
+`MyBusinessPageHost`，即使本模块默认 tab，也能打开其他模块的容器。
+定制布局才手动挂载 `bindings.host`，不要与标准组件重复挂载。
+
+```ts
+const { openBusiness } = useBusinessOpen();
+await openBusiness({ target: "sale", view: "add" });
+await openBusiness({ target: "sale", view: "detail", id: "sale-001", mode: "dialog" });
+await openBusiness({
+  target: "sale",
+  view: "add",
+  completion: "return-to-source",
+  onSaved: async (id) => {
+    /* 来源业务验证并回写；不要再次保存目标 */
+  },
+});
+```
+
+`useBusinessOpen` 从标准页面取得宿主；自定义入口需提供 `useBusinessPresentation` 并挂载宿主。
+打开入口验证目标路由可达性，目标控制器仍执行原权限与数据校验。
+新增直接打开 add，不再先跳列表寻找新增按钮。模块内部 `navigation.add/edit/detail`
+也复用同一解析。保存时，嵌入表单关闭容器并刷新来源；普通路由表单按详情展示配置打开：
+详情为 tab 时释放原表单标签，详情为容器时在已保存页上呈现，容器结束再释放原表单。
+
+参照导航的路由页保留返回来源通道；保存/取消返回原实例。返回通道只保存在内存，来源
+卸载后释放，刷新浏览器后不恢复回调。来源不存在时按普通页面导航处理。
+`ReferenceNavigation.createdId` 可显式启用新增后选入：将路由边界字符串 ID 转为参照 ID，
+再通过原 `source.resolve`、可选性、`beforeCommit` 校验；省略不自动选入。
+客户销售组织参照已接入；组织范围、数据源或当前选择改变后放弃自动回写。
+
+同模块详情切编辑复用所属容器，新组件成功加载后才替换旧页；失败保留原页。
+跨模块允许一层补充容器，最多两层；更深打开正常路由页，来源随 KeepAlive 保留。
+页面只捕获自身 ID 和实例身份；旧实例迟到的保存/关闭不能操作新实例。
+组件下载失败在容器内提供重试；关闭销毁表单实例，组件模块仍由浏览器缓存。
+
+X、遮罩、Escape、表单关闭和标签关闭复用离开守卫，父容器也检查补充容器。
+切换缓存标签隐藏容器，返回恢复。返回通道的 `businessSession` 查询参数仅区分运行实例，草稿身份剔除该参数，沿用稳定模块和业务路径，不额外创建存储。同路径后台标签被替换前也经过离开确认。
+
+### 简单档案与分区页面布局
+
+在模块 `page.layout` 显式选择内容布局；不配置时保留原有呈现。
+布局与 `page.presentation` 独立，不根据运行期字段显隐切换。
 
 ```ts
 page: {
-  // basePath、organizationId 等原配置保留
-  add: { mode: "drawer", component: () => import("./add.vue"), width: "min(1100px, 94vw)" },
-  edit: { mode: "dialog", component: () => import("./edit.vue") },
-}
+  basePath: "/base/sale",
+  organizationId: "org-a",
+  layout: { preset: "simple", entityLabel: "销售组织" },
+  presentation: { mode: "drawer", detail: { mode: "tab" } },
+  // components 复用轻量页面声明中的三个 loader。
+},
+views: {
+  // list、form 仍按原合同声明
+  detail: {
+    summary: { titleField: "name", descriptionFields: ["code"], statusFields: ["active"] },
+  },
+},
 ```
 
-标准 `useCrudView + MyCrudList` 和 `useCrudView + MyCrudDetail` 会从 `bindings.list/detail`
-自动挂载一次 `MyBusinessPageHost`；页面只保留对应的 CRUD 组件，不要再手动追加宿主。
-因此配置了 `drawer` 或 `dialog` 的 Sale 等模块不会因为漏挂宿主而无法打开新增/编辑。
-
-定制布局没有使用 `MyCrudList` / `MyCrudDetail` 时，才在页面根部手动挂载一次
-`<MyBusinessPageHost v-if="bindings.host" v-bind="bindings.host" />`；列表使用 `list.refresh`、
-详情使用 `detail.refresh` 的同一绑定。不要同时把 `bindings.host` 传给标准 CRUD 组件又手动挂载，
-否则会创建重复容器。
-
-add/edit 页面仍各自装配 MyCrudForm，不共享 Editor，也不复制弹窗专用页面。
-非 tab 模式必须提供 loader；只有打开时才加载组件，每个宿主最多保留一个编辑实例。
-外层宿主提供固定 target/instanceKey，公共 hook 自动让保存关闭容器、取消走离开守卫。
-X、遮罩、Escape、表单关闭及外层标签关闭均复用 MyCrudForm 的脏状态/提交状态检查；
-拒绝关闭保留输入。切换缓存标签隐藏宿主，返回继续编辑；关闭才销毁。
-草稿身份与同一实体的路由页一致；这不代表多个同时打开的编辑器会自动合并修改。
+- `simple` 用于销售组织等少字段档案：外壳铺满可用宽高，主字段区最大宽度 840px 并居中；默认两列，显式 `page.columns` 优先。正文超高时内部滚动，取消/保存仍可达。
+- `structured` 用于客户等主子表：使用可用高度，正文统一滚动；主表区域最大宽度 1200px，子表使用可用宽度。默认三列，可用原字段分组和 span 调整。
+- 新预设将普通草稿状态显示在底部；待恢复、冲突、提交待核实、存储错误和仅内存降级仍在正文保留完整反馈与处理入口。客户的开发示例选项默认折叠，展开后仍可操作。
+- 新预设均将原保存工具栏移至底部，复用权限、字段事务、草稿、保存和关闭保护；`footer` 核对插槽位于操作按钮之前。标题用 `entityLabel`，省略回退模块名。
+- 抽屉/弹窗继续装载同一 add/edit/detail 页面，新布局去掉内层卡片边框和页面底色，不重复显示页面标题；容器宽度由 `presentation.width` 配置决定；抽屉始终单列，弹窗按可用最大高度铺满，正文内部滚动。
+- 新预设详情直接展示主资料；无子表时不显示单独“主信息”页签。有子表时在资料下显示子表页签，切换明细保留顶部摘要。
+- `views.detail.summary` 仅引用模型字段键，按 title/status/description 顺序去重；只取已启用详情场景的字段，复用 `FieldDisplay`，从正文排除已显示字段。标题空值回退为实体详情。未配置 summary 时保留全部资料。
+- `MyDesc appearance="plain"` 使用标签/值网格，并按实际容器宽度响应；默认 `bordered` 保留原描述表。
+- 页面没有 `actions` 插槽时，标准详情提供复核权限后的默认编辑入口；提供该插槽的页面继续自行装配编辑和附加动作。
 
 ### 定制布局：按需组合相同的表单能力
 
@@ -724,16 +794,16 @@ const addresses = useCrudTableChild(controller, "addresses");
 
 已实现插槽如下：
 
-| 宿主           | 插槽                 | 用法与真实例子                                    |
-| -------------- | -------------------- | ------------------------------------------------- |
-| `MyCrudList`   | `toolbar-left/right` | 任务费用 `toolbar-right` 显示本页 Decimal 合计    |
-| `MyCrudList`   | `query-<schemaKey>`  | 自定义某个查询输入，接收 draft 与 `setDraft`      |
-| `MyCrudList`   | `column-<rowKey>`    | 特殊业务列；值与行按只读合同提供                  |
-| `MyCrudForm`   | `field-<modelKey>`   | 自定义字段，必须通过 `update(value)` 回写         |
-| `MyCrudForm`   | `section-<key>`      | 客户联系人、地址子模块                            |
-| `MyCrudForm`   | `footer`             | 显式追加业务底部区；默认为空，顶部保存/关闭不重复 |
-| `MyCrudDetail` | `tab-<key>`          | 客户只读联系人、地址页签                          |
-| `MyCrudDetail` | `actions`、`footer`  | 客户/费用详情编辑按钮及自定义尾部                 |
+| 宿主           | 插槽                 | 用法与真实例子                                           |
+| -------------- | -------------------- | -------------------------------------------------------- |
+| `MyCrudList`   | `toolbar-left/right` | 任务费用 `toolbar-right` 显示本页 Decimal 合计           |
+| `MyCrudList`   | `query-<schemaKey>`  | 自定义某个查询输入，接收 draft 与 `setDraft`             |
+| `MyCrudList`   | `column-<rowKey>`    | 特殊业务列；值与行按只读合同提供                         |
+| `MyCrudForm`   | `field-<modelKey>`   | 自定义字段，必须通过 `update(value)` 回写                |
+| `MyCrudForm`   | `section-<key>`      | 客户联系人、地址子模块                                   |
+| `MyCrudForm`   | `footer`             | 追加业务核对区；新布局在底部操作之前，旧布局保留顶部操作 |
+| `MyCrudDetail` | `tab-<key>`          | 客户只读联系人、地址页签                                 |
+| `MyCrudDetail` | `actions`、`footer`  | 客户/费用详情编辑按钮及自定义尾部                        |
 
 任务费用的已运行插槽只有业务内容，不依赖内部 ref：
 

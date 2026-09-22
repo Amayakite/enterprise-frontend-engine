@@ -2,7 +2,7 @@ import SaleAPI from "@/api/base/sale";
 import { defineBusinessModule } from "@/components/business/crud/module";
 import { defineBusinessModel } from "@/components/business/crud/model";
 import { checkQuerySort } from "@/components/business/search/model";
-import { saleTarget } from "@/router/business-targets";
+import { salePage } from "./page";
 import { classifyRequestSaveError } from "@/utils/request-error";
 import type { SaleContract } from "./types";
 
@@ -16,13 +16,7 @@ export const saleModule = defineBusinessModule<SaleContract>()({
   /** 直接采用公共组织与访问范围，不新增页面上下文字段。 */
   context: (base) => base,
   /** 路径集中登记；保留本页新增 drawer 配置，页面宿主统一处理。 */
-  page: {
-    basePath: saleTarget.list,
-    organizationId: "org-a",
-    columns: 2,
-    guideMode: "spotlight",
-    add: { mode: "drawer", component: () => import("./add.vue") },
-  },
+  page: salePage,
   /** 字符串 ID 保持原值。 */
   parseId: (value) => value,
   /** 标准 API 适配，无页面请求代码。 */
@@ -87,7 +81,11 @@ export const saleModule = defineBusinessModule<SaleContract>()({
       label: "启用",
       type: "switch",
       form: {},
-      scenes: { list: { width: 100 }, detail: true, query: { normal: true, advanced: true } },
+      scenes: {
+        list: { width: 100 },
+        detail: { format: (value) => (value ? "已启用" : "已停用") },
+        query: { normal: true, advanced: true },
+      },
     },
     {
       key: "remark",
@@ -95,7 +93,7 @@ export const saleModule = defineBusinessModule<SaleContract>()({
       type: "textarea",
       props: { maxlength: 300 },
       form: { span: 2 },
-      scenes: { detail: true },
+      scenes: { detail: { span: 2 } },
     },
   ],
   /** 自动派生普通/高级/关键词查询，不复制 UI schema。 */
@@ -104,6 +102,10 @@ export const saleModule = defineBusinessModule<SaleContract>()({
   children: {},
   /** 仅保留固定范围、排序、权限与草稿策略。 */
   views: {
+    /** 摘要复用详情字段，正文只保留备注，不重复名称、编码和状态。 */
+    detail: {
+      summary: { titleField: "name", descriptionFields: ["code"], statusFields: ["active"] },
+    },
     list: {
       getKey: (row) => row.id,
       scope: (context) => ({

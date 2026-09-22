@@ -42,11 +42,12 @@ test("实际 Customer 保存反馈配置的 saved 悬停说明包含默认文案
   assert.match(documentation, /关闭轻提示/);
 });
 
-test("实际 Sale drawer 配置的 component 悬停说明明确非标签页 loader 合同", () => {
-  const file = path.resolve("src/pages/base/sale/config.ts");
-  const documentation = quickInfoDocumentation(file, 'component: () => import("./add.vue")');
-  assert.match(documentation, /非标签模式必填/);
-  assert.match(documentation, /add\.vue\/edit\.vue/);
+test("实际 Sale 统一展示配置的悬停说明可读取默认、特例和 loader 职责", () => {
+  const file = path.resolve("src/pages/base/sale/page.ts");
+  assert.match(quickInfoDocumentation(file, "presentation:"), /统一展示策略/);
+  assert.match(quickInfoDocumentation(file, 'mode: "drawer"'), /默认 tab/);
+  assert.match(quickInfoDocumentation(file, 'detail: { mode: "tab" }'), /详情特例/);
+  assert.match(quickInfoDocumentation(file, 'add: () => import("./add.vue")'), /路由和容器共用/);
 });
 
 test("FeedbackProps 与 FeedbackEmits 的实际对象调用可读取展示和关闭职责", () => {

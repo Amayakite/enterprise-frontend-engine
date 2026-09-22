@@ -99,6 +99,7 @@ declare module 'vue' {
     LayoutToolbar: typeof import('./../../pages/layout/components/LayoutToolbar.vue')['default']
     MultiImageUpload: typeof import('./../../components/common/Upload/MultiImageUpload.vue')['default']
     MyBatchActions: typeof import('./../../components/business/crud/MyBatchActions.vue')['default']
+    MyBusinessPageContent: typeof import('./../../components/business/crud/MyBusinessPageContent.vue')['default']
     MyBusinessPageHost: typeof import('./../../components/business/crud/MyBusinessPageHost.vue')['default']
     MyCrudChildTable: typeof import('./../../components/business/crud/MyCrudChildTable.vue')['default']
     MyCrudDetail: typeof import('./../../components/business/crud/MyCrudDetail.vue')['default']

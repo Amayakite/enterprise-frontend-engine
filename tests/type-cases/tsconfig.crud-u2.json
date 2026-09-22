@@ -1,4 +1,4 @@
 {
   "extends": "../../tsconfig.json",
-  "include": ["crud-u2.ts", "../../src/types/**/*.d.ts"]
+  "include": ["crud-u2.ts", "vue-shim.d.ts", "../../src/types/**/*.d.ts"]
 }

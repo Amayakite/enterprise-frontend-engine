@@ -17,6 +17,12 @@
   gap: 12px;
 }
 
+// 新布局嵌入公共宿主时沿用宿主背景和留白，不嵌套第二层页面容器。
+.business-page-host > .crud-page:has(.crud-layout--embedded) {
+  padding: 0;
+  background: transparent;
+}
+
 .page-container--split {
   flex-direction: row;
   overflow: hidden;

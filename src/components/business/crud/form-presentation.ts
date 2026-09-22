@@ -1,8 +1,16 @@
+import type { CrudViewEnvironment } from "./crud-page";
 import type { FormChange, FieldDefinition, FieldDensity, FieldLink } from "../fields/types";
 import type { CrudFormController, CrudDetailController } from "./types";
+import type { CrudLayoutOptions, CrudDetailSummary } from "./layout";
 
 /** 完整表单及其拆分组件共用的唯一 props 合同；子组件通过 Pick 选取所需部分。 */
 export type CrudFormProps<Model extends object, Entity, Id extends string | number, C> = {
+  /** 跨模块新增/详情容器；标准装配自动提供，省略不创建宿主。 */
+  host?: CrudViewEnvironment["host"];
+  /** 内容布局；省略保持原顶部操作栏。新预设将操作放到底部，复用同一控制器。 */
+  layout?: CrudLayoutOptions;
+  /** 模块实体名，用于生成新增/编辑标题；省略不追加实体名。 */
+  entityLabel?: string;
   /**
    * 表单加载、保存、草稿和离开保护的控制器。
    * @example
@@ -73,6 +81,18 @@ export function crudFormDisabledReason<M, E, I extends string | number>(
 
 /** 标准详情及拆分呈现组件共用合同，复用原详情控制器。 */
 export type CrudDetailProps<Model extends object, Entity, Id extends string | number, C> = {
+  /** 默认编辑命令；省略无默认编辑按钮，调用仍须经过原控制器权限保护。 */
+  edit?: () => Promise<void>;
+  /** 是否展示默认编辑入口，默认 false；页面 actions 插槽可替换该入口。 */
+  canEdit?: boolean;
+  /** 编辑禁用原因；省略表示不额外限制。 */
+  editReason?: string;
+  /** 内容布局；省略保持原主信息页签，simple 限宽，structured 展开主资料。 */
+  layout?: CrudLayoutOptions;
+  /** 无摘要或摘要标题为空时的实体名；省略显示“详情”。 */
+  entityLabel?: string;
+  /** 详情摘要字段；省略不提取摘要，已展示字段不在资料区重复。 */
+  summary?: CrudDetailSummary<Model>;
   /**
    * 详情加载与业务动作的控制器。
    * @example

@@ -361,7 +361,7 @@ test("useCrudView 详情刷新更新同一 state，编辑复核只读原因并�
   assert.equal(state.model, bindings.detail.controller.state.model);
   assert.equal(state.editReason, "只读演示");
   assert.equal("save" in actions, false);
-  assert.equal(bindings.host, undefined);
+  assert.equal(bindings.host, bindings.detail.host, "tab 页面仍提供按需跨模块宿主");
   view.close();
 });
 

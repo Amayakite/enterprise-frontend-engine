@@ -19,7 +19,7 @@ registerHooks({
 
 const { saleModule } = await import("../src/pages/base/sale/config.ts");
 
-test("Sale 保留四个原始 ModuleField 配置与显式顺序", () => {
+test("Sale 保留字段顺序、编辑校验及详情状态语义", () => {
   assert.deepEqual(
     saleModule.fields.map(({ key, label, type, props, form, scenes }) => ({
       key,
@@ -27,7 +27,13 @@ test("Sale 保留四个原始 ModuleField 配置与显式顺序", () => {
       type,
       props,
       form,
-      scenes,
+      scenes:
+        typeof scenes?.detail?.format === "function"
+          ? {
+              ...scenes,
+              detail: { format: [scenes.detail.format(false), scenes.detail.format(true)] },
+            }
+          : scenes,
     })),
     [
       {
@@ -60,7 +66,11 @@ test("Sale 保留四个原始 ModuleField 配置与显式顺序", () => {
         type: "switch",
         props: undefined,
         form: {},
-        scenes: { list: { width: 100 }, detail: true, query: { normal: true, advanced: true } },
+        scenes: {
+          list: { width: 100 },
+          detail: { format: ["已停用", "已启用"] },
+          query: { normal: true, advanced: true },
+        },
       },
       {
         key: "remark",
@@ -68,7 +78,7 @@ test("Sale 保留四个原始 ModuleField 配置与显式顺序", () => {
         type: "textarea",
         props: { maxlength: 300 },
         form: { span: 2 },
-        scenes: { detail: true },
+        scenes: { detail: { span: 2 } },
       },
     ]
   );

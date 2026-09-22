@@ -1,11 +1,33 @@
 import type { CrudNavigation } from "./types";
-import type { BusinessEditorOptions } from "./presentation";
+import type {
+  BusinessEditorOptions,
+  BusinessPresentationOptions,
+  BusinessPageComponents,
+  BusinessView,
+  BusinessViewPresentation,
+} from "./presentation";
+import type { CrudLayoutOptions } from "./layout";
 
 /** 标准路由页的声明；只存业务约定，不持有登录状态或 Vue Router 实例。 */
 export interface BusinessPageOptions<Organization extends string = string> {
-  /** 新增策略；默认 tab，非标签模式须提供页面 loader。 */
+  /** 统一展示策略；场景覆盖优先于公共值，最终默认 tab。
+   * @example
+   * `presentation: { mode: "drawer", detail: { mode: "tab" } }`
+   */
+  presentation?: BusinessPresentationOptions;
+  /** 三种场景的懒加载组件；容器打开时必须有对应 loader，登记时不会加载页面。
+   * @example
+   * `components: { add: () => import("./add.vue") }`
+   */
+  components?: BusinessPageComponents;
+  /** 内容布局；省略保持原容器。simple 紧凑字段、structured 分区；均铺满可用高度。
+   * @example
+   * `layout: { preset: "simple", entityLabel: "销售组织" }`
+   */
+  layout?: CrudLayoutOptions;
+  /** 旧新增策略，兼容已有模块；新模块使用 presentation + components。 */
   add?: BusinessEditorOptions;
-  /** 编辑策略；与新增独立选择 tab/dialog/drawer。 */
+  /** 旧编辑策略，兼容已有模块；新模块使用 presentation + components。 */
   edit?: BusinessEditorOptions;
   /** 模块列表绝对路径；新增/编辑/详情默认位于其 add、edit/:id、detail/:id。 */
   basePath: string;
@@ -45,3 +67,26 @@ export function createBusinessPaths(basePath: string) {
 
 /** 页面只覆写有差异的导航命令，其余使用公共路径。 */
 export type BusinessNavigationOverrides = Partial<CrudNavigation<string>>;
+
+/** 合并展示策略，不加载组件；调用覆盖 > 场景覆盖 > 模块默认 > tab。
+ * @param page 模块轻量页面声明。
+ * @param view 要打开的场景。
+ * @param override 本次调用覆盖，不修改模块声明。
+ * @returns 展示形态、宽度及惰性 loader；容器缺少 loader 由打开入口报错。
+ * @example
+ * `resolveBusinessPresentation(page, "detail", { mode: "tab" })`
+ */
+export function resolveBusinessPresentation(
+  page: BusinessPageOptions,
+  view: BusinessView,
+  override: BusinessViewPresentation = {}
+) {
+  const legacy = view === "detail" ? undefined : page[view];
+  const common = page.presentation;
+  const specific = common?.[view];
+  return {
+    mode: override.mode ?? specific?.mode ?? common?.mode ?? legacy?.mode ?? "tab",
+    width: override.width ?? specific?.width ?? common?.width ?? legacy?.width,
+    component: page.components?.[view] ?? legacy?.component,
+  };
+}

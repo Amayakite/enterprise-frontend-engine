@@ -8,6 +8,8 @@ import {
 import NProgress from "@/router/nprogress";
 import router from "@/router";
 import { usePermissionStore, useUserStore } from "@/stores";
+import { useTagsViewStore } from "@/stores/tags-view";
+import type { TagView } from "@/stores/tags-view";
 
 /**
  * 路由权限守卫
@@ -16,6 +18,7 @@ import { usePermissionStore, useUserStore } from "@/stores";
  */
 export function setupPermissionGuard() {
   const whiteList = ["/login"];
+  const replacements = new Map<string, TagView>();
 
   router.beforeEach(async (to, _from) => {
     NProgress.start();
@@ -92,6 +95,16 @@ export function setupPermissionGuard() {
       }
 
       // 动态标题
+      // 返回通道区分新增实例；替换同路径后台标签前也必须确认其未保存内容。
+      const tags = useTagsViewStore();
+      const previous = tags.visitedViews.find(
+        (view) => view.path === to.path && view.fullPath !== to.fullPath
+      );
+      if (previous && (to.query.businessSession || previous.query?.businessSession)) {
+        if (!(await tags.canRemoveViews([previous]))) return false;
+        replacements.set(to.fullPath, { ...previous });
+      }
+
       const title = (to.params.title as string) || (to.query.title as string);
       if (title) {
         to.meta.title = title;
@@ -105,6 +118,9 @@ export function setupPermissionGuard() {
   });
 
   router.afterEach((to, _from, failure) => {
+    const previous = replacements.get(to.fullPath);
+    if (previous && failure) useTagsViewStore().rollbackRemoveViews([previous]);
+    replacements.delete(to.fullPath);
     const duplicate = isNavigationFailure(failure, NavigationFailureType.duplicated);
     const token = to.query.__navToken ?? to.redirectedFrom?.query.__navToken;
     navigationMailbox.finish(
@@ -115,6 +131,9 @@ export function setupPermissionGuard() {
     NProgress.done();
   });
   router.onError((_error, to) => {
+    const previous = replacements.get(to.fullPath);
+    if (previous) useTagsViewStore().rollbackRemoveViews([previous]);
+    replacements.delete(to.fullPath);
     const token = to.query.__navToken ?? to.redirectedFrom?.query.__navToken;
     if (typeof token === "string") navigationMailbox.cancel(token);
   });

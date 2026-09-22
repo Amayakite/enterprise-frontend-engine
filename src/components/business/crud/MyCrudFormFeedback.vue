@@ -1,7 +1,12 @@
 <template>
   <div class="crud-feedback">
     <MyFeedback
-      v-if="controller.draft"
+      v-if="
+        controller.draft &&
+        (!layout ||
+          !['idle', 'saving', 'saved'].includes(controller.draft.state.phase) ||
+          controller.draft.state.memoryOnly)
+      "
       class="crud-form__draft"
       :message="draftMessage"
       :tone="draftTone"
@@ -105,7 +110,7 @@ const props =
   defineProps<
     Pick<
       CrudFormProps<Model, Entity, Id, unknown>,
-      "controller" | "readonlyReason" | "changePending" | "changeError" | "retryChange"
+      "controller" | "readonlyReason" | "changePending" | "changeError" | "retryChange" | "layout"
     >
   >();
 const target = computed(() => cloneReadonlyModel<CrudTarget<Id>>(props.controller.state.target));

@@ -112,6 +112,8 @@ const props = withDefaults(
     width?: string | number;
     maxWidth?: string;
     maxHeight?: string;
+    /** 是否铺满 maxHeight；默认 false 自然高度，全屏时填满视口。 */
+    fillHeight?: boolean;
     top?: string;
     appendToBody?: boolean;
     destroyOnClose?: boolean;
@@ -211,6 +213,11 @@ const dialogStyle = computed(
     ({
       "--my-dialog-max-width": props.maxWidth,
       "--my-dialog-max-height": props.maxHeight,
+      height: props.fillHeight
+        ? resolvedFullscreen.value
+          ? "100dvh"
+          : props.maxHeight
+        : undefined,
     }) as CSSProperties
 );
 

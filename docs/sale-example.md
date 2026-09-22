@@ -21,9 +21,9 @@
 
 新增/编辑各自装配，不增加共用 Editor。没有模型转换差异，因此不额外建立 adapters.ts；
 config.model 直接写出保存白名单。必须保留 context 与 parseId 适配，不能只写 page.basePath。
-页面无需 CSS；当前新增为抽屉，列表已启用 KeepAlive。
-index/detail 仅渲染标准 `MyCrudList` / `MyCrudDetail`；它们会自动挂载一次
-`MyBusinessPageHost`，后续只改 page.add/edit 即可选择 tab/dialog/drawer。
+页面无需 CSS；当前新增/编辑为抽屉、详情为页面，列表已启用 KeepAlive。
+四页分别渲染标准 `MyCrudList` / `MyCrudForm` / `MyCrudDetail`；它们会自动挂载一次
+`MyBusinessPageHost`，在轻量 `page.ts` 的 presentation 中统一选择 tab/dialog/drawer，场景只声明特例。
 默认未配置的模式仍为 tab，直接访问 add/edit 路由仍显示完整页面。
 
 ## 客户如何参照 Sale
@@ -39,6 +39,7 @@ reference: reference({
   navigation: {
     view: (id) => ({ target: "sale", id }),
     create: "sale",
+    createdId: (id) => id,
     createLabel: "前往新增销售组织",
   },
 });
@@ -49,8 +50,8 @@ reference: reference({
 1. 新增客户时选择销售组织；保存 DTO 只提交 saleId，saleName 由 Mock 解析返回。
 2. 选择后点查看入口进入该组织详情；是否显示入口由 navigation.view 配置决定。
 3. 找不到时先改关键词，或通过“筛选”打开普通/高级查询。
-4. 点击“前往新增销售组织”进入 Sale 列表，由该页权限决定能否引导新增。
-5. 新增后返回来源，重新查询并选择；不自动建单、不自动回填新记录。
+4. 点击“前往新增销售组织”按 Sale 展示配置直接打开新增抽屉，原控制器校验新增权限。
+5. 保存后返回来源，通过原参照数据源解析并验证新记录后选入；不自动保存客户。
 
 目标路径在 [business-targets.ts](../src/router/business-targets.ts) 的 saleTarget 登记，
 与 config.page.basePath 共用；菜单和隐藏路由由 Mock 菜单接口提供，不用页面硬编码跳转地址。
@@ -65,7 +66,7 @@ reference: reference({
 - 无销售组织新增权限：选择此项，再从销售组织参照点击“前往新增销售组织”。
 - 无客户新增权限：在实验页客户参照点击“前往新增客户”。
 
-有权限时目标列表高亮新增按钮；无权限时没有新增按钮，只显示无需确认的轻提示。
+有权限时直接打开新增表单；无权限时目标新增界面显示受限说明，不挂载可编辑表单。
 直接访问受限 add 地址也不渲染可编辑表单。返回来源点击“恢复权限”，或刷新浏览器恢复。
 开关仅修改内存中的前端预览，不修改 Mock 用户接口、不持久化，也不能给登录用户增加权限。
 权限变化会改变访问范围；已打开表单若提示上下文变化，先按页面提示重新加载，再打开参照。

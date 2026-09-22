@@ -1,3 +1,4 @@
+import type { CrudDetailSummary } from "./layout";
 import type { Component, DeepReadonly, VNodeChild } from "vue";
 import type { PageResult } from "@/types/http";
 import type { FieldDefinition, FieldKey } from "@/components/business/fields/types";
@@ -492,6 +493,8 @@ export interface CrudFormConfig<
 }
 /** 详情页的加载、模型转换、字段、页签与动作配置。 */
 export interface CrudDetailConfig<Entity, Model, Id extends string | number, C> {
+  /** 详情摘要配置；省略不提取，字段键受页面模型约束，隐藏字段不会展示。 */
+  summary?: CrudDetailSummary<Model>;
   /** 详情加载前准备；不代替 load，不修改 ID。 */
   beforeOpen?: (id: Id, request: CrudRequestContext<C>) => Promise<void>;
   /** 当前有效详情回显后执行；只读模型，失败进入详情错误态。 */

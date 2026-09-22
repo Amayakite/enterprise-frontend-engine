@@ -1,6 +1,7 @@
 import type { CrudColumnIdentity } from "@/composables/useCrudColumns";
 import type { ReferenceOverrides } from "../fields/reference-overrides";
 import type { BusinessPresentation } from "./presentation";
+import type { CrudLayoutOptions, CrudDetailSummary } from "./layout";
 import type { ArrayModelKey } from "./aggregate";
 import type { CrudListSlots, CrudFormSlots, CrudDetailSlots, CrudTableBinding } from "./types";
 import type { DeepReadonly, Slots, VNode, VNodeChild, UnwrapNestedRefs } from "vue";
@@ -211,7 +212,7 @@ export interface CrudViewEnvironment {
   /** 固定目标缺失等初始化错误；空值时允许挂载业务组件。 */ readonly invalidReason:
     | string
     | undefined;
-  /** 列表/详情的弹窗和抽屉宿主；表单不提供。 */ readonly host:
+  /** 当前页面的弹窗和抽屉宿主，表单也可打开跨模块页面。 */ readonly host:
     | {
         /** 当前实例的呈现管理器。 */ presentation: BusinessPresentation;
         /** 嵌入编辑保存后刷新宿主，不再次提交。 */ afterSave: () => Promise<void>;
@@ -277,6 +278,9 @@ export interface CrudFormPage<
   ) => CrudTableBinding<T["Model"][K] extends readonly (infer Row extends object)[] ? Row : never>;
   /** 高级布局的公开 MyCrudForm props；仍使用同一控制器。 */ bindings: {
     /** 完整表单 props。 */ form: {
+      /** 跨模块页面宿主，标准表单自动挂载。 */ host?: CrudViewEnvironment["host"];
+      /** 内容布局；省略保持原外壳。 */ layout?: CrudLayoutOptions;
+      /** 新增/编辑标题的实体称呼。 */ entityLabel?: string;
       /** 原控制器。 */ controller: CrudFormController<T["Model"], T["Entity"], T["Id"]>;
       /** 字段合同。 */ fields: Form<T>["fields"];
       /** 子表分区。 */ sections: Form<T>["sections"];
@@ -299,6 +303,12 @@ export interface CrudDetailPage<
   /** 编辑动作禁用原因；可编辑时 undefined。 */ readonly editReason: string | undefined;
   /** 直接详情组件绑定。 */ bindings: {
     /** 与默认容器共用的详情 props。 */ readonly detail: {
+      /** 原详情页的编辑入口，复核权限及只读状态。 */ edit?: () => Promise<void>;
+      /** 是否允许展示默认编辑按钮。 */ canEdit?: boolean;
+      /** 当前编辑限制，undefined 表示无额外限制。 */ editReason?: string;
+      /** 内容布局；省略保持原外壳。 */ layout?: CrudLayoutOptions;
+      /** 详情标题的实体称呼。 */ entityLabel?: string;
+      /** 按模型字段键配置摘要；省略不展示。 */ summary?: CrudDetailSummary<T["Model"]>;
       /** 唯一详情控制器。 */ controller: CrudDetailController<T["Model"], T["Entity"], T["Id"]>;
       /** 主信息字段。 */ fields: Detail<T>["fields"];
       /** 子表页签。 */ tabs: Detail<T>["tabs"];

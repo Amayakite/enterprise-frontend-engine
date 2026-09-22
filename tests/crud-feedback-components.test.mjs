@@ -22,7 +22,23 @@ test("CRUD 的状态与错误提示统一使用 MyFeedback，保留原动作入�
 
   const form = source("MyCrudFormFeedback.vue");
   assert.doesNotMatch(form, /role="(alert|status)"/);
-  assert.match(form, /<MyFeedback\s+v-if="controller\.draft"/);
+  const draftCondition = form.match(/<MyFeedback\s+v-if="([^"]+)"/);
+  assert.ok(draftCondition, "草稿操作提示仍使用 MyFeedback");
+  const visible = new Function("controller", "layout", `return (${draftCondition[1]})`);
+  for (const phase of ["checking", "available", "conflict", "unsafe", "error"]) {
+    assert.equal(visible({ draft: { state: { phase } } }, { preset: "simple" }), true);
+  }
+  for (const phase of ["idle", "saving", "saved"]) {
+    assert.equal(
+      !!visible({ draft: { state: { phase, memoryOnly: false } } }, { preset: "simple" }),
+      false
+    );
+    assert.equal(visible({ draft: { state: { phase } } }, undefined), true);
+    assert.equal(
+      visible({ draft: { state: { phase, memoryOnly: true } } }, { preset: "simple" }),
+      true
+    );
+  }
   assert.match(form, /恢复草稿/);
   assert.match(form, /丢弃旧草稿/);
   assert.match(form, /重试草稿操作/);

@@ -1,7 +1,15 @@
+import { customerPage } from "@/pages/base/customer/page";
+import { salePage } from "@/pages/base/sale/page";
+import type { BusinessPageOptions } from "@/components/business/crud/page";
+import type { BusinessPresentationMode } from "@/components/business/crud/presentation";
 import { createBusinessPaths } from "@/components/business/crud/page";
 
 /** 业务导航目标元信息；登记不代表授权，不加载页面组件。 */
 export interface BusinessTarget {
+  /** 轻量展示及组件声明；不包含业务字段/API。 */
+  page?: BusinessPageOptions;
+  /** 可选编辑路径，ID 仅在 URL 边界编码。 */
+  edit?: (id: string | number) => string;
   /** 稳定模块标识，例如 customer；不使用显示标题。 */
   key: string;
   /** 供查看、新增和受限提示使用的实体名称。 */
@@ -23,6 +31,7 @@ const customerPaths = createBusinessPaths("/base/customer");
  */
 export const customerTarget: BusinessTarget = {
   key: "customer",
+  page: customerPage,
   title: "客户",
   ...customerPaths,
   matches: (path) =>
@@ -34,6 +43,7 @@ const salePaths = createBusinessPaths("/base/sale");
 /** 销售组织的配置化跳转目标；登记不代表授权。 */
 export const saleTarget: BusinessTarget = {
   key: "sale",
+  page: salePage,
   title: "销售组织",
   ...salePaths,
   matches: (path) =>
@@ -63,8 +73,23 @@ export function findBusinessTarget(path: string) {
 export interface BusinessNavigationRequest {
   /** 已登记目标 key。 */
   target: string;
-  /** create 到列表引导；view 到详情（有 id 时）或列表，默认 view。 */
+  /** create 直接打开新增；view 到详情（有 id 时）或列表，默认 view。 */
   action?: "create" | "view";
+  /** 本次展示覆盖；省略使用目标模块配置。 */
+  mode?: BusinessPresentationMode;
   /** 查看记录的原始 ID，0 有效；省略时打开列表。 */
   id?: string | number;
+}
+
+/** 路由与容器共用已登记 loader；未知组件路径返回 undefined，交回原 glob。
+ * @example
+ * `businessRouteComponent("base/sale/add")`
+ */
+export function businessRouteComponent(componentPath: string) {
+  for (const target of targets) {
+    const base = target.list.replace(/^\//, "");
+    for (const view of ["add", "edit", "detail"] as const) {
+      if (componentPath === `${base}/${view}`) return target.page?.components?.[view];
+    }
+  }
 }

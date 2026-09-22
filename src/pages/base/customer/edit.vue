@@ -5,14 +5,19 @@
 
     <MyCrudForm v-if="!state.invalidReason" v-bind="bindings.form">
       <template #header>
-        <MyFeedback v-if="state.notice" :message="state.notice" />
+        <details class="customer-example-options">
+          <summary>开发示例选项与说明</summary>
+          <div class="customer-example-options__body">
+            <MyFeedback v-if="state.notice" :message="state.notice" />
 
-        <el-space wrap>
-          <el-text>本次载入版本：{{ state.custom.loadedVersion ?? "正在加载" }}</el-text>
-          <el-checkbox v-model="state.custom.requireShortName">
-            本次编辑必须填写客户简称
-          </el-checkbox>
-        </el-space>
+            <el-space wrap>
+              <el-text>本次载入版本：{{ state.custom.loadedVersion ?? "正在加载" }}</el-text>
+              <el-checkbox v-model="state.custom.requireShortName">
+                本次编辑必须填写客户简称
+              </el-checkbox>
+            </el-space>
+          </div>
+        </details>
 
         <el-text v-if="state.custom.changeSummary" type="info">
           {{ state.custom.changeSummary }}
@@ -48,9 +53,10 @@
       </template>
       <template #footer="{ state: formState }">
         <el-space wrap>
-          <el-tag :type="formState.dirty ? 'warning' : 'info'" effect="plain">
-            {{ formState.dirty ? "有未保存修改" : "内容未修改" }}
-          </el-tag>
+          <el-text type="info">
+            联系人 {{ formState.model.contacts.length }} 位；地址
+            {{ formState.model.addresses.length }} 处
+          </el-text>
           <el-text v-if="state.custom.lastSavedCode">
             最近保存：{{ state.custom.lastSavedCode }}
           </el-text>
@@ -150,3 +156,18 @@ function fillShortName(update: (value: string) => void, commit: () => void, name
   commit();
 }
 </script>
+<style scoped>
+.customer-example-options {
+  color: var(--el-text-color-secondary);
+  font-size: 13px;
+}
+.customer-example-options summary {
+  cursor: pointer;
+  width: fit-content;
+}
+.customer-example-options__body {
+  display: grid;
+  gap: 12px;
+  padding-top: 12px;
+}
+</style>

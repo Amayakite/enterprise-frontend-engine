@@ -10,6 +10,12 @@ export interface ReferenceNavigation<Row, Id extends ReferenceId> {
   view?: (id: Id, row: Readonly<Row>) => BusinessNavigationRequest;
   /** 前往新增的已登记目标 key；不按来源菜单权限隐藏，目标页判断权限。 */
   create?: string;
+  /** 新增完成后将路由边界 ID 转为本参照 ID；省略不自动选择，返回 null 放弃回写。
+   * 回写仍经过 source.resolve、可选性与 beforeCommit 校验，不直接填名称。
+   * @example
+   * `createdId: (id) => id`
+   */
+  createdId?: (id: string) => Id | null;
   /** 覆写前往新增文案；省略从目标名称生成。 */
   createLabel?: string;
 }
