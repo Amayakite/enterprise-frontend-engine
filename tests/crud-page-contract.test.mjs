@@ -59,6 +59,10 @@ test("实际调用处的生命周期与富文本字段提供 TypeScript 悬停�
       ["bindings.fields", "bindings.".length],
       ['actions.patch({ customerName: "正确" })', "actions.".length],
       ['bindings.child("contacts")', "bindings.".length],
+      [
+        'bindings.fields.controller.focusIssue({ field: "customerName"',
+        "bindings.fields.controller.".length,
+      ],
     ]) {
       const position = source.indexOf(expression);
       const info = service.getQuickInfoAtPosition(file, position + offset + 1);

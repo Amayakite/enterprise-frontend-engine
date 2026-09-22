@@ -827,6 +827,14 @@ export interface CrudFormController<Model, Entity, Id extends string | number> {
   patch: (patch: Partial<Model>) => void;
 
   /**
+   * 定位主字段或子表错误；复用已登记端口，不触发保存或修改模型。
+   * 主表传 field；子表传 section、rowKey、rowField。省略参数定位当前首错，无错误时不操作。
+   * @example
+   * await controller.focusIssue({ field: "customerName", message: "请填写客户名称" });
+   */
+  focusIssue: (issue?: CrudIssue<Model> | DeepReadonly<CrudIssue<Model>>) => Promise<void>;
+
+  /**
    * 校验主子表并执行当前场景保存；控制器统一处理忙碌、回填和失效通知。
    */
   save: () => Promise<void>;

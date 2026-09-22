@@ -1,4 +1,13 @@
-import { computed, onBeforeUnmount, readonly, ref, shallowRef, watch } from "vue";
+import {
+  computed,
+  onActivated,
+  onDeactivated,
+  onBeforeUnmount,
+  readonly,
+  ref,
+  shallowRef,
+  watch,
+} from "vue";
 import { cloneModel } from "@/components/business/fields/model";
 import { createRequestChannel } from "@/utils/request-channel";
 import {
@@ -60,9 +69,12 @@ export function useSearchQuery<
   const scope = computed(() => source.scope());
   const channel = createRequestChannel();
   let alive = true;
+  let active = true;
+  let pendingScope = false;
   let revision = 0;
   async function load(allowClamp: boolean) {
     if (!alive) return;
+    pendingScope = false;
     const run = channel.start();
     const scopeKey = scope.value.key;
     loading.value = true;
@@ -150,10 +162,22 @@ export function useSearchQuery<
       applied.value = cloneModel(initial.applied);
       pageNum.value = 1;
       sort.value = cloneModel(source.initialSort ?? null);
-      if (options.scopeChanged) options.scopeChanged();
-      else void refresh();
+      if (!active) pendingScope = true;
+      else refreshScope();
     }
   );
+  function refreshScope() {
+    pendingScope = false;
+    if (options.scopeChanged) options.scopeChanged();
+    else void refresh();
+  }
+  onDeactivated(() => {
+    active = false;
+  });
+  onActivated(() => {
+    active = true;
+    if (pendingScope) refreshScope();
+  });
   onBeforeUnmount(() => {
     alive = false;
     channel.cancel();

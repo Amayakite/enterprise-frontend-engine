@@ -29,6 +29,8 @@ pnpm type-check  # TypeScript / Vue 类型检查
 pnpm test:quick  # 日常反馈：行为、结构与文档断言，不启动完整 TS/Vue 编译
 pnpm test:contracts # 类型正反例、语言服务悬停及混合合同测试
 pnpm test        # 合同与行为测试（限制并发，降低内存占用）
+pnpm test:e2e    # 独立 Mock 服务上的浏览器回归，首次需安装 Playwright Chromium
+pnpm bench:crud  # 0/100/500 行子表模型回写基准（不代表浏览器帧率）
 pnpm build       # 类型检查后打包至 dist
 pnpm preview     # 预览构建产物，不启动 Mock
 pnpm format      # 手动格式化全部文件

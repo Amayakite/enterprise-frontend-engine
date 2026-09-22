@@ -115,3 +115,7 @@ void formSlots;
 
 state.canSave satisfies boolean;
 bindings.fields.controller.state.model.customerName satisfies string;
+bindings.fields.controller.focusIssue({ field: "customerName", message: "名称必填" });
+bindings.fields.controller.focusIssue(bindings.fields.controller.state.issues[0]);
+// @ts-expect-error 错误定位只能指向模型字段
+bindings.fields.controller.focusIssue({ field: "missingField", message: "错误" });

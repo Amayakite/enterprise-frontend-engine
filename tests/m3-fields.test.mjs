@@ -33,18 +33,40 @@ const initial = () => ({
   amount: 0,
   enabled: false,
 });
+
+test("不可变宿主回写跳过未变分支，外部替换和同批 hydrate 仍同步且不污染基线", async () => {
+  const view = mount(initial(), undefined, true);
+  const untouched = view.state.model.value.custom;
+  view.state.applyPatch({ note: "输入" }, "user", "note");
+  await flush();
+  assert.equal(view.events.length, 1, "回写不应再次发布");
+  assert.equal(view.state.model.value.custom, untouched);
+  view.props.modelValue = { ...view.props.modelValue, custom: { tags: ["外部替换"] } };
+  await flush();
+  assert.deepEqual(view.state.model.value.custom.tags, ["外部替换"]);
+  assert.notEqual(view.state.model.value.custom, view.props.modelValue.custom);
+  view.props.formKey = "another";
+  view.props.modelValue = { ...initial(), customerId: 9, contactId: 8 };
+  await flush();
+  assert.equal(view.state.model.value.contactId, 8, "hydrate 不应清空联动字段");
+  view.state.applyPatch({ note: "修改" });
+  view.state.reset();
+  assert.equal(view.state.model.value.note, "");
+  view.close();
+});
 const dependency = {
   watch: ["customerId"],
   writes: ["contactId", "phone"],
   clear: ["contactId", "phone"],
 };
-function mount(modelValue = initial(), confirmed) {
+function mount(modelValue = initial(), confirmed, immutableModel = false) {
   const events = [];
   const props = reactive({
     modelValue,
     context: {},
     createInitialModel: initial,
     links: [dependency],
+    immutableModel,
   });
   let state;
   const app = renderer.createApp({

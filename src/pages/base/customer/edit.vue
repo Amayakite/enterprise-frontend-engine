@@ -16,12 +16,11 @@
                 本次编辑必须填写客户简称
               </el-checkbox>
             </el-space>
+            <el-text class="customer-example-options__change-summary" type="info">
+              {{ state.custom.changeSummary }}
+            </el-text>
           </div>
         </details>
-
-        <el-text v-if="state.custom.changeSummary" type="info">
-          {{ state.custom.changeSummary }}
-        </el-text>
       </template>
       <template #field-shortName="{ model, value, update, commit, readonly }">
         <el-input
@@ -169,5 +168,13 @@ function fillShortName(update: (value: string) => void, commit: () => void, name
   display: grid;
   gap: 12px;
   padding-top: 12px;
+}
+.customer-example-options__change-summary {
+  display: block;
+  min-height: 1.5em;
+  line-height: 1.5;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
 }
 </style>

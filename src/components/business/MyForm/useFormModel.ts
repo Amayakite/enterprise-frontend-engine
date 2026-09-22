@@ -42,6 +42,8 @@ export function useFormModel<M extends object, C>(
      * 创建全新初始模型；每次返回独立对象与数组，不复用可变单例。
      */
     createInitialModel: () => M;
+    /** 宿主是否始终替换根对象、保留未变分支；默认 false 深监听。挂载后不变更此策略。 */
+    immutableModel?: boolean;
 
     /**
      * 字段联动规则数组；复用公共联动引擎，不在页面重复写 watch。
@@ -139,7 +141,7 @@ export function useFormModel<M extends object, C>(
   let entityKey = props.formKey;
   watch(
     [() => props.modelValue, () => props.formKey],
-    ([next, key]) => {
+    ([next, key], [previous]) => {
       // 同一渲染批次的新 key 与实体一起 hydrate，避免先当运行期变更清下游。
       if (key !== entityKey) {
         entityKey = key;
@@ -147,17 +149,20 @@ export function useFormModel<M extends object, C>(
         return;
       }
       // 同步回写（包括父级浅拷贝）不重跑联动；深监听同时捕获父级原位修改。
-      if (sameModelValue(next, model.value)) return;
+      if (!props.immutableModel && sameModelValue(next, model.value)) return;
       const patch: Partial<M> = {};
       for (const key of Object.keys(next) as FieldKey<M>[]) {
         // DeepReadonly 的条件映射在泛型处不能反推键；仅恢复同一模型字段的对应关系。
         const value = next[key as keyof typeof next] as M[typeof key] | DeepReadonly<M[typeof key]>;
+        // CRUD 每次只替换被修改分支；无需再次遍历数百条未修改子行。
+        if (props.immutableModel && Object.is(value, previous[key as keyof typeof previous]))
+          continue;
         if (!sameModelValue(value, model.value[key]))
           patch[key] = cloneReadonlyModel<M[typeof key]>(value);
       }
       applyPatch(patch, "external");
     },
-    { deep: true }
+    { deep: !props.immutableModel }
   );
   watch(
     () => props.context,

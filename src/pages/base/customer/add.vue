@@ -19,12 +19,11 @@
                 本次新增必须填写联系电话
               </el-checkbox>
             </el-space>
+            <el-text class="customer-example-options__change-summary" type="info">
+              {{ state.custom.changeSummary }}
+            </el-text>
           </div>
         </details>
-
-        <el-text v-if="state.custom.changeSummary" type="info">
-          {{ state.custom.changeSummary }}
-        </el-text>
       </template>
       <!-- update 保留公共模型/脏状态/草稿流程；readonly 同时约束输入和模板按钮。 -->
       <template #field-remark="{ value, update, commit, readonly }">
@@ -186,5 +185,13 @@ function applyRemarkTemplate(update: (value: string) => void, commit: () => void
   display: grid;
   gap: 12px;
   padding-top: 12px;
+}
+.customer-example-options__change-summary {
+  display: block;
+  min-height: 1.5em;
+  line-height: 1.5;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
 }
 </style>

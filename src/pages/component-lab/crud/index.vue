@@ -15,6 +15,17 @@
         <el-checkbox v-model="controls.delay">慢查询</el-checkbox>
       </div>
       <div class="page-toolbar__right">
+        <template v-if="mode === 'form'">
+          <el-button :disabled="editor.busy || !!readonlyReason" @click="fillPerformanceRows(100)">
+            装入 100 行测试明细
+          </el-button>
+          <el-button :disabled="editor.busy || !!readonlyReason" @click="fillPerformanceRows(500)">
+            装入 500 行测试明细
+          </el-button>
+          <span role="status" aria-label="性能测试数据">
+            当前 {{ editor.state.model.lines.length }} 行
+          </span>
+        </template>
         <el-button
           v-if="mode === 'form' && editor.state.model.lines.length > 10"
           :disabled="editor.busy || !!readonlyReason"
@@ -192,5 +203,15 @@ function invalidateLastLine() {
   const rows = cloneReadonlyModel<CrudLabLine[]>(editor.state.model.lines);
   if (rows.length) rows[rows.length - 1]!.name = "";
   editor.patch({ lines: rows });
+}
+/** 仅开发实验页可见：替换本页未提交明细，使用稳定且唯一的行键以复测分页、编辑及首错定位。 */
+function fillPerformanceRows(count: number) {
+  editor.patch({
+    lines: Array.from({ length: count }, (_, index) => ({
+      id: `performance-${index}`,
+      name: `性能测试明细 ${index + 1}`,
+      quantity: 1,
+    })),
+  });
 }
 </script>

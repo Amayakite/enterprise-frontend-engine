@@ -294,50 +294,53 @@ import type { AppliedQuery, QueryDraft, QuerySchema } from "@/components/busines
 import type { TableSort } from "@/components/table/types";
 import type { CrudListConfig, CrudListController, CrudListSlots, CrudNavigation } from "./types";
 import type { CrudViewEnvironment } from "./crud-page";
-const props = defineProps<{
-  /** 标准装配层的新增权限；省略保持独立列表原行为。 */
-  createPermitted?: boolean;
-  /** 导航意图视觉效果；默认 halo，false 仅文字说明。 */
-  guideMode?: "halo" | "spotlight" | false;
-  /**
-   * 当前列表自动消费的弹窗/抽屉宿主；标准 useCrudView 会提供，独立列表省略时不挂载。
-   * @example
-   * `<MyCrudList v-bind="bindings.list" />`
-   */
-  host?: CrudViewEnvironment["host"];
-  /** index 的批量控制器；省略不显示，不从 config 创建业务规则。 */
-  batch?: BatchController;
-  /**
-   * 列表查询、列、操作与 DTO 适配的模块配置。
-   * @example `<MyCrudList :config="customerConfig" ... />`
-   */
-  config: CrudListConfig<Row, Id, S, Scope, QueryDTO, C>;
-  /**
-   * 列表状态与动作控制器；数据、分页、排序均由它受控。
-   * @example `<MyCrudList :controller="customerList" ... />`
-   */
-  controller: CrudListController<Row, Id, S>;
-  /**
-   * 单元格字段和业务动作所需的页面上下文。
-   * @example `<MyCrudList :context="pageContext" ... />`
-   */
-  context: C;
-  /**
-   * 新增、详情和编辑页面的导航入口；不传则隐藏对应操作。
-   * @example `<MyCrudList :navigation="{ add, detail, edit }" ... />`
-   */
-  navigation?: CrudNavigation<Id>;
-  /**
-   * 用户列设置的稳定存储身份。
-   * @example `<MyCrudList :preference="{ moduleKey: 'base.customer.list' }" ... />`
-   */
-  preference: CrudColumnIdentity;
-  /**
-   * 当前组织/权限等列表范围的稳定标识。
-   * @example `<MyCrudList :scope-key="organizationId" ... />`
-   */
-  scopeKey: string;
-}>();
+const props = withDefaults(
+  defineProps<{
+    /** 标准装配层的新增权限；默认 true 保持独立列表原行为，false 隐藏并禁用新增。 */
+    createPermitted?: boolean;
+    /** 导航意图视觉效果；默认 halo，false 仅文字说明。 */
+    guideMode?: "halo" | "spotlight" | false;
+    /**
+     * 当前列表自动消费的弹窗/抽屉宿主；标准 useCrudView 会提供，独立列表省略时不挂载。
+     * @example
+     * `<MyCrudList v-bind="bindings.list" />`
+     */
+    host?: CrudViewEnvironment["host"];
+    /** index 的批量控制器；省略不显示，不从 config 创建业务规则。 */
+    batch?: BatchController;
+    /**
+     * 列表查询、列、操作与 DTO 适配的模块配置。
+     * @example `<MyCrudList :config="customerConfig" ... />`
+     */
+    config: CrudListConfig<Row, Id, S, Scope, QueryDTO, C>;
+    /**
+     * 列表状态与动作控制器；数据、分页、排序均由它受控。
+     * @example `<MyCrudList :controller="customerList" ... />`
+     */
+    controller: CrudListController<Row, Id, S>;
+    /**
+     * 单元格字段和业务动作所需的页面上下文。
+     * @example `<MyCrudList :context="pageContext" ... />`
+     */
+    context: C;
+    /**
+     * 新增、详情和编辑页面的导航入口；不传则隐藏对应操作。
+     * @example `<MyCrudList :navigation="{ add, detail, edit }" ... />`
+     */
+    navigation?: CrudNavigation<Id>;
+    /**
+     * 用户列设置的稳定存储身份。
+     * @example `<MyCrudList :preference="{ moduleKey: 'base.customer.list' }" ... />`
+     */
+    preference: CrudColumnIdentity;
+    /**
+     * 当前组织/权限等列表范围的稳定标识。
+     * @example `<MyCrudList :scope-key="organizationId" ... />`
+     */
+    scopeKey: string;
+  }>(),
+  { createPermitted: true }
+);
 const dictionaries = useFieldDictionaries(
   () => props.config.fields ?? [],
   () => props.context

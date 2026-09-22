@@ -246,7 +246,7 @@ export function useCrudRuntime<
     let handledInvalidation = viewInvalidationRevision(config.key);
     onActivated(() => {
       const revision = viewInvalidationRevision(config.key);
-      if (revision === handledInvalidation) return;
+      if (revision === handledInvalidation || detail.state.phase === "loading") return;
       // 只刷新当前实例绑定的记录；后台缓存页不读取其他标签的路由参数。
       if (id !== null)
         void detail.load(id).then(() => {

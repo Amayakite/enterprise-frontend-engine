@@ -286,8 +286,14 @@ const unregister = props.binding.register({
     );
   },
   async focus(key, field) {
-    const row = rows.value.find((row) => props.getRowKey(row) === key);
-    const column = props.fields.find((item) => item.key === field);
+    // 整个分区/活动草稿错误可能没有列定位；沿公开草稿快照回到正在编辑的行。
+    const draftKey = !field ? table.value?.snapshotDraft([])?.rowKey : undefined;
+    const row = field
+      ? rows.value.find((row) => props.getRowKey(row) === key)
+      : (rows.value.find((row) => props.getRowKey(row) === draftKey) ?? rows.value[0]);
+    const column = field
+      ? props.fields.find((item) => item.key === field)
+      : props.fields.find((item) => !!item.form);
     if (row && column) await table.value?.focusCell(props.getRowKey(row), column.key);
   },
 });

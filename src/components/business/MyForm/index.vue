@@ -59,6 +59,7 @@ import type {
   FieldValidationResult,
   MyFormExpose,
   FieldDensity,
+  FormVisibleGroup,
 } from "@/components/business/fields/types";
 import { useFormModel } from "./useFormModel";
 import { useFieldDictionaries } from "@/composables/useFieldDictionaries";
@@ -68,6 +69,13 @@ const props = defineProps<{
    * @example `<MyForm v-model="form" ... />`
    */
   modelValue: M | DeepReadonly<M>;
+  /**
+   * 宿主保证根对象替换、未变分支引用稳定时设为 true，关闭深监听；默认 false 兼容原位修改。
+   * 挂载后不切换策略；本组件仍不修改输入，CRUD 适配器自动启用。
+   * @example
+   * <MyForm :immutable-model="true" :model-value="model" />
+   */
+  immutableModel?: boolean;
   /** 用户确认后通知；文本 change、参照回填及同步 links 完成后触发。省略不追踪快照。
    * @example
    * <MyForm :change="onFieldChange" />
@@ -130,6 +138,11 @@ const emit = defineEmits<{
    * @example `<MyForm @patch="({ changes }) => controller.patch(changes)" />`
    */
   patch: [patch: FormPatch<M>];
+  /** 当前可见分组变化时通知宿主；只传字段键和标题，首次挂载也触发，不修改模型。
+   * @example
+   * <MyForm @groups-change="groups = $event" />
+   */
+  "groups-change": [groups: readonly FormVisibleGroup<M>[]];
 }>();
 const slots = defineSlots<
   {
@@ -181,6 +194,22 @@ const visibleFields = computed(() =>
     (entry): entry is typeof entry & { form: NonNullable<typeof entry.form> } =>
       !!entry.form?.visible
   )
+);
+watch(
+  () => {
+    const groups: FormVisibleGroup<M>[] = [];
+    for (const entry of visibleFields.value) {
+      const label = entry.form.group || groups.at(-1)?.label || "基本信息";
+      const previous = groups.at(-1);
+      if (previous?.label === label) previous.fields = [...previous.fields, entry.field.key];
+      else groups.push({ key: entry.field.key, label, fields: [entry.field.key] });
+    }
+    return groups;
+  },
+  (groups, previous) => {
+    if (!sameModelValue(groups, previous)) emit("groups-change", groups);
+  },
+  { immediate: true }
 );
 const mountedFields = new Set<FieldKey<M>>();
 function field<K extends FieldKey<M>>(key: K): FormFieldBinding<M, C, M[K]> {
@@ -256,6 +285,8 @@ function focusField(key: FieldKey<M>) {
   const wrapper = Array.from(
     gridRef.value?.querySelectorAll<HTMLElement>("[data-field]") ?? []
   ).find((element) => element.dataset.field === key);
+  // 只读分区可能没有可聚焦输入，导航仍需让目标字段进入正文可视区域。
+  wrapper?.scrollIntoView({ block: "nearest", inline: "nearest" });
   focusFieldControl(wrapper);
 }
 defineExpose<MyFormExpose<M>>({

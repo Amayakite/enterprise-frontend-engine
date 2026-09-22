@@ -84,6 +84,14 @@ function mountKept(setup) {
       visible.value = true;
       await nextTick();
     },
+    async deactivate() {
+      visible.value = false;
+      await nextTick();
+    },
+    async activate() {
+      visible.value = true;
+      await nextTick();
+    },
     close: () => app.unmount(),
   };
 }
@@ -373,6 +381,109 @@ const formConfig = (overrides = {}) => ({
   }),
   getKey: (entity) => entity.id,
   ...overrides,
+});
+
+test("公开错误定位复用主字段和子表端口，行键 0 不丢失，卸载后不定位", async () => {
+  const calls = [];
+  const view = mount(() => useCrudForm(formConfig(), { context: defaultContext }));
+  view.state.registerForm({
+    validate: async () => ({ valid: true }),
+    clear() {},
+    focus: (issue) => calls.push(issue),
+  });
+  await view.state.focusIssue({ field: "name", message: "名称必填" });
+  assert.equal(calls[0].field, "name");
+  view.state.registerChild({
+    key: "lines",
+    isDirty: () => false,
+    commitDraft: async () => ({ proceed: true }),
+    cancelDraft() {},
+    validate: async () => ({ valid: true }),
+    setReadonly() {},
+    focus: async (issue) => {
+      calls.push(issue);
+    },
+  });
+  await view.state.focusIssue({
+    section: "lines",
+    rowKey: 0,
+    rowField: "name",
+    message: "明细必填",
+  });
+  assert.equal(calls[1].rowKey, 0);
+  view.close();
+  await view.state.focusIssue({ field: "name", message: "已关闭" });
+  assert.equal(calls.length, 2);
+});
+
+test("后台详情合并上下文变化，激活只读取固定 ID，卸载取消迟到响应", async () => {
+  const context = ref({ org: "a" });
+  const requests = [];
+  const view = mountKept(() =>
+    useCrudDetail(
+      {
+        fields: [],
+        toModel: (entity) => entity,
+        load: (id, input) => {
+          const request = pending();
+          requests.push({ id, ...input, ...request });
+          return request.promise;
+        },
+      },
+      () => context.value
+    )
+  );
+  const initial = view.state.load(0);
+  requests[0].resolve({ name: "原范围" });
+  await initial;
+  await view.deactivate();
+  context.value = { org: "b" };
+  await flush();
+  context.value = { org: "c" };
+  await flush();
+  assert.equal(requests.length, 1);
+  assert.equal(view.state.state.model, null);
+  await view.activate();
+  assert.equal(requests.length, 2);
+  assert.equal(requests[1].id, 0);
+  assert.equal(requests[1].context.org, "c");
+  view.close();
+  assert.equal(requests[1].signal.aborted, true);
+  requests[1].resolve({ name: "迟到" });
+  await flush();
+  assert.equal(view.state.state.model, null);
+});
+
+test("后台列表不请求新范围，多次切页不重复首次读取，销毁后请求被取消", async () => {
+  const context = ref({ org: "a" });
+  const requests = [];
+  const view = mountKept(() =>
+    useCrudList(
+      listConfig({
+        request: async (query, input) => {
+          requests.push({ query, signal: input.signal });
+          return { list: [{ id: 0, name: query.scope.value.org }], total: 1 };
+        },
+      }),
+      () => context.value
+    )
+  );
+  await flush();
+  for (let i = 0; i < 20; i++) await view.reactivate();
+  assert.equal(requests.length, 1);
+  await view.deactivate();
+  context.value = { org: "b" };
+  await flush();
+  context.value = { org: "c" };
+  await flush();
+  assert.equal(requests.length, 1);
+  assert.equal(view.state.state.rows.length, 0);
+  await view.activate();
+  await flush();
+  assert.equal(requests.length, 2);
+  assert.equal(view.state.state.rows[0].name, "c");
+  view.close();
+  assert.equal(requests[1].signal.aborted, true);
 });
 
 test("S4 编辑深链以 loading 初态挂载并沿同一目标完成回填", async () => {
@@ -727,6 +838,7 @@ test("S3 缺失子模块与空错误的失败校验均阻止写入，全量错�
     })),
   });
   let emptyErrors = false;
+  let childLocked = false;
   view.state.registerChild({
     key: "lines",
     commitDraft: async () => ({ proceed: true }),
@@ -741,9 +853,13 @@ test("S3 缺失子模块与空错误的失败校验均阻止写入，全量错�
       };
     },
     focus: async (issue) => {
+      assert.equal(view.state.busy, false, "定位前释放保存状态，允许错误字段进入编辑");
+      assert.equal(childLocked, false, "定位前释放子表校验锁");
       focused = issue;
     },
-    setReadonly() {},
+    setReadonly(value) {
+      childLocked = value;
+    },
   });
   await view.state.save();
   assert.equal(writes, 0);

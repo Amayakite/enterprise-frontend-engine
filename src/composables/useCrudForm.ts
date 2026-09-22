@@ -224,9 +224,11 @@ export function useCrudForm<
     issues.value = [];
     drafts.changed();
   }
-  async function focusFirst() {
-    const issue = issues.value[0];
-    if (!issue) return;
+  async function focusFirst(
+    input: CrudIssue<Model> | DeepReadonly<CrudIssue<Model>> | undefined = issues.value[0]
+  ) {
+    if (!input || !alive) return;
+    const issue = cloneReadonlyModel<CrudIssue<Model>>(input);
     const child = issue.section
       ? [...children].find(([key]) => key === issue.section)?.[1]
       : undefined;
@@ -465,6 +467,7 @@ export function useCrudForm<
     const flight = ++flightVersion;
     saveFlight.value = true;
     let submitted = false;
+    let focusValidationIssue = false;
     phase.value = "committing";
     error.value = null;
     issues.value = [];
@@ -480,7 +483,7 @@ export function useCrudForm<
         if (!result.proceed) {
           issues.value = [{ section: key, message: result.reason ?? "请完成明细草稿" }];
           phase.value = "ready";
-          await focusFirst();
+          focusValidationIssue = true;
           return;
         }
       }
@@ -512,7 +515,7 @@ export function useCrudForm<
         issues.value = [{ message: "校验未通过或已过期，请重试" }];
       if (issues.value.length) {
         phase.value = "ready";
-        await focusFirst();
+        focusValidationIssue = true;
         return;
       }
       const guard = await config.beforeSave?.(input);
@@ -571,6 +574,11 @@ export function useCrudForm<
       if (current()) {
         if (phase.value === "validating" || phase.value === "committing") phase.value = "ready";
         lock(false);
+        if (focusValidationIssue) {
+          // 先释放整单校验锁并更新子表 readonly，再进入错误行编辑。
+          await nextTick();
+          if (current()) await focusFirst();
+        }
       }
     }
   }
@@ -671,6 +679,7 @@ export function useCrudForm<
       );
     },
     patch,
+    focusIssue: focusFirst,
     save,
     retrySync,
     open,

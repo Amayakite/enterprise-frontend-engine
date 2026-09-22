@@ -1,4 +1,13 @@
-import { computed, onBeforeUnmount, readonly, shallowRef, watch, type DeepReadonly } from "vue";
+import {
+  computed,
+  onActivated,
+  onDeactivated,
+  onBeforeUnmount,
+  readonly,
+  shallowRef,
+  watch,
+  type DeepReadonly,
+} from "vue";
 import { cloneModel, readonlyModel } from "@/components/business/fields/model";
 import { createRequestChannel } from "@/utils/request-channel";
 import type { CrudDetailConfig, CrudDetailController } from "@/components/business/crud/types";
@@ -25,9 +34,12 @@ export function useCrudDetail<Entity, Model, Id extends string | number, C>(
   }>({ id: null, phase: "idle", entity: null, model: null, error: null });
   const channel = createRequestChannel();
   let alive = true;
+  let active = true;
+  let contextChanged = false;
   let revision = 0;
   async function load(id: Id) {
     if (!alive) return;
+    contextChanged = false;
     const run = channel.start();
     revision++;
     const snapshot = cloneModel(context());
@@ -96,10 +108,22 @@ export function useCrudDetail<Entity, Model, Id extends string | number, C>(
     context,
     () => {
       channel.cancel();
-      if (state.value.id !== null) void load(state.value.id);
+      revision++;
+      // 后台页不读取新范围；立即丢弃旧范围内容，激活时仍加载本实例固定 ID。
+      if (!active) {
+        contextChanged = true;
+        state.value = { ...state.value, phase: "idle", entity: null, model: null, error: null };
+      } else if (state.value.id !== null) void load(state.value.id);
     },
     { deep: true }
   );
+  onDeactivated(() => {
+    active = false;
+  });
+  onActivated(() => {
+    active = true;
+    if (contextChanged && state.value.id !== null) void load(state.value.id);
+  });
   onBeforeUnmount(() => {
     alive = false;
     channel.cancel();

@@ -2,6 +2,7 @@
   <MyForm
     ref="form"
     :model-value="model"
+    :immutable-model="true"
     :change="change"
     :fields="fields"
     :context="context"
@@ -13,6 +14,7 @@
     :columns="columns"
     :density="density"
     @patch="onPatch"
+    @groups-change="emit('groups-change', $event)"
   >
     <template v-if="$slots.default" #default="layout"><slot v-bind="layout" /></template>
     <template
@@ -34,7 +36,7 @@
 <script setup lang="ts" generic="Model extends object, Entity, Id extends string | number, C">
 import { computed, ref, onBeforeUnmount } from "vue";
 import MyForm from "../MyForm/index.vue";
-import type { FormPatch } from "../fields/types";
+import type { FormPatch, FormVisibleGroup } from "../fields/types";
 import { cloneReadonlyModel } from "../fields/model";
 import type { MyFormExpose, FieldKey, FormFieldBinding } from "../fields/types";
 import type { CrudFormSlots, CrudTarget } from "./types";
@@ -59,6 +61,10 @@ const slots = defineSlots<
   }
 >();
 const form = ref<MyFormExpose<Model>>();
+const emit = defineEmits<{
+  /** 透传当前可见主字段分组；供导航显示与错误计数，不包含模型值。 */
+  "groups-change": [groups: readonly FormVisibleGroup<Model>[]];
+}>();
 // 实体 ID 相同也可能重新读取或恢复草稿；整批回填必须与运行期 patch 分开。
 const hydrationKey = computed(() =>
   JSON.stringify([props.entityKey, props.controller.state.hydrationRevision])

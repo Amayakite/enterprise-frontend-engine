@@ -15,6 +15,15 @@ import type {
  * `FieldKey<CustomerForm> // "name" | "status" | ...`
  */
 export type FieldKey<M> = Extract<keyof M, string>;
+/** 当前可见主字段分组；由 MyForm 计算，供宿主导航使用，不保存模型副本。 */
+export interface FormVisibleGroup<M> {
+  /** 当前连续分组首个可见字段键，用于定位；同名但不连续的分组保持独立。 */
+  key: FieldKey<M>;
+  /** 配置的 group 文案；首段未分组时为“基本信息”，后续未声明 group 的字段沿用前段。 */
+  label: string;
+  /** 此分组实际可见的字段键，按呈现顺序排列；用于错误数量归属。 */
+  fields: readonly FieldKey<M>[];
+}
 /**
  * 字段值变更来源；用于联动、脏状态和只读保护。
  *
