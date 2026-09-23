@@ -4,6 +4,16 @@
       {{ loading ? "正在更新表格数据" : "" }}
     </span>
     <el-alert v-if="tableError" :title="tableError" type="error" :closable="false" />
+    <div
+      v-else-if="!prepared.rows.length && !loading"
+      class="table-view__empty-state"
+      :style="{
+        height: typeof resolvedHeight === 'number' ? `${resolvedHeight}px` : resolvedHeight,
+      }"
+      role="status"
+    >
+      <slot name="empty">暂无数据</slot>
+    </div>
     <VxeTable
       v-else
       ref="engine"
@@ -388,6 +398,12 @@ function rowClassName({ row }: { row: EngineRow }) {
 </script>
 
 <style scoped lang="scss">
+.table-view__empty-state {
+  display: grid;
+  place-items: center;
+  min-height: 140px;
+  color: var(--el-text-color-regular);
+}
 .table-view {
   box-sizing: border-box;
   :deep(.table-view__current) {

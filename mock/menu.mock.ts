@@ -44,7 +44,13 @@ export default defineMock([
               path: "sale",
               component: "base/sale/index",
               name: "SaleManagement",
-              meta: { title: "销售组织档案", icon: "client", hidden: false, keepAlive: true },
+              meta: {
+                title: "销售组织档案",
+                searchAliases: ["销售组织", "销组", "sales"],
+                icon: "client",
+                hidden: false,
+                keepAlive: true,
+              },
             },
             {
               path: "sale/add",
@@ -68,7 +74,13 @@ export default defineMock([
               path: "customer",
               component: "base/customer/index",
               name: "CustomerManagement",
-              meta: { title: "客户管理", icon: "client", hidden: false, keepAlive: true },
+              meta: {
+                title: "客户管理",
+                searchAliases: ["客管", "客户档案", "customer"],
+                icon: "client",
+                hidden: false,
+                keepAlive: true,
+              },
             },
             {
               path: "customer/add",

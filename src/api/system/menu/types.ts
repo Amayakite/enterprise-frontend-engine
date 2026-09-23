@@ -114,6 +114,8 @@ export interface RouteItem {
 
 /** 路由属性 */
 export interface Meta {
+  /** 可选菜单搜索别名；省略只匹配标题、路由名和路径，不改变菜单权限。 */
+  searchAliases?: string[];
   /** 【目录】只有一个子路由是否始终显示 */
   alwaysShow?: boolean;
   /** 是否隐藏(true-是 false-否) */

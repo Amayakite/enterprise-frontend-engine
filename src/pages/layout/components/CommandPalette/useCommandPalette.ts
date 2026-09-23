@@ -1,216 +1,188 @@
-/**
- * 菜单搜索逻辑
- */
-import { ref, onMounted, onBeforeUnmount, toRaw } from "vue";
-import { RouteRecordRaw, LocationQueryRaw } from "vue-router";
+import { computed, nextTick, onBeforeUnmount, ref, watch } from "vue";
+import { useEventListener } from "@vueuse/core";
 import router from "@/router";
-import { usePermissionStore } from "@/stores";
-import { isExternal } from "@/utils";
+import { usePermissionStore, useUserStore } from "@/stores";
+import { createUserDataKey, userDataStore } from "@/utils/user-data";
+import { collectSearchItems, createMenuSearch, highlightTitle } from "./search";
+import type { SearchItem } from "./search";
 
-/** 搜索项类型 */
-interface SearchItem {
-  title: string;
-  path: string;
-  name?: string;
-  icon?: string;
-  redirect?: string;
-  params?: LocationQueryRaw;
-}
-
-const STORAGE_KEY = "menu_search_history";
-const MAX_HISTORY = 5;
-
+/** 当前账号的菜单搜索；权限更新时重建索引，历史经公共偏好存储隔离。
+ * @remarks 不读旧版无账号归属的历史，不保存业务参数；存储不可用不阻断导航。
+ * @example
+ * `const palette = useCommandPalette()`
+ */
 export function useCommandPalette() {
-  const permissionStore = usePermissionStore();
-
-  // 状态
+  const permission = usePermissionStore();
+  const user = useUserStore();
   const visible = ref(false);
   const keyword = ref("");
-  const activeIndex = ref(-1);
+  const activeIndex = ref(0);
   const inputRef = ref<HTMLInputElement>();
-  const menuItems = ref<SearchItem[]>([]);
-  const results = ref<SearchItem[]>([]);
-  const history = ref<SearchItem[]>([]);
-
-  // 排除的路由
-  const excludedPaths = ["/redirect", "/login", "/401", "/404"];
-
-  // ============================================
-  // 弹窗控制
-  // ============================================
+  const historyPaths = ref<string[]>([]);
+  const notice = ref("");
+  const navigating = ref(false);
+  let alive = true;
+  let revision = 0;
+  let historyRevision = 0;
+  const items = computed(() => collectSearchItems(permission.routes));
+  const search = computed(() => createMenuSearch(items.value));
+  const results = computed(() => (keyword.value.trim() ? search.value(keyword.value) : []));
+  const history = computed(() =>
+    historyPaths.value.flatMap((path) => {
+      const item = items.value.find((item) => item.path === path);
+      return item ? [item] : [];
+    })
+  );
+  const displayList = computed(() =>
+    keyword.value.trim()
+      ? results.value.map(({ item, matches }) => ({
+          ...item,
+          parts: highlightTitle(
+            item.title,
+            matches?.find((match) => match.key === "title")?.indices
+          ),
+        }))
+      : (history.value.length ? history.value : items.value.slice(0, 8)).map((item) => ({
+          ...item,
+          parts: highlightTitle(item.title),
+        }))
+  );
+  const sectionLabel = computed(() =>
+    keyword.value.trim() ? "搜索结果" : history.value.length ? "最近访问" : "可用菜单"
+  );
+  const storageKey = computed(() => {
+    const userId = user.userInfo.userId;
+    return userId === undefined || userId === null
+      ? null
+      : createUserDataKey({
+          kind: "preferences",
+          userId,
+          moduleKey: "layout.command-palette",
+          slot: "history:v1",
+        });
+  });
+  watch(
+    storageKey,
+    async (key) => {
+      const run = ++revision;
+      const initialRevision = ++historyRevision;
+      historyPaths.value = [];
+      notice.value = "";
+      visible.value = false;
+      if (!key) return;
+      try {
+        const result = await userDataStore.read<unknown>(key);
+        if (!alive || run !== revision || initialRevision !== historyRevision) return;
+        const value = result.record?.schemaVersion === 1 ? result.record.value : null;
+        if (Array.isArray(value))
+          historyPaths.value = [
+            ...new Set(value.filter((path): path is string => typeof path === "string")),
+          ].slice(0, 8);
+        if (result.level === "memory") notice.value = "历史仅在本次运行保留";
+      } catch {
+        if (alive && run === revision) notice.value = "历史暂不可读取，不影响搜索";
+      }
+    },
+    { immediate: true }
+  );
+  watch(displayList, () => {
+    activeIndex.value = 0;
+  });
 
   function open() {
+    if (visible.value) return;
     keyword.value = "";
-    results.value = [];
-    activeIndex.value = -1;
+    activeIndex.value = 0;
     visible.value = true;
-    setTimeout(() => inputRef.value?.focus(), 100);
   }
-
   function close() {
     visible.value = false;
   }
-
-  // ============================================
-  // 搜索逻辑
-  // ============================================
-
-  function onSearch() {
-    activeIndex.value = -1;
-    if (!keyword.value.trim()) {
-      results.value = [];
-      return;
-    }
-    const kw = keyword.value.toLowerCase();
-    results.value = menuItems.value.filter((item) => item.title.toLowerCase().includes(kw));
+  async function focusInput() {
+    await nextTick();
+    inputRef.value?.focus();
   }
-
-  function getDisplayList() {
-    return results.value.length ? results.value : history.value;
-  }
-
-  function onSelect() {
-    const list = getDisplayList();
-    if (list.length === 0) return;
-    if (activeIndex.value < 0) return;
-    const item = list[activeIndex.value];
-    if (!item) return;
-    onGo(item);
-  }
-
-  function onNavigate(direction: "up" | "down") {
-    const list = getDisplayList();
-    if (list.length === 0) return;
-
-    if (direction === "up") {
-      activeIndex.value = activeIndex.value <= 0 ? list.length - 1 : activeIndex.value - 1;
-    } else {
-      activeIndex.value = activeIndex.value >= list.length - 1 ? 0 : activeIndex.value + 1;
-    }
-  }
-
-  function onGo(item: SearchItem) {
-    close();
-    addHistory(item);
-
-    if (isExternal(item.path)) {
-      window.open(item.path, "_blank");
-    } else {
-      router.push({ path: item.path, query: item.params });
-    }
-  }
-
-  // ============================================
-  // 历史记录
-  // ============================================
-
-  function loadHistory() {
+  async function persist(paths: string[]) {
+    const key = storageKey.value;
+    const run = revision;
+    historyRevision++;
+    historyPaths.value = paths;
+    if (!key) return;
     try {
-      const data = localStorage.getItem(STORAGE_KEY);
-      history.value = data ? JSON.parse(data) : [];
+      const result = await userDataStore.write(key, paths, {
+        schemaVersion: 1,
+        ttlMs: 365 * 86400000,
+      });
+      if (alive && run === revision)
+        notice.value = result.level === "memory" ? "历史仅在本次运行保留" : "";
     } catch {
-      history.value = [];
+      if (alive && run === revision) notice.value = "历史未能保存，不影响搜索";
     }
   }
-
-  function saveHistory() {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(history.value));
-  }
-
-  function addHistory(item: SearchItem) {
-    // 去重
-    const idx = history.value.findIndex((i) => i.path === item.path);
-    if (idx !== -1) history.value.splice(idx, 1);
-
-    // 添加到开头
-    history.value.unshift(item);
-
-    // 限制数量
-    if (history.value.length > MAX_HISTORY) {
-      history.value = history.value.slice(0, MAX_HISTORY);
-    }
-
-    saveHistory();
-  }
-
-  function removeHistory(index: number) {
-    history.value.splice(index, 1);
-    saveHistory();
-  }
-
-  function clearHistory() {
-    history.value = [];
-    localStorage.removeItem(STORAGE_KEY);
-  }
-
-  // ============================================
-  // 路由解析
-  // ============================================
-
-  function loadRoutes(routes: RouteRecordRaw[], parentPath = "") {
-    routes.forEach((route) => {
-      const path = route.path.startsWith("/")
-        ? route.path
-        : `${parentPath}${parentPath.endsWith("/") ? "" : "/"}${route.path}`;
-
-      if (excludedPaths.includes(route.path) || isExternal(route.path)) return;
-
-      if (route.children) {
-        loadRoutes(route.children, path);
-      } else if (route.meta?.title) {
-        menuItems.value.push({
-          title: route.meta.title === "dashboard" ? "首页" : route.meta.title,
-          path,
-          name: typeof route.name === "string" ? route.name : undefined,
-          icon: route.meta.icon,
-          redirect: typeof route.redirect === "string" ? route.redirect : undefined,
-          params: route.meta.params
-            ? JSON.parse(JSON.stringify(toRaw(route.meta.params)))
-            : undefined,
-        });
+  async function onGo(item: SearchItem) {
+    const current = items.value.find((entry) => entry.path === item.path);
+    if (!current || navigating.value) return;
+    const run = revision;
+    navigating.value = true;
+    close();
+    try {
+      const failure = await router.push({ path: current.path, query: current.query });
+      if (alive && run === revision && !failure)
+        await persist(
+          [current.path, ...historyPaths.value.filter((path) => path !== current.path)].slice(0, 8)
+        );
+    } catch {
+      if (alive && run === revision) {
+        notice.value = "页面暂时无法打开，请重试";
+        visible.value = true;
       }
-    });
+    } finally {
+      navigating.value = false;
+    }
   }
-
-  // ============================================
-  // 快捷键
-  // ============================================
-
-  function handleKeydown(e: KeyboardEvent) {
-    if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "k") {
-      e.preventDefault();
+  function onSelect() {
+    const item = displayList.value[activeIndex.value];
+    if (item) void onGo(item);
+  }
+  function onNavigate(direction: "up" | "down") {
+    const count = displayList.value.length;
+    if (count)
+      activeIndex.value = (activeIndex.value + (direction === "up" ? -1 : 1) + count) % count;
+  }
+  useEventListener(document, "keydown", (event) => {
+    if (
+      event.defaultPrevented ||
+      event.isComposing ||
+      event.keyCode === 229 ||
+      event.repeat ||
+      event.altKey ||
+      event.shiftKey
+    )
+      return;
+    if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "k") {
+      event.preventDefault();
       open();
     }
-  }
-
-  // ============================================
-  // 生命周期
-  // ============================================
-
-  onMounted(() => {
-    loadRoutes(permissionStore.routes);
-    loadHistory();
-    document.addEventListener("keydown", handleKeydown);
   });
-
   onBeforeUnmount(() => {
-    document.removeEventListener("keydown", handleKeydown);
+    alive = false;
+    revision++;
   });
-
   return {
     visible,
     keyword,
-    results,
-    history,
     activeIndex,
     inputRef,
+    displayList,
+    sectionLabel,
+    notice,
+    navigating,
     open,
     close,
-    onSearch,
+    focusInput,
     onSelect,
     onNavigate,
     onGo,
-    removeHistory,
-    clearHistory,
+    clearHistory: () => persist([]),
   };
 }

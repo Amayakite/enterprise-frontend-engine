@@ -92,6 +92,14 @@ const contacts = useCrudTableChild(controller, "contacts", {
 
 后端仍须补齐 preference 的 read/write/remove、服务端修订号和版本冲突协议。当前测试适配器验证的是前端同步行为，不代表真实多端联调已完成。Excel 解析、校验和导入执行归后端，前端只呈现上传进度和处理结果，不在此存储层实现 Excel 导入。
 
+## 快捷搜索历史
+
+快捷搜索的最近访问复用同一公共 preferences 存储，模块 key 为 `layout.command-palette`，
+用途为 `history:v1`，按账号隔离，最多 8 个路径、保留 365 天。不保存菜单标题或业务查询参数；
+展示和导航时重新匹配当前授权菜单，隐藏、参数化和已撤权页面不显示。
+旧版无账号归属的 `menu_search_history` 不自动迁移，避免把另一账号的历史带入当前账号。
+读取或写入失败不阻断导航；内存降级时提示仅本次运行保留。
+
 ## 命名查询方案
 
 标准模块在 `views.list` 配置 `queryPresets: { version: 1 }` 即开启；当前客户、销售组织已接入。

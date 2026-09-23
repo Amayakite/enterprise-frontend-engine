@@ -91,7 +91,7 @@ test("U3 子模块默认项、诊断和 DTO 白名单由配置所有者执行", 
   );
 });
 
-test("U3 生产普通弹窗已迁移 MyDialog，仅保留有记录的特殊命令浮层", () => {
+test("U3 生产弹窗使用 MyDialog，直接用法仅保留实验探针", () => {
   const vueFiles = walk("src").filter((file) => file.endsWith(".vue"));
   const directDialogs = vueFiles
     .filter((file) => /<el-dialog\b/.test(read(file)))
@@ -101,9 +101,9 @@ test("U3 生产普通弹窗已迁移 MyDialog，仅保留有记录的特殊命�
     "src/components/common/MyDialog.vue",
     "src/pages/component-lab/reference/SingleReferenceDemo.vue",
     "src/pages/component-lab/reference/index.vue",
-    "src/pages/layout/components/CommandPalette/index.vue",
   ]);
   for (const file of [
+    "src/pages/layout/components/CommandPalette/index.vue",
     "src/pages/service/application/components/ApplicationEditorDialog.vue",
     "src/pages/service/application/components/ApplicationDetailDialog.vue",
     "src/pages/system/user/index.vue",

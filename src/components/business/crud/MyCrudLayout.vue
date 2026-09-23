@@ -1,5 +1,5 @@
 <template>
-  <section
+  <div
     class="crud-layout"
     :class="[
       layout && `crud-layout--${layout.preset}`,
@@ -8,11 +8,11 @@
   >
     <div v-if="$slots.toolbar" class="crud-layout__toolbar"><slot name="toolbar" /></div>
     <div class="crud-layout__body">
-      <main class="crud-layout__main"><slot /></main>
+      <div class="crud-layout__main"><slot /></div>
       <aside v-if="$slots.aside" class="crud-layout__aside"><slot name="aside" /></aside>
     </div>
     <footer v-if="$slots.footer" class="crud-layout__footer"><slot name="footer" /></footer>
-  </section>
+  </div>
 </template>
 <script setup lang="ts">
 import { inject } from "vue";

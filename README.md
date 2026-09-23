@@ -11,6 +11,11 @@ Enterprise Frontend Engine 是面向企业业务系统的通用前端开发引�
 
 以上是前端能力，不是正式后端服务或安全保障。当前仍处于持续开发阶段。
 
+Ctrl+K（macOS Command+K）打开快捷搜索，支持标题、路由名、路径和 `meta.searchAliases`
+声明的别名，方向键选择、Enter 打开、Esc 关闭；只索引当前授权的可见静态菜单，最多显示 30 项。
+别名是显式配置，不自动生成拼音。当前 Mock 为客户配置了“客管/客户档案”，销售组织配置了“销组”。
+标准 CRUD 表单内支持 Ctrl/Command+S，沿用保存权限与整单校验。
+
 当前接口协议和数据使用开发 Mock；写入只在 Vite 开发进程内保存，重启后恢复种子数据。Mock 成功不代表真实后端、持久化、权限或事务已联调。
 
 ## 快速开始
@@ -29,17 +34,22 @@ pnpm type-check  # TypeScript / Vue 类型检查
 pnpm test:quick  # 日常反馈：行为、结构与文档断言，不启动完整 TS/Vue 编译
 pnpm test:contracts # 类型正反例、语言服务悬停及混合合同测试
 pnpm test        # 合同与行为测试（限制并发，降低内存占用）
-pnpm test:e2e    # 独立 Mock 服务上的浏览器回归，首次需安装 Playwright Chromium
 pnpm bench:crud  # 0/100/500 行子表模型回写基准（不代表浏览器帧率）
 pnpm build       # 类型检查后打包至 dist
 pnpm preview     # 预览构建产物，不启动 Mock
 pnpm format      # 手动格式化全部文件
 ```
 
-日常修改先运行相关测试或 `pnpm test:quick`，类型变更再运行 `pnpm type-check` 与
-`pnpm test:contracts`；提交前仍跑完整 `pnpm test` 和构建。两组测试没有交集，合起来就是完整集，
-不删除原有断言。`node scripts/run-tests.mjs quick --list` 可查看分组；新增创建 TypeScript/Vue
-程序或语言服务的测试需登记到 `scripts/test-groups.mjs`，分组自检会防止混入快组。
+日常验证按改动范围选择，避免每次修改都跑全量测试：
+
+- 交互改动直接使用内置浏览器或浏览器 MCP 检查实际页面、相关键盘操作和控制台；布局变更再补明暗主题、窄屏检查。不默认引入浏览器测试依赖或自动化脚本。
+- TS/Vue 改动运行 `pnpm type-check`；逻辑变更只运行相关的 `node --test tests/<文件>.test.mjs`，公共类型合同变更再补对应合同测试。
+- 需要扩大检查范围时使用 `pnpm test:quick` 或 `pnpm test:contracts`；全量 `pnpm test` 留给明确的整体验证或核心跨模块风险，不作为每次提交的固定步骤。
+- 构建配置、运行时依赖或影响打包的跨模块改动运行 `pnpm build`，它已包含类型检查，无需重复执行。纯文档、测试设施清理不默认构建；`pnpm bench:crud` 只在排查性能时使用。
+- 验证通过后，仅在新增修改、失败或仍有疑点时补测，不反复执行相同检查。
+
+`node scripts/run-tests.mjs quick --list` 可查看分组；quick 与 contracts 没有交集，合起来就是完整集。
+新增创建 TypeScript/Vue 程序或语言服务的测试需登记到 `scripts/test-groups.mjs`。
 
 ## 开发入口
 
@@ -104,7 +114,7 @@ VITE_APP_VUE_DEVTOOLS=true # 需要组件树/更新时间线排查时才开启
 - 提交源码、当前文档、测试、`pnpm-lock.yaml` 和安全的默认环境配置；本机覆盖使用 `.env.*.local`。
 - `.gitignore` 排除依赖、构建产物、日志、测试截图/报告、缓存、本地环境和常见私钥文件。测试截图统一放在 `artifacts/`，不要散落仓库根目录。
 - `src/types/generated/` 是构建工具维护的类型声明，保留版本管理，不手工修改；`.vscode` 仅保留共享设置和扩展推荐。
-- 提交前运行 `pnpm type-check`、`pnpm test` 和 `pnpm build`；只格式化本次修改的文件。
+- 按[快速开始](#快速开始)中的改动范围选择验证；只格式化本次修改的文件。
 - GitHub 仓库地址确定后，再在 `package.json` 中填写实际 `repository`；当前不使用上游仓库地址冒充本项目地址。
 - 在决定公开仓库之前，确认许可证、第三方版权声明及敏感信息；忽略规则不会移除已经提交到 Git 历史中的秘密。
 

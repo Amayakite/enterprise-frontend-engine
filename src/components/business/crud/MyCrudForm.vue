@@ -1,5 +1,13 @@
 <template>
-  <MyCrudLayout class="crud-form" :layout="layout" :aria-busy="controller.busy">
+  <MyCrudLayout
+    class="crud-form"
+    role="form"
+    :aria-label="`${entityLabel || '业务'}表单`"
+    data-crud-keyboard-scope
+    :layout="layout"
+    :aria-busy="controller.busy"
+    @keydown="onFormKeydown"
+  >
     <template #toolbar>
       <div v-if="layout && !embedded" class="crud-form__heading">
         <h1>{{ controller.state.target.mode === "add" ? "新增" : "编辑" }}{{ entityLabel }}</h1>
@@ -52,7 +60,7 @@
         tabindex="-1"
         class="crud-form__section"
       >
-        <h3>{{ section.label }}</h3>
+        <h2>{{ section.label }}</h2>
         <slot :name="sectionSlot(section.key)" v-bind="controller" />
       </section>
     </div>
@@ -68,7 +76,8 @@
   </MyCrudLayout>
 </template>
 <script setup lang="ts" generic="Model extends object, Entity, Id extends string | number, C">
-import { computed, inject, onMounted, ref, shallowRef } from "vue";
+import { computed, inject, nextTick, onMounted, ref, shallowRef } from "vue";
+import { crudFormDisabledReason } from "./form-presentation";
 import { embeddedEditorKey } from "./presentation";
 import MyBusinessPageHost from "./MyBusinessPageHost.vue";
 import MyCrudLayout from "./MyCrudLayout.vue";
@@ -82,6 +91,36 @@ import { diagnoseCrudSlots } from "./config";
 const props = defineProps<CrudFormProps<Model, Entity, Id, C>>();
 const embedded = inject(embeddedEditorKey, undefined);
 const slots = defineSlots<CrudFormSlots<Model, Entity, Id>>();
+async function onFormKeydown(event: KeyboardEvent) {
+  if (
+    event.defaultPrevented ||
+    event.isComposing ||
+    event.keyCode === 229 ||
+    event.altKey ||
+    event.shiftKey ||
+    !(event.ctrlKey || event.metaKey) ||
+    event.key.toLowerCase() !== "s"
+  )
+    return;
+  // 事件只由焦点所在的最近表单处理；Teleport 弹层和后台缓存页不会收到此事件。
+  if (
+    !(event.target instanceof Element) ||
+    event.target.closest("[data-crud-keyboard-scope]") !== event.currentTarget
+  )
+    return;
+  event.preventDefault();
+  event.stopPropagation();
+  if (event.repeat) return;
+  if (event.target instanceof HTMLElement) event.target.blur();
+  await nextTick();
+  if (
+    props.changePending ||
+    props.changeError ||
+    crudFormDisabledReason(props.controller, props.readonlyReason)
+  )
+    return;
+  await props.controller.save();
+}
 const body = ref<HTMLElement>();
 const groups = shallowRef<readonly FormVisibleGroup<Model>[]>([]);
 const navigation = computed(() => [
@@ -163,7 +202,7 @@ onMounted(() =>
 .crud-form__section {
   margin-top: 20px;
 }
-.crud-form__section h3 {
+.crud-form__section h2 {
   font-size: 15px;
   padding: 8px 0;
   border-bottom: 1px solid var(--el-border-color-lighter);

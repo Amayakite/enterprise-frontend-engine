@@ -6,6 +6,8 @@ declare module "vue-router" {
    */
   interface RouteMeta {
     title?: string;
+    /** 菜单搜索别名；默认无，支持业务简称或英文关键词，不授予路由权限。 */
+    searchAliases?: string[];
     type?: string;
     icon?: string;
     hidden?: boolean;

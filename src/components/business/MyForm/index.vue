@@ -13,12 +13,12 @@
       <slot :field="field">
         <div class="my-form-grid" :style="{ '--form-columns': columns ?? 2 }">
           <template v-for="(entry, index) in visibleFields" :key="entry.field.key">
-            <h3
+            <h2
               v-if="entry.form.group && entry.form.group !== visibleFields[index - 1]?.form.group"
               class="my-form-group"
             >
               {{ entry.form.group }}
-            </h3>
+            </h2>
             <MyFormField v-bind="field(entry.field.key)">
               <template v-if="slots[fieldSlotName(entry.field.key)]" #default="cell">
                 <slot

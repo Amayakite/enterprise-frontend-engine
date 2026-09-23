@@ -42,6 +42,9 @@
         :loading="busy"
         @click="controller.save"
       />
+      <span v-if="permitted" class="crud-form-shortcut" title="焦点在当前表单内时可用">
+        Ctrl / ⌘ + S
+      </span>
       <el-button v-if="!footerMode" :disabled="busy" @click="controller.close">关闭</el-button>
     </div>
   </div>
@@ -85,5 +88,9 @@ const blocked = computed(() => !!readonlyReason.value);
 .crud-form-status {
   color: var(--el-text-color-secondary);
   font-size: 13px;
+}
+.crud-form-shortcut {
+  font-size: 12px;
+  color: var(--el-text-color-regular);
 }
 </style>

@@ -1,294 +1,227 @@
 <template>
   <div>
-    <div
-      class="command-palette-trigger"
-      role="button"
-      tabindex="0"
-      aria-label="打开搜索面板"
-      @click="open"
-      @keydown.enter.prevent="open"
-      @keydown.space.prevent="open"
-    >
-      <div class="command-palette-trigger__left">
-        <div class="i-svg:search" />
-        <span class="command-palette-trigger__text">搜索菜单</span>
-      </div>
-      <kbd class="command-palette-trigger__kbd">Ctrl K</kbd>
-    </div>
-
-    <el-dialog
+    <button type="button" class="command-palette-trigger" aria-label="打开快捷搜索" @click="open">
+      <span class="i-svg:search" aria-hidden="true" />
+      <span>搜索菜单</span>
+      <kbd>{{ modifier }} K</kbd>
+    </button>
+    <MyDialog
       v-model="visible"
-      width="720px"
-      :close-on-click-modal="true"
-      :show-close="false"
-      @close="close"
+      title="快捷搜索"
+      width="min(640px, 94vw)"
+      :show-footer="false"
+      :show-fullscreen="false"
+      :draggable="false"
+      @opened="focusInput"
     >
-      <div class="command-palette-dialog">
-        <el-input
+      <div class="command-palette" @keydown="handleInputKeydown">
+        <input
           ref="inputRef"
           v-model="keyword"
           class="command-palette-input"
+          type="search"
           placeholder="搜索菜单"
-          @input="onSearch"
-          @keydown="handleInputKeydown"
-        >
-          <template #prefix>
-            <div class="i-svg:search" />
-          </template>
-          <template #suffix>
-            <div class="command-palette-input__suffix">
-              <div
-                class="i-svg:close"
-                role="button"
-                tabindex="0"
-                aria-label="关闭"
-                @click="close"
-              />
-            </div>
-          </template>
-        </el-input>
-
-        <div class="command-palette-results">
-          <div v-if="displayList.length === 0" class="command-palette-empty">没有搜索历史</div>
-
-          <ul v-else class="command-palette-list">
-            <li
-              v-for="(item, idx) in displayList"
-              :key="item.path + idx"
-              :class="['command-palette-item', { 'is-active': activeIndex === idx }]"
-              @mouseenter="activeIndex = idx"
-              @click="onGo(item)"
-            >
-              <div class="command-palette-item__title">{{ item.title }}</div>
-              <div class="command-palette-item__path">{{ item.path }}</div>
-            </li>
-          </ul>
+          aria-label="搜索菜单"
+          role="combobox"
+          aria-autocomplete="list"
+          :aria-expanded="true"
+          :aria-controls="listId"
+          :aria-activedescendant="displayList.length ? `${listId}-${activeIndex}` : undefined"
+        />
+        <div class="command-palette-section">
+          <span>{{ sectionLabel }} · {{ displayList.length }}</span>
+          <button v-if="sectionLabel === '最近访问'" type="button" @click="clearHistory">
+            清空历史
+          </button>
         </div>
-
+        <p v-if="!displayList.length" class="command-palette-empty" role="status">未找到匹配页面</p>
+        <ul
+          :id="listId"
+          ref="list"
+          role="listbox"
+          :aria-label="sectionLabel"
+          class="command-palette-list"
+        >
+          <li
+            v-for="(item, index) in displayList"
+            :id="`${listId}-${index}`"
+            :key="item.path"
+            role="option"
+            :aria-selected="activeIndex === index"
+            :aria-disabled="navigating"
+            :class="{ 'is-active': activeIndex === index }"
+            @mouseenter="activeIndex = index"
+            @click="onGo(item)"
+          >
+            <span class="command-palette-title">
+              <template v-for="(part, partIndex) in item.parts" :key="partIndex">
+                <mark v-if="part.matched">{{ part.text }}</mark>
+                <span v-else>{{ part.text }}</span>
+              </template>
+            </span>
+            <span class="command-palette-path">{{ item.path }}</span>
+          </li>
+        </ul>
+        <p v-if="notice" class="command-palette-notice" role="status">{{ notice }}</p>
         <div class="command-palette-hints">
-          <div class="command-palette-hint">
-            <div class="command-palette-hint__key"><div class="i-svg:up" /></div>
-            <div class="command-palette-hint__key"><div class="i-svg:down" /></div>
-            <span class="command-palette-hint__text">切换</span>
-          </div>
-          <div class="command-palette-hint">
-            <div class="command-palette-hint__key"><div class="i-svg:enter" /></div>
-            <span class="command-palette-hint__text">选择</span>
-          </div>
-          <div class="command-palette-hint">
-            <div class="command-palette-hint__key"><div class="i-svg:esc" /></div>
-            <span class="command-palette-hint__text">关闭</span>
-          </div>
+          <span>↑ ↓ 选择</span>
+          <span>Enter 打开</span>
+          <span>Esc 关闭</span>
         </div>
       </div>
-    </el-dialog>
+    </MyDialog>
   </div>
 </template>
-
 <script setup lang="ts">
-import { computed } from "vue";
+import { nextTick, ref, useId, watch } from "vue";
+import MyDialog from "@/components/common/MyDialog.vue";
 import { useCommandPalette } from "./useCommandPalette";
-
 const {
   visible,
   keyword,
-  results,
-  history,
   activeIndex,
   inputRef,
+  displayList,
+  sectionLabel,
+  notice,
+  navigating,
   open,
   close,
-  onSearch,
+  focusInput,
   onSelect,
   onNavigate,
   onGo,
+  clearHistory,
 } = useCommandPalette();
-
-const displayList = computed(() => (results.value.length ? results.value : history.value));
-
-const handleInputKeydown = (_evt: KeyboardEvent | Event) => {
-  if (!(_evt instanceof KeyboardEvent)) return;
-  const e = _evt;
-  const key = e.key.toLowerCase();
-
-  if (key === "escape") {
-    e.preventDefault();
-    close();
-    return;
+const listId = `menu-search-${useId()}`;
+const list = ref<HTMLElement>();
+const modifier = /Mac|iPhone|iPad/.test(navigator.platform) ? "⌘" : "Ctrl";
+watch(activeIndex, async (index) => {
+  await nextTick();
+  list.value?.children.item(index)?.scrollIntoView({ block: "nearest" });
+});
+function handleInputKeydown(event: KeyboardEvent) {
+  if (event.isComposing || event.keyCode === 229 || event.defaultPrevented) return;
+  // Enter 只接管搜索输入；清空历史、关闭按钮保留自己的键盘行为。
+  if (!(event.target instanceof HTMLInputElement)) return;
+  if (["ArrowUp", "ArrowDown", "Enter", "Escape"].includes(event.key)) {
+    event.preventDefault();
+    event.stopPropagation();
+    if (event.key === "Escape") close();
+    else if (event.key === "Enter") {
+      if (!event.repeat) onSelect();
+    } else onNavigate(event.key === "ArrowUp" ? "up" : "down");
   }
-
-  if (key === "arrowup") {
-    e.preventDefault();
-    onNavigate("up");
-    return;
-  }
-
-  if (key === "arrowdown") {
-    e.preventDefault();
-    onNavigate("down");
-    return;
-  }
-
-  if (key === "enter") {
-    e.preventDefault();
-    if (displayList.value.length === 0) return;
-    if (activeIndex.value < 0) activeIndex.value = 0;
-    onSelect();
-  }
-};
+}
 </script>
-
 <style scoped>
 .command-palette-trigger {
   display: flex;
-  gap: 10px;
   align-items: center;
-  justify-content: space-between;
+  gap: 8px;
   height: 32px;
   padding: 0 12px;
-  user-select: none;
+  font: inherit;
+  font-size: 12px;
+  color: var(--el-text-color-regular);
   background: var(--el-fill-color-light);
-  border: 1px solid var(--el-border-color-lighter);
+  border: 1px solid var(--el-border-color);
   border-radius: 999px;
+  cursor: pointer;
 }
-
-.command-palette-trigger__left {
+.command-palette-trigger kbd {
+  margin-left: 12px;
+  font: inherit;
+}
+.command-palette {
   display: flex;
-  gap: 8px;
-  align-items: center;
+  flex-direction: column;
+  gap: 12px;
 }
-
-.command-palette-trigger__text {
-  font-size: 12px;
-  color: var(--el-text-color-secondary);
-  white-space: nowrap;
+.command-palette-input {
+  box-sizing: border-box;
+  width: 100%;
+  min-width: 0;
+  padding: 10px 12px;
+  border: 1px solid var(--el-border-color);
+  border-radius: 6px;
+  background: var(--el-fill-color-blank);
+  color: var(--el-text-color-primary);
+  font: inherit;
 }
-
-.command-palette-trigger__kbd {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  padding: 2px 8px;
-  font-size: 12px;
-  line-height: 1;
-  color: var(--el-text-color-secondary);
-  white-space: nowrap;
-  background: var(--el-bg-color-overlay);
-  border: 1px solid var(--el-border-color-lighter);
-  border-radius: 8px;
-}
-
-.command-palette-trigger:focus-visible {
+.command-palette-input:focus-visible {
   outline: 2px solid var(--el-color-primary);
   outline-offset: 2px;
 }
-
-.command-palette-trigger:hover {
-  border-color: var(--el-border-color);
+.command-palette-section {
+  display: flex;
+  justify-content: space-between;
+  color: var(--el-text-color-regular);
+  font-size: 13px;
 }
-
-.command-palette-dialog {
+.command-palette-section button {
+  border: 0;
+  background: transparent;
+  color: var(--el-text-color-regular);
+  cursor: pointer;
+  font: inherit;
+  text-decoration: underline;
+}
+.command-palette-list {
+  max-height: 45vh;
+  overflow: auto;
+  list-style: none;
+  margin: 0;
+  padding: 2px;
+}
+.command-palette-list li {
   display: flex;
   flex-direction: column;
-  gap: 14px;
+  gap: 4px;
+  padding: 12px;
+  border-radius: 8px;
+  cursor: pointer;
 }
-
-.command-palette-input :deep(.el-input__wrapper) {
-  border-radius: 10px;
+.command-palette-list li:hover,
+.command-palette-list li.is-active {
+  background: var(--el-fill-color);
+  outline: 1px solid var(--el-border-color);
 }
-
-.command-palette-input__suffix {
-  display: inline-flex;
-  gap: 10px;
-  align-items: center;
+.command-palette-title {
+  color: var(--el-text-color-primary);
+  font-size: 14px;
 }
-
-.command-palette-input__suffix :deep([class^="i-svg:"]) {
-  font-size: 16px;
-  color: var(--el-text-color-secondary);
+.command-palette-title mark {
+  color: inherit;
+  background: var(--el-color-primary-light-8);
+  font-weight: 600;
 }
-
-.command-palette-input__suffix :deep([class^="i-svg:"]):hover {
-  color: var(--el-color-primary);
+.command-palette-path {
+  color: var(--el-text-color-regular);
+  font-size: 12px;
+  overflow-wrap: anywhere;
 }
-
-.command-palette-results {
-  max-height: 48vh;
-  overflow: auto;
-}
-
 .command-palette-empty {
   padding: 24px 0;
-  color: var(--el-text-color-secondary);
   text-align: center;
+  color: var(--el-text-color-regular);
 }
-
-.command-palette-list {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  padding: 0;
-  margin: 0;
-  list-style: none;
-}
-
-.command-palette-item {
-  padding: 10px 12px;
-  cursor: pointer;
-  border-radius: 10px;
-}
-
-.command-palette-item:hover {
-  background: var(--el-fill-color-light);
-}
-
-.command-palette-item.is-active {
-  background: var(--el-color-primary-light-9);
-}
-
-.command-palette-item__title {
-  font-size: 14px;
-  color: var(--el-text-color-primary);
-}
-
-.command-palette-item__path {
-  margin-top: 2px;
-  font-size: 12px;
-  color: var(--el-text-color-secondary);
-}
-
 .command-palette-hints {
   display: flex;
-  gap: 14px;
-  align-items: center;
-  padding-top: 10px;
+  flex-wrap: wrap;
+  gap: 16px;
   border-top: 1px solid var(--el-border-color-lighter);
-}
-
-.command-palette-hint {
-  display: inline-flex;
-  gap: 6px;
-  align-items: center;
-}
-
-.command-palette-hint__key {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  height: 24px;
-  padding: 0 8px;
-  background: var(--el-bg-color-overlay);
-  border: 1px solid var(--el-border-color-lighter);
-  border-radius: 8px;
-}
-
-.command-palette-hint__key :deep([class^="i-svg:"]) {
-  font-size: 14px;
-  color: var(--el-text-color-secondary);
-}
-
-.command-palette-hint__text {
+  padding-top: 12px;
   font-size: 12px;
-  color: var(--el-text-color-secondary);
+  color: var(--el-text-color-regular);
+}
+.command-palette-notice {
+  margin: 0;
+  font-size: 12px;
+  color: var(--el-text-color-regular);
+}
+button:focus-visible {
+  outline: 2px solid var(--el-color-primary);
+  outline-offset: 2px;
 }
 </style>
