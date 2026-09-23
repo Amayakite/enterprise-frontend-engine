@@ -38,8 +38,11 @@ import {
   pauseFeedback,
   resumeFeedback,
 } from "@/utils/feedback";
+/** 使用项目弹层层级分配，让全局反馈显示在普通页面之上。 */
 const { nextZIndex } = useZIndex();
+/** 当前反馈浮层使用的层级，有新提示时可提升到最新弹层上方。 */
 const zIndex = ref(2000);
+/** 反馈队列变化时调整浮层层级，让新消息不会被其他弹窗遮住。 */
 watch(
   feedbackNotices,
   (current, previous) => {
@@ -48,6 +51,7 @@ watch(
   },
   { immediate: true, flush: "sync" }
 );
+/** 焦点真正离开当前提示后才恢复自动关闭，提示内切换按钮不重启计时。 */
 function onFocusOut(id: number, event: FocusEvent) {
   if (
     event.currentTarget instanceof HTMLElement &&
@@ -57,6 +61,7 @@ function onFocusOut(id: number, event: FocusEvent) {
     return;
   resumeFeedback(id, "focus");
 }
+/** 反馈容器卸载时清空消息和自动关闭计时器。 */
 onBeforeUnmount(clearFeedback);
 </script>
 <style scoped>

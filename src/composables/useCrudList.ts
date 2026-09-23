@@ -20,7 +20,7 @@ import type { TableSort } from "@/components/table/types";
 import type { CrudListConfig, CrudListController } from "@/components/business/crud/types";
 
 /**
- * 将模块 CrudListConfig 装配为可供 MyCrudList 使用的受控列表控制器。
+ * 根据模块 list 配置管理列表查询、筛选、勾选和按钮操作，返回值可直接传给 MyCrudList。
  *
  * @typeParam Row 列表行类型。
  * @typeParam Id 行稳定主键。
@@ -28,7 +28,8 @@ import type { CrudListConfig, CrudListController } from "@/components/business/c
  * @param context 返回当前页面上下文的 getter；调用时会拍摄只读快照。
  * @param options 可选的 KeepAlive 页面失效 key。
  * @remarks 复用结构化查询核心，只增加查询草稿、当前页选择和业务动作；不会缓存历史页数据。
- * @example `const controller = useCrudList(config.list, () => pageContext, { invalidationKey: "base.customer.list" });`
+ * @example
+ * `const controller = useCrudList(config.list, () => pageContext, { invalidationKey: "base.customer.list" });`
  */
 export function useCrudList<
   Row,
@@ -49,6 +50,7 @@ export function useCrudList<
     preference?: () => CrudColumnIdentity;
   } = {}
 ) {
+  /** 复用结构化查询管理条件和分页，在请求前后追加模块回调及行键检查。 */
   const query = useSearchQuery<Row, S, Scope, TableSort<Row>>(
     {
       schema: config.query.schema,
@@ -57,6 +59,7 @@ export function useCrudList<
       pageSize: config.pageSize,
       scope: () => config.scope(context()),
       request: async (request, run) => {
+        // 固定本次查询的组织和权限数据，前后回调与 DTO 转换使用同一份快照。
         const snapshot = cloneModel(context());
         const dto = config.toQuery(request, snapshot);
         const input = { ...run, context: snapshot };
@@ -82,7 +85,9 @@ export function useCrudList<
       },
     }
   );
+  /** 筛选面板中尚未应用的条件；取消筛选时从已应用条件恢复。 */
   const draft = shallowRef(createQueryDraft(config.query.schema, config.query.initial));
+  /** 可选的本机查询方案；同时配置方案规则和存储身份时才启用。 */
   const presets =
     config.queryPresets && options.preference
       ? useQueryPresets<Row, S>({
@@ -100,19 +105,26 @@ export function useCrudList<
           },
         })
       : undefined;
+  /** 范围初始化次数，防止旧默认方案读取结束后补发无条件查询。 */
   let initializeRun = 0;
+  /** 先尝试当前范围的默认方案；未配置默认方案时才按默认条件请求列表。 */
   async function initializeQuery() {
     const run = ++initializeRun;
     if (presets && (await presets.initialize())) return;
     if (run === initializeRun) await query.refresh();
   }
+  /** 仅保存当前页已勾选的稳定 ID，刷新或换范围时清空。 */
   const selectedKeys = shallowRef<Id[]>([]);
+  /** 筛选草稿校验错误，与请求失败和按钮操作错误分开保存。 */
   const queryError = shallowRef<string | null>(null);
+  /** 勾选变化次数，确认框等待期间改了选择则原动作不再执行。 */
   let selectionRevision = 0;
+  /** 清空当前勾选并让基于旧选择的业务动作失效。 */
   const clearSelection = () => {
     selectedKeys.value = [];
     selectionRevision++;
   };
+  /** 每次开始查询清空勾选，避免操作刷新前的旧记录。 */
   watch(
     query.loading,
     (value) => {
@@ -120,6 +132,7 @@ export function useCrudList<
     },
     { flush: "sync" }
   );
+  /** 范围 key 变化后重置筛选草稿、选择及旧校验提示。 */
   watch(
     () => query.scope.value.key,
     () => {
@@ -129,6 +142,7 @@ export function useCrudList<
     },
     { flush: "sync" }
   );
+  /** 为业务动作提供只读数据，禁止回调直接修改列表或上下文。 */
   const snapshot = <T>(value: T) => readonly(shallowRef(cloneModel(value))).value;
   // 每次数据变化只构建一次行索引。按钮可用性会在每个单元格多次求值，不能为取 ID
   // 反复深拷贝主子表数据并扫描整页；独立只读快照仍隔离业务回调对查询数据的修改。
@@ -140,13 +154,16 @@ export function useCrudList<
     }
     return index;
   });
+  /** 当前组织和权限等数据的只读视图，供行按钮及批量动作使用。 */
   const contextSnapshot = computed(() => snapshot(context()));
+  /** 按勾选 ID 从当前页索引提取只读记录，忽略已不在本页的 ID。 */
   const selectedRows = computed(() => {
     const keys = new Set(selectedKeys.value);
     return Object.freeze(
       [...indexedRows.value].filter(([key]) => keys.has(key)).map(([, row]) => row)
     );
   });
+  /** 为一次按钮操作组装取消信号、上下文和勾选快照。 */
   const actionContext = (signal: AbortSignal) =>
     Object.freeze({
       signal,
@@ -154,6 +171,7 @@ export function useCrudList<
       selectedKeys: Object.freeze([...selectedKeys.value]),
       selectedRows: selectedRows.value,
     });
+  /** 管理列表按钮的权限、确认和执行，成功后按动作配置刷新分页。 */
   const actions = useCrudActions({
     actions: config.actions ?? [],
     context: actionContext,
@@ -170,6 +188,7 @@ export function useCrudList<
       if (query.error.value) throw new Error(query.error.value);
     },
   });
+  /** 新查询开始时清除上次按钮错误，避免提示与新数据混在一起。 */
   watch(
     query.loading,
     (value) => {
@@ -213,13 +232,18 @@ export function useCrudList<
       return draft.value;
     },
   };
+  /** 标记首次挂载已开始，避免首次 activated 重复处理刷新。 */
   let mounted = false;
+  /** 最近成功刷新时确认的模块变化版本，失败时不前移。 */
   let handledInvalidation = viewInvalidationRevision(options.invalidationKey);
+  /** 缓存页刷新轮次，防止旧刷新完成后吞掉新的失效通知。 */
   let invalidationRefreshRun = 0;
+  /** 首次挂载先读取默认查询方案，再发起对应查询。 */
   onMounted(() => {
     mounted = true;
     void initializeQuery();
   });
+  /** 缓存页恢复时检查其他页面的写入通知；仅数据已过期才刷新。 */
   onActivated(() => {
     if (!mounted) return;
     const revision = viewInvalidationRevision(options.invalidationKey);
@@ -240,6 +264,7 @@ export function useCrudList<
         handledInvalidation = revision;
     })();
   });
+  /** 向列表组件暴露筛选、分页、勾选和按钮动作，状态只读。 */
   const controller: CrudListController<Row, Id, S> = {
     presets: presets?.controller,
     // Vue 的 DeepReadonly 对未实例化泛型不满足幂等推导；运行时仍深只读。

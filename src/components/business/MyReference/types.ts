@@ -21,11 +21,11 @@ export interface ReferenceNavigation<Row, Id extends ReferenceId> {
 }
 import type { QueryPageRequest, QuerySchema } from "@/components/business/search/types";
 
-/** 数据源合同支持单/多选；MyReference 单多选共用内核。 */
+/** 数据源配置支持单/多选；MyReference 单多选共用内核。 */
 export type ReferenceId = string | number;
 /** 参照查询允许的标量值；不传 Vue 实例、函数或任意对象。 */
 export type QueryValue = string | number | boolean | null | readonly QueryValue[];
-/** 参照固定业务筛选的基础合同；具体源扩展组织/父 ID 等字段。 */
+/** 参照固定业务筛选的基础接口约定；具体源扩展组织/父 ID 等字段。 */
 export type ReferenceFilters = Readonly<Record<string, QueryValue>>;
 
 /** 参照普通查询条件；字段与操作符必须受数据源白名单限制。 */
@@ -61,7 +61,7 @@ export interface ReferenceQuery<F extends ReferenceFilters> {
      */
     order: "asc" | "desc";
   };
-  /** 请求用途；数据源可按候选/弹窗做不同优化，但返回合同不能变。 */
+  /** 请求用途；数据源可按候选/弹窗做不同优化，但返回接口约定不能变。 */
   purpose: "suggest" | "dialog";
 }
 
@@ -143,7 +143,7 @@ export interface ReferenceResolveResult<Row, Id extends ReferenceId> {
 }
 
 /**
- * MyReference 的数据源合同，统一候选搜索、已选解析和可选性校验。
+ * MyReference 的数据源配置，统一候选搜索、已选解析和可选性校验。
  *
  * @typeParam Row 参照记录类型。
  * @typeParam Id 参照稳定主键类型。
@@ -255,7 +255,7 @@ export interface ReferenceCommit<Row, Id extends ReferenceId, Multiple extends b
   reason: "select" | "clear" | "dependency-clear";
 }
 
-/** 单/多选模型关联合同；multiple:true 时 modelValue 必须是数组。 */
+/** 单/多选模型关联接口约定；multiple:true 时 modelValue 必须是数组。 */
 export type ReferenceModelProps<Id extends ReferenceId> =
   | {
       /**
@@ -281,7 +281,7 @@ export type ReferenceModelProps<Id extends ReferenceId> =
 /** 使用 NoInfer 让 Id/Filters 只由 source 决定，拒绝错误模型将 Id 拓宽成联合类型。 */
 export type ReferenceProps<Row, Id extends ReferenceId, F extends ReferenceFilters> = {
   /**
-   * 参照数据源合同；提供稳定 key、行主键/名称、搜索和 ID 回显方法。创建对象本身不发请求。
+   * 参照数据源配置；提供稳定 key、行主键/名称、搜索和 ID 回显方法。创建对象本身不发请求。
    * @example
    * `source: provinceReference`
    */
@@ -331,7 +331,7 @@ export interface ReferenceError {
    */
   error: unknown;
 }
-/** MyReference 的公开事件合同，供模板事件悬停和调用方适配使用。 */
+/** MyReference 的公开事件参数说明，供模板事件悬停和调用方适配使用。 */
 export type ReferenceEmits<Row, Id extends ReferenceId, Multiple extends boolean> = {
   /**
    * 已确认的参照 ID 值变更；单选为空时为 null，多选为空数组。
@@ -470,14 +470,14 @@ export interface ReferenceInputProps<
   ) => ReferenceAvailability | Promise<ReferenceAvailability>;
 }
 
-/** 单选参照组件的类型别名；用于只允许 ID|null 的装配场景。 */
+/** 单选参照组件的类型别名；用于只允许 ID|null 的组合场景。 */
 export type SingleReferenceProps<
   Row,
   Id extends ReferenceId,
   F extends ReferenceFilters,
 > = ReferenceInputProps<Row, Id, F, false>;
 
-/** 参照公开实例方法；宿主仅通过这些方法打开、关闭、聚焦或校验。 */
+/** 参照公开实例方法；调用方仅通过这些方法打开、关闭、聚焦或校验。 */
 export interface ReferenceExpose {
   /**
    * 打开指定目标/参照；返回是否成功，失败或守卫拦截时为 false。

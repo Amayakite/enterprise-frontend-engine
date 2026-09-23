@@ -55,7 +55,7 @@ const props = defineProps<
       createInitialQuery: () => Q;
       /** 字段渲染与联动所需的页面上下文。 */
       context: C;
-      /** 宿主正在查询时禁用重复操作。 */
+      /** 调用方正在查询时禁用重复操作。 */
       loading?: boolean;
       schema?: never;
       modelValue?: never;
@@ -82,7 +82,7 @@ const props = defineProps<
       initial?: AppliedQuery<S>;
       /** 查询范围的稳定标识。 */
       scopeKey: string;
-      /** 宿主正在查询时禁用重复操作。 */
+      /** 调用方正在查询时禁用重复操作。 */
       loading?: boolean;
       fields?: never;
       createInitialQuery?: never;
@@ -116,7 +116,7 @@ const emit = defineEmits<{
    */
   refresh: [];
 }>();
-/** 转发 QueryPanel 的已应用查询，保持 MySearch 的对外 v-model 合同。 */
+/** 转发 QueryPanel 的已应用查询，保持 MySearch 的对外 v-model 接口约定。 */
 function onQueryModelUpdate(value: AppliedQuery<S>) {
   emit("update:modelValue", value);
 }
@@ -144,13 +144,17 @@ const slots = defineSlots<{
     readonly: boolean;
   }) => unknown;
 }>();
+/** 保留旧式 SearchFields 的公开查询方法，兼容已有字段查询页面。 */
 const legacy = ref<{ submit: () => void; reset: () => void; getQuery: () => Q }>();
+/** 保留新查询面板的公开操作，向调用页面提供统一的查询/重置入口。 */
 const queryPanel = ref<{
   reset: () => void;
   clear: () => void;
   apply: (entry: QueryEntry) => Promise<void>;
 }>();
+/** 将旧查询字段名转成 field-* 插槽名称。 */
 const fieldSlotName = (key: string) => `field-${key}` as keyof typeof slots;
+/** 只转发页面实际提供的字段插槽，其余查询输入沿用默认显示。 */
 const slottedFields = computed(() =>
   props.mode === "query" ? [] : props.fields.filter((field) => !!slots[fieldSlotName(field.key)])
 );

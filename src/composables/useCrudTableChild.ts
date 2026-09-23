@@ -5,12 +5,13 @@ import type { FieldKey } from "@/components/business/fields/types";
 import type { CrudFormController, CrudTableBinding } from "@/components/business/crud/types";
 
 /**
- * 将主表中的对象数组字段绑定为 MyCrudChildTable 可消费的子表端口。
+ * 将主表中的对象数组字段绑定为 MyCrudChildTable 可消费的子表操作接口。
  *
  * @typeParam K 只能是 Model 的对象数组字段，避免把普通数组误接为子表。
  * @remarks 主表仍拥有最终提交值；子表只能通过 binding.replace 回写。草稿版本和字段白名单
  * 必须在子表 config 中声明。
- * @example `const contacts = useCrudTableChild(controller, "contacts", { draft: { version: 1, fields: ["name"] } });`
+ * @example
+ * `const contacts = useCrudTableChild(controller, "contacts", { draft: { version: 1, fields: ["name"] } });`
  */
 export function useCrudTableChild<
   Model extends object,
@@ -33,6 +34,7 @@ export function useCrudTableChild<
   }
 ) {
   type Row = Model[K] extends readonly (infer Item extends object)[] ? Item : never;
+  /** 主表保存流程传下来的子表只读锁，与控制器忙碌状态共同限制编辑。 */
   const locked = ref(false);
   // K 已被调用签名限制为对象数组；条件类型在泛型实现体内无法反向缩窄。
   const binding: CrudTableBinding<Row> = {

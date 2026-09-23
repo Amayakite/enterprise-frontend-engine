@@ -1,8 +1,45 @@
 # CRUD 开发指南
 
+## 先做出一个页面
+
+`MyCrudList` 显示可查询、分页的列表，`MyCrudForm` 显示新增或编辑表单，`MyCrudDetail` 显示只读详情。`useCrudView` 根据模块配置准备这些组件需要的数据、按钮和加载状态。
+
+已有模块时，页面通常只需选择类型并传入对应的 bindings：
+
+| 页面 | useCrudView 的 view | 模板中的用法                                | 得到的功能                                     |
+| ---- | ------------------- | ------------------------------------------- | ---------------------------------------------- |
+| 列表 | `list`              | `<MyCrudList v-bind="bindings.list" />`     | 查询、分页、表格和配置好的操作按钮             |
+| 新增 | `add`               | `<MyCrudForm v-bind="bindings.form" />`     | 默认值、字段输入、校验、保存及已配置的草稿恢复 |
+| 编辑 | `edit`              | `<MyCrudForm v-bind="bindings.form" />`     | 读取已有数据后修改，使用同一套校验与保存       |
+| 详情 | `detail`            | `<MyCrudDetail v-bind="bindings.detail" />` | 字段显示、刷新、返回及配置好的业务按钮         |
+
+下面是可放在销售组织详情路由中的完整页面；模块和路由已经存在，其他模块需换成自己的配置。
+
+```vue
+<script setup lang="ts">
+import MyCrudDetail from "@/components/business/crud/MyCrudDetail.vue";
+import MyFeedback from "@/components/business/feedback/MyFeedback.vue";
+import { useCrudView } from "@/composables/useCrudView";
+import { saleModule } from "@/pages/base/sale/config";
+
+const { state, bindings } = useCrudView(saleModule, { view: "detail" });
+</script>
+
+<template>
+  <div class="page-container crud-page">
+    <MyFeedback v-if="state.invalidReason" :message="state.invalidReason" />
+    <MyCrudDetail v-else v-bind="bindings.detail" />
+  </div>
+</template>
+```
+
+通常不必手写 controller：`useCrudView` 已经创建好加载数据、刷新和执行按钮操作的方法，放在 bindings 中传给组件。字段和按钮在模块 config.ts 配置；客户详情的子表等额外内容放在 `tab-*` 插槽。只想展示一组现成数据、不需要加载和按钮时，使用 [独立 MyDesc](./business-components-guide.md#独立表单与详情完整最小例子) 即可。
+
+下面依次介绍添加业务规则、配置接口、查询与保存的方法；涉及旧模块的底层接法时会明确说明。
+
 > 标准业务模块现在优先从 [模块实操](./module-development-example.md) 的 `defineBusinessModule`
-> 入口装配：一套字段按场景派生、子表绑定生成注册信息。本文的 `defineCrudConfig` 和可选
-> `list/form/detail` 是仍兼容的低层合同，不要求将已定义的模块再次拆成多份配置。
+> 入口组合：一套字段按场景派生、子表绑定生成注册信息。本文的 `defineCrudConfig` 和可选
+> `list/form/detail` 是仍兼容的低层接口约定，不要求将已定义的模块再次拆成多份配置。
 
 本指南说明当前已交付的 `MyCrud* + useCrud*` 接法。目录选择先读 [业务模块开发规范](./business-module-standard.md)；公开类型以 `src/components/business/crud/types.ts`、`src/components/business/search/types.ts` 和各组件源码为准。
 
@@ -13,25 +50,25 @@
 标准模块使用 `useCrudView(module, { view, state?, hooks?, navigation?, batch? })`，
 解构 `{ state, actions, bindings }`，模板直接引用 `MyCrudList/MyCrudForm/MyCrudDetail`，
 从组件名即可跳转真实源码。[五类文件接法](./module-development-example.md#6-页面最终形态)
-以客户为参照。`useCrudView` 是标准模块唯一页面入口，直接装配当前场景的
+以客户为参照。`useCrudView` 是标准模块唯一页面入口，直接组合当前场景的
 `useCrudList/useCrudForm/useCrudDetail`，公开 state/actions/bindings；不再转接另一套页面 Runtime。
 `createViewConfig()` 只生成配置，不创建页面实例或请求数据。
 模块定义时检查静态字段、分区和必需方法；`createViewConfig()` 首次读取 list/detail 时才执行
 对应动作工厂并检查动作键，同一实例复用结果。动作工厂应只返回配置，不承担初始化副作用。
 
-| 位置                              | 内容与所有权                                                   |
-| --------------------------------- | -------------------------------------------------------------- |
-| config.fields/links/children      | 共享字段、联动和子表规则；子表各有 config                      |
-| config.views.form/list/detail     | 公共生命周期与场景策略                                         |
-| options.hooks                     | 本界面的追加业务行为；公共规则先执行                           |
-| state.custom                      | 工厂创建的辅助数据，可直接修改，不进入 DTO、草稿或 Pinia       |
-| state.model / rows / dirty / busy | 原控制器的只读实时状态，不复制模型                             |
-| state.pagination                  | 列表页码、每页条数和总数；用 actions.setPage 修改              |
-| actions                           | 按场景提供 patch/save/refresh 等命令；表单 back 经过离开守卫   |
-| bindings.form/list/detail         | 直接传给真实组件的 props，保留同一控制器                       |
-| bindings.child(key)               | 表单的同一子表端口，setup 中读取；每个配置分区必须挂载对应组件 |
-| bindings.host                     | 列表/详情的弹窗与抽屉宿主 props；存在时挂载 MyBusinessPageHost |
-| options.navigation                | 替换指定导航；saved 仅在保存回填成功后调用                     |
+| 位置                              | 内容与所有权                                                       |
+| --------------------------------- | ------------------------------------------------------------------ |
+| config.fields/links/children      | 共享字段、联动和子表规则；子表各有 config                          |
+| config.views.form/list/detail     | 公共生命周期与场景策略                                             |
+| options.hooks                     | 本界面的追加业务行为；公共规则先执行                               |
+| state.custom                      | 工厂创建的辅助数据，可直接修改，不进入 DTO、草稿或 Pinia           |
+| state.model / rows / dirty / busy | 原控制器的只读实时状态，不复制模型                                 |
+| state.pagination                  | 列表页码、每页条数和总数；用 actions.setPage 修改                  |
+| actions                           | 按场景提供 patch/save/refresh 等命令；表单 back 经过离开守卫       |
+| bindings.form/list/detail         | 直接传给真实组件的 props，保留同一控制器                           |
+| bindings.child(key)               | 表单的同一子表操作接口，setup 中读取；每个配置分区必须挂载对应组件 |
+| bindings.host                     | 列表/详情的弹窗与抽屉容器 props；存在时挂载 MyBusinessPageHost     |
+| options.navigation                | 替换指定导航；saved 仅在保存回填成功后调用                         |
 
 state 工厂每个实例创建普通对象，只放可快照数据，不放组件、函数或循环引用。
 `const { state, actions, bindings } = useCrudView(...)` 可安全解构；不要把
@@ -127,7 +164,7 @@ validate 是例外：两级依次执行并收集合并全部问题，而非第�
 模块钩子抛错或信号取消时不继续页面钩子；页面钩子抛错沿当前查询、加载、保存或关闭流程处理。
 options.navigation 替换指定导航，模型 overrides 替换指定转换步骤，两者不套用追加钩子的规则。
 
-子表配置只提供行规则、DTO 映射和草稿定义；`bindings.child(key)` 按需创建同一编辑端口，
+子表配置只提供行规则、DTO 映射和草稿定义；`bindings.child(key)` 按需创建子表的编辑参数和方法，
 不隐式加载组件、不创建额外模型。页面显式导入子组件，详情直接从只读模型取得行。
 模型基线由表单控制器拥有，行编辑草稿由子表拥有，本机持久化由现有 useCrudDraft/公共存储拥有。
 
@@ -164,14 +201,14 @@ DTO 白名单转换 → create/update → resolveSaved →
 - beforeClose 是额外业务检查；原提交锁、脏状态确认、草稿和标签导航保护仍生效。
 - 未声明的钩子不增加空操作或无用快照；过期请求继续由原请求通道处理。
 
-悬停合同见 [crud-view.ts](../src/components/business/crud/crud-view.ts) 与继承的 [生命周期合同](../src/components/business/crud/crud-page.ts)。
-下文保留低层直接装配用法。
+参数说明见 [crud-view.ts](../src/components/business/crud/crud-view.ts) 与继承的 [生命周期接口约定](../src/components/business/crud/crud-page.ts)。
+下文保留低层直接组合用法。
 
-## 1. 建立 API 与查询合同
+## 1. 建立 API 与查询接口约定
 
 新标准模块的查询入口、关键词与默认操作符从 fields 派生，见 [模块规范 `3.4](./business-module-standard.md#34-一套字段按场景派生)。下例解释兼容的显式 schema 接法，不要求 customer 再维护 API 查询字段。
 
-先在 `src/api/<领域>/<模块>/` 定义服务端合同。以任务费用为例：
+先在 `src/api/<领域>/<模块>/` 定义服务端接口约定。以任务费用为例：
 
 - `types.ts` 声明 `FeeItem`、`FeeSavePayload`、`FeeSaveResult`、`FeeSearchRequest`；金额和日期仍是服务端字符串。
 - `query.ts` 定义 `feeQuerySchema`、允许排序字段和 `toFeeSearchRequest`。
@@ -192,7 +229,7 @@ export function toFeeSearchRequest(
 
 `schema` 只声明真实端点支持的字段、入口和运算符。`0`、`false`、完整日期区间、多选 ID 和空值运算符由查询核心保留；API 适配仍需拒绝非法字段、运算符和排序键。后端只接受平面参数时，在 `toQuery` 或 API `query.ts` 明确把 AST 转成该 DTO，不让 Mock 外观代替实际适配。
 
-API 请求把取消信号传给现有 request 实例，并让装配层显示局部错误：
+API 请求把取消信号传给现有 request 实例，并让CRUD 组件和 useCrud 方法显示局部错误：
 
 ```ts
 search(data: FeeSearchRequest, signal?: AbortSignal) {
@@ -237,7 +274,7 @@ export function createFeeCrud(navigation: CrudNavigation<string>) {
 }
 ```
 
-主配置小就保留一个文件，主字段较多时拆 `fields.config.ts`。业务子表不受主配置大小影响，每个子表都建立独立 `children/<子模块>/config.ts`，再由父 config 汇总。各所有者的导入边界见模块规范，子组件读取自己的同级 config，不反向导入父装配配置。
+主配置小就保留一个文件，主字段较多时拆 `fields.config.ts`。业务子表不受主配置大小影响，每个子表都建立独立 `children/<子模块>/config.ts`，再由父 config 汇总。各所有者的导入边界见模块规范，子组件读取自己的同级 config，不反向导入父组合配置。
 
 `defineCrudConfig` 会检查模块 key、必需函数、重复字段/列/动作/分区/页签以及默认页大小。`list`、`form`、`detail` 和 `navigation` 都是可选能力；简单列表只声明 `list` 即可。
 
@@ -313,7 +350,7 @@ const list = useCrudList(config.list!, () => context.value, { invalidationKey: c
 
 失效版本在当前刷新成功后才确认；失败保留版本差异，下次激活重试。请求期间出现的新失效不会被旧响应确认。`useCrudView` 的详情也复用模块失效标记：保存后重新激活时读取自身记录，普通标签切换不请求。完整路径隔离的详情和编辑实例应在创建时固定实体 ID，不能让后台缓存页监听全局 `route.params.id`，否则切换到另一实体会触发后台重复请求并覆盖原页面内容。
 
-列设置复用 `MyDialog` 与 `useCrudColumns`。真实表头预览、分区/分组栏目轨道和当前设置面板共用一份草稿；显隐、固定位置、顺序、列宽、对齐和密度只有保存后才按用户、模块和配置版本整体写入本机存储，取消不会污染当前列表。表头预览支持点击普通列、分组标题或分组叶子定位对应设置；拖拽以未分组列或整个分组为单位，可在左侧固定、普通、右侧固定区域内及跨区域快速排序。搜索或显隐筛选时暂停排序，避免局部结果与真实顺序混淆。下方结构列表和设置面板使用可折叠的 `el-splitter`，默认弱化结构浏览区并允许用户调整宽度。表头直接拖动列宽仍即时保存。历史偏好没有 `fixed`、`align` 或 `groupAlign` 时沿用源码列定义，损坏宽度、未知字段、非法对齐和全部隐藏继续安全回退。业务列可选声明 `headerGroup: { key, label, align?, fixed? }` 形成两层表头，`align` 控制分组标题默认对齐，`fixed` 控制整组默认固定区域；弹窗按固定区域呈现层级，支持整组显隐/恢复、标题对齐和固定位置。同组叶子列可独立显隐、设置宽度和内容对齐，但不显示拖拽入口，组内顺序始终服从源码配置；分组本身不可拆，只能整体排序或切换固定区域，`useCrudColumns` 会在读取和应用偏好时收拢旧的碎片状态。未声明的模块保持单层表头。
+列设置复用 `MyDialog` 与 `useCrudColumns`。真实表头预览、分区/分组栏目轨道和当前设置面板共用一份草稿；显隐、固定位置、顺序、列宽、对齐和密度只有保存后才按用户、模块和配置版本整体写入本机存储，取消不会污染当前列表。表头预览支持点击普通列、分组标题或分组叶子定位对应设置；拖拽以未分组列或整个分组为单位，可在左侧固定、普通、右侧固定区域内及跨区域快速排序。搜索或显隐筛选时暂停排序，避免局部结果与真实顺序混淆。下方结构列表和设置面板使用可折叠的 `el-splitter`，默认弱化结构浏览区并允许用户调整宽度。表头直接拖动列宽仍即时保存。历史偏好没有 `fixed`、`align` 或 `groupAlign` 时沿用源码列定义，损坏宽度、未知字段、非法对齐和全部隐藏继续安全回退。业务列可选声明 `headerGroup: { key, label, align?, fixed? }` 形成两层表头，`align` 控制分组标题默认对齐，`fixed` 控制整组默认固定区域；弹窗按固定区域显示层级，支持整组显隐/恢复、标题对齐和固定位置。同组叶子列可独立显隐、设置宽度和内容对齐，但不显示拖拽入口，组内顺序始终服从源码配置；分组本身不可拆，只能整体排序或切换固定区域，`useCrudColumns` 会在读取和应用偏好时收拢旧的碎片状态。未声明的模块保持单层表头。
 
 系统选择列与操作列分别构成最左和最右边界，不进入偏好排序；左、右固定业务列始终排列在系统边界列内侧。TableView 将系统边界列与业务表头放入同一个显式渲染序列，避免条件节点与分组组件的挂载时序改变 VXE 的最终列顺序。
 
@@ -351,7 +388,7 @@ MyCrudList 默认单行：新增、更多操作、短快捷搜索；筛选与刷
 不影响其他入口且不立即请求；点击“应用查询”生效，取消仍回到已应用条件。
 单个文本快捷字段将查询图标放进输入框，回车仍只提交 quick 条件；多个字段或自定义输入保留成组查询按钮。
 普通/高级查询、已应用条件计数、条件删除与重置集中在筛选面板，不常驻第二行。
-独立 QueryPanel 默认沿用展开布局，需要紧凑呈现时传 compact，参照弹窗不被强制改变。
+独立 QueryPanel 默认沿用展开布局，需要紧凑显示时传 compact，参照弹窗不被强制改变。
 
 toolbar-left 历史插槽名保留，但内容现位于“更多操作”面板；使用图标配合文字按钮。
 已有工具栏动作与 MyBatchActions 一同收纳，权限与禁用原因仍由原控制器决定。
@@ -394,7 +431,7 @@ toolbar-right 保留给必要常驻工具；不要再追加多排低频按钮。
 
 依赖清空用 `FieldLink` 显式声明 `watch/writes/clear/apply`。参照 `map` 只处理该次 typed commit 的业务回填；名称 resolve 不触发业务写入。保存前 `MyForm` 会验证参照，不能用显示名称已出现代替有效性验证。
 
-自动 fields 模式在 scenes.query.input 使用 `createQueryReference`；旧 schema 模式通过 `withQueryInputs` 增加输入呈现。两种方式都不让 source 覆盖固定 scope。完整例子见客户、任务费用 `config.ts`。
+自动 fields 模式在 scenes.query.input 使用 `createQueryReference`；旧 schema 模式通过 `withQueryInputs` 增加输入显示。两种方式都不让 source 覆盖固定 scope。完整例子见客户、任务费用 `config.ts`。
 
 ### 字典声明、自动预热与刷新
 
@@ -415,9 +452,9 @@ toolbar-right 保留给必要常驻工具；不要再追加多排低频按钮。
 
 `MyCrudList/MyCrudDetail/MyForm` 内部用 `useFieldDictionaries` 预热。
 `useDictionary` 与 Pinia 字典池按“访问范围 + code”合并在途请求，所有行共用一份只读结果。
-这只是活跃消费者共享，不写 localStorage/IndexedDB，不做长期缓存：
-查询/刷新列表会重新获取；KeepAlive 停用或组件卸载释放租约，最后一个消费者释放即清除并取消请求。
-仍有其他活跃消费者时保留其正在使用的数据。数据库维护不会实时推送到页面，刷新即可重新查询。
+字典数据只在当前使用它的组件之间共享，不写入 localStorage/IndexedDB：
+查询/刷新列表会重新获取；KeepAlive 页面停用或组件卸载后停止使用字典；没有组件继续使用时，清除数据并取消请求。
+其他页面仍在使用时保留数据。数据库维护不会实时推送到页面，刷新即可重新查询。
 
 失败保留明确提示与重试入口，未识别的值显示原值，不能悄悄当成正常空值。
 自定义组织上下文应提供稳定 `scopeKey`；独立控件未提供范围时使用 application。
@@ -497,12 +534,12 @@ const batch = useBatchActions({
 - 确认框展示范围；确认期间范围/选择改变即取消提交。一次请求处理整个批次，不循环逐行请求。
 - 统一回执包含 requestId、matched、succeeded、failed、failures；结果可再次打开，前端最多保留 50 条失败样本。
 - 部分失败仍刷新列表；网络异常或回执不合法标记“结果待核实”，本实例禁止再次写入，不自动重试。requestId 只用于关联，不代表真实服务端已实现幂等。
-- 全量查询以服务端执行时匹配集合为准，不是数据库快照；要求快照/异步任务的业务须由后端扩展合同。
+- 全量查询以服务端执行时匹配集合为准，不是数据库快照；要求快照/异步任务的业务须由后端扩展接口约定。
 
 ## 6. 新增、编辑与整单保存
 
-可选本机草稿通过 `form.draft` 开启，主、子字段各自声明白名单，宿主提供身份与实例键；恢复、降级、提交保护和列偏好远端适配见 [用户数据存储指南](./user-data-guide.md)。未开启模块保持原有行为。
-新模块默认在 `add.vue`、`edit.vue` 各自装配 `MyCrudForm/useCrudForm`，复用字段、子配置和转换函数，不额外增加 Create/Edit 转发层。下文以现有共用宿主展示控制器接法；独立页面使用相同公共合同并各自创建控制器、传入新增或编辑目标。共用宿主的选用与状态隔离以 [模块规范](./business-module-standard.md) 第 3.2 节为准。
+可选本机草稿通过 `form.draft` 开启，主、子字段各自声明白名单，调用方提供身份与实例键；恢复、降级、提交保护和列偏好远端适配见 [用户数据存储指南](./user-data-guide.md)。未开启模块保持原有行为。
+新模块默认在 `add.vue`、`edit.vue` 各自组合 `MyCrudForm/useCrudForm`，复用字段、子配置和转换函数，不额外增加 Create/Edit 转发层。下文以现有共用编辑组件展示控制器接法；独立页面使用相同公共接口约定并各自创建控制器、传入新增或编辑目标。共用编辑组件的选用与状态隔离以 [模块规范](./business-module-standard.md) 第 3.2 节为准。
 
 表单配置声明权限、字段、可选子模块、初始模型、读取/转换、业务校验、写入与回填：
 
@@ -537,7 +574,7 @@ form: {
 
 上例省略了 imports，其余来自当前费用配置。`toCreate/toUpdate` 必须显式选取 DTO 白名单，不能把 clientKey、显示名称或页面辅助字段整体透传。
 
-`resolveSaved` 处理两类真实后端回执：客户 Mock 直接返回完整 `CustomerRecord`，所以直接回填；任务费用只返回 `FeeSaveResult`，所以按回执 ID 再读详情。新增/编辑宿主创建 controller 后，始终通过 `open` 加载目标：
+`resolveSaved` 处理两类真实后端回执：客户 Mock 直接返回完整 `CustomerRecord`，所以直接回填；任务费用只返回 `FeeSaveResult`，所以按回执 ID 再读详情。新增/编辑容器创建 controller 后，始终通过 `open` 加载目标：
 
 ```ts
 const controller = useCrudForm(config.form!, {
@@ -559,7 +596,7 @@ watch(
 );
 ```
 
-`initialTarget` 让编辑深链首屏直接进入 loading。`controller.open` 负责 ID 切换和离开守卫；`controller.close` 负责取消；不要用 watch 直接覆盖 model。`MyCrudFormFields` 登记主表验证端口；`useCrudForm` 创建时统一登记离开保护，标准外壳和定制布局均复用同一保存、回填及关闭流程，页面不维护另一套 loading/dirty/saving。新增、编辑和详情路由应声明 `meta.keepAlive: true`：切换标签时保留草稿、明细编辑状态与滚动位置，不重复弹出未保存确认；关闭标签、刷新标签或页面不再缓存时才执行离开确认并销毁状态。
+`initialTarget` 让编辑深链首屏直接进入 loading。`controller.open` 负责 ID 切换和离开守卫；`controller.close` 负责取消；不要用 watch 直接覆盖 model。`MyCrudFormFields` 登记主表校验方法；`useCrudForm` 创建时统一登记离开保护，标准外壳和定制布局均复用同一保存、回填及关闭流程，页面不维护另一套 loading/dirty/saving。新增、编辑和详情路由应声明 `meta.keepAlive: true`：切换标签时保留草稿、明细编辑状态与滚动位置，不重复弹出未保存确认；关闭标签、刷新标签或页面不再缓存时才执行离开确认并销毁状态。
 
 `useCrudForm` 按实例创建时的完整路径注册公开离开守卫，后台标签也参与关闭与刷新确认。标签栏先确认所有待关闭页面，再移除缓存；批量关闭被拒绝时撤回先前的临时许可。确认、缓存删除和导航完成由同一个标签操作锁串行保护，连续点击不会重复确认或重复删除。独立编辑页应通过 `tagsViewStore.registerLeaveGuard` 接入并在卸载时注销。同路径查询参数变化会替换缓存实例，未保存编辑页仍需确认。退出登录清空整个标签会话；不按隐式数量上限驱逐未保存草稿。
 
@@ -574,7 +611,7 @@ watch(
 
 CRUD 的 `MyCrudFormFields` 自动启用 `MyForm.immutableModel`：控制器始终替换模型根对象，
 未变子表保持引用，所以主字段输入不深遍历整份子表。普通 `MyForm` 默认仍深监听，兼容
-父级原位修改；仅在宿主能保证上述更新约定时开启该选项，挂载后不要切换策略。
+父级原位修改；仅在调用方能保证上述更新约定时开启该选项，挂载后不要切换策略。
 
 控制器通过只读的 `state.hydrationRevision` 区分整体回填和运行期修改；`MyCrudForm` 自动把它纳入 `MyForm.formKey`。初次读取、同 ID 重载、保存回填和草稿恢复均不执行字段联动或用户 `change`，避免载入省市区时误清下级；普通 `patch` 仍执行配置的同步联动。页面无需维护此版本。
 
@@ -602,7 +639,7 @@ CRUD 的 `MyCrudFormFields` 自动启用 `MyForm.immutableModel`：控制器始�
 `ElMessage/ElNotification`。轻提示位于视口顶部居中，使用紧凑的中性底色、状态图标和关闭按钮；
 页内提示使用相同视觉语言，保留安全的下一步操作。浮动提示不遮挡其他区域点击，也不抢焦点。
 默认最多 4 条，超出上限释放最早一条；长文不自动消失，重要业务错误仍须保留在当前页。
-鼠标悬停或键盘焦点停留时暂停关闭，全部离开后按剩余时间继续；销毁宿主时清理计时器。
+鼠标悬停或键盘焦点停留时暂停关闭，全部离开后按剩余时间继续；销毁调用方时清理计时器。
 动效是 180ms 的 CSS opacity/translateY 过渡，遵守 `prefers-reduced-motion`，不引入动画依赖。
 
 | 情况                         | 展示方式                                       | 安全的下一步                      |
@@ -630,7 +667,7 @@ views: {
 操作身份，不使用“相同文案 + 时间窗”跨页面去重。导航失败时撤销该次成功轻提示，
 由控制器持有后续错误；旧请求的迟到结果沿用现有请求版本和卸载检查，不创建全局保存状态。
 后台 KeepAlive 页完成保存不弹提示、不抢占当前路由；返回时通过工具栏“已保存”查看状态，
-不补弹一次旧提示。嵌入容器先完成宿主后置工作再关闭，避免后置失败时表单已销毁而无处提示。
+不补弹一次旧提示。嵌入容器先完成调用方后置工作再关闭，避免后置失败时表单已销毁而无处提示。
 
 `MyCrudFormFeedback/MyCrudList/MyCrudDetailFeedback` 以及详情导航失败、批量结果面板均复用
 `MyFeedback` 展示当前控制器状态；短文本直接显示，长文本只在点击后创建详情窗口。文本始终按
@@ -640,7 +677,7 @@ views: {
 普通自定义页面可调用 `feedback.success/error/warning/info("纯文本")`，从
 `@/utils/feedback` 导入。当前页可恢复的问题优先使用 `MyFeedback`，动作按钮通过默认插槽
 提供；不要把“重试写入”的回调放进全局提示。请求采用 `errorPresentation: "local"` 时，
-调用者必须接住并呈现错误；未迁移接口保留全局兜底，会话失效仍由认证入口处理。
+调用者必须接住并显示错误；未迁移接口保留全局兜底，会话失效仍由认证入口处理。
 
 当前标准 CRUD、Customer、Sale、费用保存及请求/认证入口已接入；历史系统页面、上传等
 直接调用 Element Plus 的独立提示暂不批量替换，后续按模块迁移到同一入口，避免一次改动
@@ -672,7 +709,7 @@ export const salePage: BusinessPageOptions<"org-a"> = {
 
 轻量 `page.ts` 是为路由/跨模块入口共享声明而拆出；业务字段、权限、API、子表仍由
 `config.ts` 汇总。三个 loader 各写一次，菜单路由解析与容器复用它们，不为登记导航加载
-目标字段、接口或表单实例。直接访问 add/edit/detail URL 始终呈现正常路由页。
+目标字段、接口或表单实例。直接访问 add/edit/detail URL 始终显示正常路由页。
 
 标准 `MyCrudList/MyCrudForm/MyCrudDetail` 都自动挂载一个空闲时不渲染内容的
 `MyBusinessPageHost`，即使本模块默认 tab，也能打开其他模块的容器。
@@ -692,11 +729,11 @@ await openBusiness({
 });
 ```
 
-`useBusinessOpen` 从标准页面取得宿主；自定义入口需提供 `useBusinessPresentation` 并挂载宿主。
+`useBusinessOpen` 从标准页面取得弹窗/抽屉容器；自定义入口需提供 `useBusinessPresentation` 并放置 MyBusinessPageHost。
 打开入口验证目标路由可达性，目标控制器仍执行原权限与数据校验。
 新增直接打开 add，不再先跳列表寻找新增按钮。模块内部 `navigation.add/edit/detail`
 也复用同一解析。保存时，嵌入表单关闭容器并刷新来源；普通路由表单按详情展示配置打开：
-详情为 tab 时释放原表单标签，详情为容器时在已保存页上呈现，容器结束再释放原表单。
+详情为 tab 时释放原表单标签，详情为容器时在已保存页上显示，容器结束再释放原表单。
 
 参照导航的路由页保留返回来源通道；保存/取消返回原实例。返回通道只保存在内存，来源
 卸载后释放，刷新浏览器后不恢复回调。来源不存在时按普通页面导航处理。
@@ -714,7 +751,7 @@ X、遮罩、Escape、表单关闭和标签关闭复用离开守卫，父容器�
 
 ### 简单档案与分区页面布局
 
-在模块 `page.layout` 显式选择内容布局；不配置时保留原有呈现。
+在模块 `page.layout` 显式选择内容布局；不配置时保留原有显示。
 布局与 `page.presentation` 独立，不根据运行期字段显隐切换。
 
 ```ts
@@ -726,7 +763,7 @@ page: {
   // components 复用轻量页面声明中的三个 loader。
 },
 views: {
-  // list、form 仍按原合同声明
+  // list、form 仍按原接口约定声明
   detail: {
     summary: { titleField: "name", descriptionFields: ["code"], statusFields: ["active"] },
   },
@@ -737,7 +774,7 @@ views: {
 - `structured` 用于客户等主子表：使用可用高度，正文统一滚动；主表区域最大宽度 1200px，子表使用可用宽度。默认三列，可用原字段分组和 span 调整。
 - 标准表单有多个可见主字段分组或子表分区时，标题下显示分区导航，直接复用字段 `form.group`
   和 `sections`，不另写一份导航配置。窄容器横向滚动；单分区不显示。条件字段隐藏后导航同步更新。
-- 保存校验失败显示可点击的错误清单及分区错误数量，主字段聚焦现有控件，子表沿用分页和行定位端口。
+- 保存校验失败显示可点击的错误清单及分区错误数量，主字段聚焦现有控件，子表沿用分页和行定位方法。
   没有定位信息的业务错误保留纯文本。修改后以再次保存的完整校验结果为准，不假装完成后台校验。
   定制布局可调用 `controller.focusIssue(issue)`；不传参数时定位当前首错。分区导航只跳转，不触发保存。
 - 新预设将普通草稿状态显示在底部；待恢复、冲突、提交待核实、存储错误和仅内存降级仍在正文保留完整反馈与处理入口。客户的开发示例选项默认折叠，展开后仍可操作。
@@ -746,7 +783,7 @@ views: {
 - 新预设详情直接展示主资料；无子表时不显示单独“主信息”页签。有子表时在资料下显示子表页签，切换明细保留顶部摘要。
 - `views.detail.summary` 仅引用模型字段键，按 title/status/description 顺序去重；只取已启用详情场景的字段，复用 `FieldDisplay`，从正文排除已显示字段。标题空值回退为实体详情。未配置 summary 时保留全部资料。
 - `MyDesc appearance="plain"` 使用标签/值网格，并按实际容器宽度响应；默认 `bordered` 保留原描述表。
-- 页面没有 `actions` 插槽时，标准详情提供复核权限后的默认编辑入口；提供该插槽的页面继续自行装配编辑和附加动作。
+- 页面没有 `actions` 插槽时，标准详情提供复核权限后的默认编辑入口；提供该插槽的页面继续自行组合编辑和附加动作。
 
 ### 定制布局：按需组合相同的表单能力
 
@@ -760,10 +797,10 @@ views: {
   <MyCrudFormFeedback v-bind="bindings.feedback" />
   <MyCrudFormFields v-bind="bindings.fields">
     <template #default="{ field }">
-      <MyBusinessCard>
+      <el-card shadow="never">
         <MyFormField v-bind="field('customerName')" />
         <MyFormField v-bind="field('phone')" />
-      </MyBusinessCard>
+      </el-card>
     </template>
   </MyCrudFormFields>
   <CustomerContacts :binding="contacts" />
@@ -779,10 +816,10 @@ views: {
 
 - `bindings.form` 用于完整标准外壳；`fields / toolbar / feedback` 用于拆分组件，两种布局不同时挂载主字段区。
 - `MyCrudFormFields` 默认自动排版；`default` 插槽中的 `field(key)` 返回同一主表单的字段绑定。`MyFormField` 的默认插槽可替换输入控件，保留标题、帮助、只读和错误区域；通过 `update/commit` 更新并确认。
-- 字段 key 和值保留类型关联。一个字段只能呈现一次；未渲染的必填字段仍按配置验证，不以模板是否存在绕过规则。条件布局优先 `v-show`；错误定位依赖字段已挂载且所在区域可见，第一版不自动切换业务页签。
-- 加载期间保持字段、子表挂载，用 `v-show` 隐藏，避免丢失草稿端口。自定义子表依旧来自 `bindings.child(key)`。
+- 字段 key 和值保留类型关联。一个字段只能显示一次；未渲染的必填字段仍按配置验证，不以模板是否存在绕过规则。条件布局优先 `v-show`；错误定位依赖字段已挂载且所在区域可见，第一版不自动切换业务页签。
+- 加载期间保持字段、子表挂载，用 `v-show` 隐藏，避免丢失草稿和校验方法。自定义子表依旧来自 `bindings.child(key)`。
 - 自定义按钮调用 `actions.save()`，显示状态使用 `state.canSave / saveDisabledReason / canClose`；可发起保存不等于已通过校验。不挂工具栏仍保留权限、字段事务、草稿和离开保护。
-- 不挂反馈组件时，需要自行呈现 `state.error / issues / changeError` 和 `bindings.feedback.controller.draft`；省略提示不会关闭底层保护。
+- 不挂反馈组件时，需要自行显示 `state.error / issues / changeError` 和 `bindings.feedback.controller.draft`；省略提示不会关闭底层保护。
 - 详情使用 `MyCrudDetailToolbar / MyCrudDetailFeedback`；`bindings.description` 未加载时为 undefined，加载后可传给现有 `MyDesc`。也可直接读取 `state.model` 自己展示。
 - 公共布局只有滚动和区域样式，没有业务状态；可替换成业务自己的布局。不配置独立分区控制器，不复制主模型。
 - 只要字段、不需要 CRUD 的页面继续使用 `MyForm`，它同样支持 `field(key) + MyFormField`；保存和数据读取由该页面负责。
@@ -799,7 +836,7 @@ sections: [
 childKeys: ["contacts", "addresses"],
 ```
 
-编辑宿主使用公开 binding：
+编辑容器使用公开 binding：
 
 ```ts
 const contacts = useCrudTableChild(controller, "contacts");
@@ -818,9 +855,9 @@ const addresses = useCrudTableChild(controller, "addresses");
 </MyCrudForm>
 ```
 
-客户子模块内部使用 `MyCrudChildTable`，配置所有者统一提供 key、标题、字段、稳定行键、初始行、编辑呈现、normalize、validate、主要项动作和 DTO 映射。组件只装配配置与 binding，不重复业务规则。组件会提交活动行草稿、校验完整数组并根据 `{ section, rowKey, rowField }` 切页、定位和聚焦首错。
+客户子模块内部使用 `MyCrudChildTable`，配置所有者统一提供 key、标题、字段、稳定行键、初始行、编辑显示、normalize、validate、主要项动作和 DTO 映射。组件只组合配置与 binding，不重复业务规则。组件会提交活动行草稿、校验完整数组并根据 `{ section, rowKey, rowField }` 切页、定位和聚焦首错。
 
-编辑呈现按字段复杂度选择：少量短文本和高频录入使用 `edit-presentation="inline"`；需要集中确认的中等表单使用 `dialog`；字段较多、纵向录入较长或需要保留表格上下文时使用 `drawer`。后两者分别通过 `edit-dialog`、`edit-drawer` 设置标题、宽度和一至三列表单，并与行内模式共用同一行草稿、校验和提交合同。聚合子表不支持跳转新页面，因为父单尚未保存时无法建立独立子记录上下文；新页面新增/编辑由主表 `CrudNavigation.add/edit` 路由负责。行内编辑状态统一放在操作列，编辑行各列从顶部对齐，帮助和错误只向下扩展，不再把各输入框分别垂直居中。错误数量与摘要在表格顶部展示，错误行和字段同步标记；点击摘要会自动切换公共分页、重算动态行高、滚动并聚焦实际编辑器。
+编辑显示按字段复杂度选择：少量短文本和高频录入使用 `edit-presentation="inline"`；需要集中确认的中等表单使用 `dialog`；字段较多、纵向录入较长或需要保留表格上下文时使用 `drawer`。后两者分别通过 `edit-dialog`、`edit-drawer` 设置标题、宽度和一至三列表单，并与行内模式共用同一行草稿、校验和提交接口约定。聚合子表不支持跳转新页面，因为父单尚未保存时无法建立独立子记录上下文；新页面新增/编辑由主表 `CrudNavigation.add/edit` 路由负责。行内编辑状态统一放在操作列，编辑行各列从顶部对齐，帮助和错误只向下扩展，不再把各输入框分别垂直居中。错误数量与摘要在表格顶部展示，错误行和字段同步标记；点击摘要会自动切换公共分页、重算动态行高、滚动并聚焦实际编辑器。
 
 子表默认内容高度、164px 最小高度，超过默认 10 行才出现分页。可显式传 `height/min-height/page-size`，但业务模块不得按行数猜测高度或覆盖 VXE 私有 DOM。横向溢出由 TableView 处理，右侧操作列固定且每一列在窄屏均可通过横向滚动访问。
 
@@ -834,11 +871,11 @@ const addresses = useCrudTableChild(controller, "addresses");
 
 已实现插槽如下：
 
-| 宿主           | 插槽                 | 用法与真实例子                                           |
+| 调用方         | 插槽                 | 用法与真实例子                                           |
 | -------------- | -------------------- | -------------------------------------------------------- |
 | `MyCrudList`   | `toolbar-left/right` | 任务费用 `toolbar-right` 显示本页 Decimal 合计           |
 | `MyCrudList`   | `query-<schemaKey>`  | 自定义某个查询输入，接收 draft 与 `setDraft`             |
-| `MyCrudList`   | `column-<rowKey>`    | 特殊业务列；值与行按只读合同提供                         |
+| `MyCrudList`   | `column-<rowKey>`    | 特殊业务列；值与行按只读接口约定提供                     |
 | `MyCrudForm`   | `field-<modelKey>`   | 自定义字段，必须通过 `update(value)` 回写                |
 | `MyCrudForm`   | `section-<key>`      | 客户联系人、地址子模块                                   |
 | `MyCrudForm`   | `footer`             | 追加业务核对区；新布局在底部操作之前，旧布局保留顶部操作 |
@@ -855,15 +892,15 @@ const addresses = useCrudTableChild(controller, "addresses");
 </MyCrudList>
 ```
 
-动态分区和页签名称在开发模式由 `diagnoseCrudSlots` 检查。插槽接收只读状态与公开命令；不要通过组件实例、DOM 查询或 VXE 私有 API修改装配状态。
+动态分区和页签名称在开发模式由 `diagnoseCrudSlots` 检查。插槽接收只读状态与公开命令；不要通过组件实例、DOM 查询或 VXE 私有 API修改组合状态。
 
-## 9. 何时不用装配层
+## 9. 何时不使用完整 CRUD
 
-直接组合基础组件适合以下情况：只读仪表盘、复杂树表、画布/地图、动态跨行跨列单元格和虚拟滚动的特殊组合、分步骤多实体事务、独立保存型子表、审批设计器，或布局与列表/表单/详情范式明显不同的页面。标准两层分组表头已由 `headerGroup` 支持，无需退出装配层。此时仍复用适用的 MyReference、字段输入、MyTable、TableView、Pagination、request、日期和 Decimal 工具。
+直接组合基础组件适合以下情况：只读仪表盘、复杂树表、画布/地图、动态跨行跨列单元格和虚拟滚动的特殊组合、分步骤多实体事务、独立保存型子表、审批设计器，或布局与列表/表单/详情范式明显不同的页面。标准两层分组表头已由 `headerGroup` 支持，无需退出CRUD 组件和 useCrud 方法。此时仍复用适用的 MyReference、字段输入、MyTable、TableView、Pagination、request、日期和 Decimal 工具。
 
 局部差异优先放在模块 `config.ts` 的格式化、guard、validate、adapter、action 或公开插槽中。只有第二个真实模块出现同语义缺口，且能保持既有调用兼容时，才增强公共组件或 composable。不要为了一个页面增加大量布尔 props，不访问私有 refs，也不复制分页、保存、确认、脏状态和常规布局。
 
-兼容边界：旧系统页面、`TableSelect`、`usePageTable` 继续可用；新模块采用本规范。MyReference、MyForm、MyTable 仍可独立使用，升级到 MyCrud 只是把页面通用编排交给已验收的控制器，不改变它们原有公开合同。
+兼容边界：旧系统页面、`TableSelect`、`usePageTable` 继续可用；新模块采用本规范。MyReference、MyForm、MyTable 仍可独立使用，升级到 MyCrud 只是让 useCrud\* 处理通用的加载、保存等流程，原组件的参数和事件保持不变。
 
 ## 10. 验证与交付
 
@@ -909,7 +946,7 @@ const addresses = useCrudTableChild(controller, "addresses");
 
 缓存实例仍以固定实体和完整路由为边界，不按数量强行淘汰未保存表单。后台列表/详情遇到
 范围变化立即清空旧范围数据并取消旧读请求，激活时合并读取最新范围；正常切页不重复初次请求。
-关闭后沿用作用域销毁，释放查询通道、子表端口、草稿订阅和离开守卫。写入中的事务不因切页
+关闭后沿用作用域销毁，释放查询通道、子表操作接口、草稿订阅和离开守卫。写入中的事务不因切页
 直接中止，以免把已提交误判为未提交。
 
 已有 Node 测试保留，优先只运行与本次逻辑相关的文件；分组命令和扩大验证范围的条件统一见

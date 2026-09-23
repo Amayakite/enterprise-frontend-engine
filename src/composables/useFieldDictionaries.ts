@@ -13,7 +13,9 @@ export function useFieldDictionaries<M, C>(
   fields: () => readonly FieldDefinition<M, C>[],
   context: () => C
 ) {
+  /** 父字段区域提供的范围，本区域 context 没有 scopeKey 时继承。 */
   const inherited = inject(dictionaryScopeKey, undefined);
+  /** 本区域共用的字典隔离范围，并继续提供给下级字段控件。 */
   const scope = computed(() => {
     const value = context();
     return value &&
@@ -24,13 +26,18 @@ export function useFieldDictionaries<M, C>(
       : (inherited?.value ?? "application");
   });
   provide(dictionaryScopeKey, scope);
+  /** 共用字典 Store，预加载与字段实际使用合并请求。 */
   const store = useDictStore();
+  /** 本区域为静态字典预加载持有的使用凭据，字段变化或隐藏时释放。 */
   let leases: ReturnType<typeof store.acquire>[] = [];
+  /** 区域是否处于前台，后台期间不预加载字典。 */
   let active = true;
+  /** 释放本区域全部预加载引用，不干涉其他区域仍在使用的字典。 */
   function release() {
     leases.forEach((x) => x.release());
     leases = [];
   }
+  /** 从字段声明提取并去重静态字典编码；动态编码由实际字段控件处理。 */
   function preload() {
     release();
     if (!active) return;
@@ -41,17 +48,21 @@ export function useFieldDictionaries<M, C>(
     );
     leases = [...codes].filter(Boolean).map((code) => store.acquire(code, scope.value));
   }
+  /** 字段集合或范围变化后重建预加载引用，首次创建立即执行。 */
   watch(() => [fields(), scope.value], preload, { immediate: true });
+  /** 缓存区域隐藏后释放预加载字典引用。 */
   onDeactivated(() => {
     active = false;
     release();
   });
+  /** 区域重新显示后恢复预加载，避免首次激活重复申请。 */
   onActivated(() => {
     if (!active) {
       active = true;
       preload();
     }
   });
+  /** 区域销毁时释放剩余引用。 */
   onScopeDispose(release);
   return { refresh: () => store.refreshScope(scope.value) };
 }

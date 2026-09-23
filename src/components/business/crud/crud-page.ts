@@ -22,9 +22,9 @@ export interface CrudPageModule<T extends BusinessModuleContract> extends Omit<
   BusinessModuleConfig<T>,
   "model"
 > {
-  /** 编译期合同标记，不读写也不参与持久化。 */
+  /** 编译期接口约定标记，不读写也不参与持久化。 */
   readonly __contract?: T;
-  /** 生成当前实例合同，不创建控制器或发请求。 */
+  /** 生成当前实例接口约定，不创建控制器或发请求。 */
   createViewConfig: (
     navigation: CrudNavigation<T["Id"]>,
     mode?: "add" | "edit"
@@ -173,10 +173,10 @@ export interface CrudViewEnvironment {
   /** 固定目标缺失等初始化错误；空值时允许挂载业务组件。 */ readonly invalidReason:
     | string
     | undefined;
-  /** 当前页面的弹窗和抽屉宿主，表单也可打开跨模块页面。 */ readonly host:
+  /** 当前页面打开弹窗或抽屉所需的参数，传给 MyBusinessPageHost；也支持从表单打开其他模块。 */ readonly host:
     | {
-        /** 当前实例的呈现管理器。 */ presentation: BusinessPresentation;
-        /** 嵌入编辑保存后刷新宿主，不再次提交。 */ afterSave: () => Promise<void>;
+        /** 当前打开的是哪个页面，以及它的弹窗/抽屉状态。 */ presentation: BusinessPresentation;
+        /** 嵌入编辑保存后刷新调用方，不再次提交。 */ afterSave: () => Promise<void>;
       }
     | undefined;
 }
@@ -192,7 +192,7 @@ export type CrudListBinding<T extends BusinessModuleContract> = {
   /** 标准模块的新增权限，独立列表省略时保留旧行为。 */ createPermitted?: boolean;
   /** create 意图的视觉模式，默认 halo，false 仅文字。 */ guideMode?: "halo" | "spotlight" | false;
   /**
-   * 列表内自动挂载的编辑宿主；仅模块配置 dialog/drawer 时存在。
+   * 列表内自动挂载的编辑容器；仅模块配置 dialog/drawer 时存在。
    * 自定义布局不使用 MyCrudList 时，可改用同页 bindings.host 手动挂载一次。
    */
   host: CrudViewEnvironment["host"];
@@ -213,12 +213,12 @@ export type CrudDetailBinding<T extends BusinessModuleContract> = {
   /** 默认返回入口。 */ back: CrudNavigation<T["Id"]>["close"];
   /** 布局列数。 */ columns: 1 | 2 | 3;
   /**
-   * 详情内自动挂载的编辑宿主；仅模块配置 dialog/drawer 时存在。
+   * 详情内自动挂载的编辑容器；仅模块配置 dialog/drawer 时存在。
    * 自定义详情布局不使用 MyCrudDetail 时，可改用同页 bindings.host 手动挂载一次。
    */
   host: CrudViewEnvironment["host"];
 };
-/** 按主模型数组 key 读取同一聚合端口；未知 key 抛错，页面负责挂载子组件。 */
+/** 按主模型数组 key 读取子表的编辑参数和方法；未知 key 抛错，页面负责挂载子组件。 */
 export type CrudChildBinding<T extends BusinessModuleContract> = <
   K extends ArrayModelKey<T["Model"]>,
 >(

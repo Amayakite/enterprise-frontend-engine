@@ -12,7 +12,7 @@ import { defineCrudConfig, validateCrudKeys } from "./config";
 import type { CrudListConfig, CrudFormConfig, CrudDetailConfig, CrudNavigation } from "./types";
 
 /**
- * 模块的命名合同，替代容易错位的长串位置泛型。
+ * 集中声明模块使用的数据类型：表单数据填 Model，接口记录填 Entity，ID 类型填 Id，查询和保存参数分别填写。
  * @remarks Model 是字段共享的页面视图模型；Entity/保存 DTO 保持 API 所有权。
  * @example
  * ```ts
@@ -28,7 +28,7 @@ export interface BusinessModuleContract {
   Entity: object;
   /** 后端主键的真实类型；number 的 0 也有效，不强转为 string。 */
   Id: string | number;
-  /** 查询组件合同；自动 fields 模式填 QuerySchema，旧 schema 模式填 typeof schema。 */
+  /** 查询组件参数类型；自动 fields 模式填 QuerySchema，旧 schema 模式填 typeof schema。 */
   Schema: QuerySchema;
   /** 固定组织/数据范围，不与用户输入的查询条件混合。 */
   Scope: unknown;
@@ -72,7 +72,7 @@ export type Detail<T extends BusinessModuleContract> = CrudDetailConfig<
 
 /**
  * 标准 CRUD 模块唯一配置入口；简单只读模块仍可使用 defineCrudConfig。
- * @remarks 配置描述能力，createViewConfig 只装配合同；控制器仍在页面各自创建。
+ * @remarks createViewConfig 只整理页面配置，不读取或保存数据；页面通过 useCrudView 使用它。
  */
 export interface BusinessModuleConfig<T extends BusinessModuleContract> {
   /** 统一页面上下文适配；纯函数，不发请求。
@@ -203,8 +203,8 @@ export interface BusinessModuleConfig<T extends BusinessModuleContract> {
 }
 
 /**
- * 定义标准业务模块，编译字段一次，按页面装配 CRUD 合同。
- * @typeParam T 用命名合同关联页面、实体、查询和保存类型。
+ * 定义一个业务模块的字段、接口和页面设置；返回的模块配置可直接传给 useCrudView 创建列表、新增、编辑或详情页。
+ * @typeParam T 模块的类型定义，说明页面数据、接口记录、查询和保存参数分别是什么。
  * @returns 原配置及 createViewConfig；原 children 的具体配置和字面量 key 保留。
  * @remarks 不产生响应式单例、网络请求或缓存。每页仍独立 useCrudForm/useCrudList。
  * @example
@@ -225,7 +225,7 @@ export function defineBusinessModule<T extends BusinessModuleContract>() {
        */
       children: Children;
       /**
-       * 直接传模型配置，或用工厂读取当前 children 后装配模型。
+       * 直接传模型配置，或用工厂读取当前 children 后组合模型。
        * @example
        * `model: children => defineBusinessModel<Contract>()({ ... })`
        */
@@ -237,7 +237,7 @@ export function defineBusinessModule<T extends BusinessModuleContract>() {
     if (!config.meta.key.trim() || !config.meta.title.trim())
       throw new Error("模块身份/标题不能为空");
     const automatic = "source" in config.query ? compileFieldQuery(config.fields) : undefined;
-    // 自动模式只允许合同 Schema 为 QuerySchema（见 query 的条件类型）；
+    // 自动模式只允许接口约定 Schema 为 QuerySchema（见 query 的条件类型）；
     // 因此这里恢复泛型身份，不将未校验的请求断言为业务 DTO。
     const querySchema = (
       "schema" in config.query ? config.query.schema : automatic!.schema
@@ -309,14 +309,14 @@ export function defineBusinessModule<T extends BusinessModuleContract>() {
       tabs: sections,
     };
     const forms = { add: createForm("add"), edit: createForm("edit") };
-    // 与实例无关的合同只检查一次；动作工厂保留到对应场景首次读取时执行。
+    // 与实例无关的接口约定只检查一次；动作工厂保留到对应场景首次读取时执行。
     defineCrudConfig({ key: config.meta.key, list: listBase, form: forms.add, detail: detailBase });
     defineCrudConfig({ key: config.meta.key, form: forms.edit });
     /**
-     * 按需生成当前页面配置；同一次装配的场景配置复用，不创建控制器或请求。
+     * 按需生成当前页面配置；同一次组合的场景配置复用，不创建控制器或请求。
      * @param navigation 当前路由实例的导航函数，仅对应场景动作工厂会读取。
      * @param mode 表单场景，默认 add；编辑页传 edit。
-     * @returns 独立表单配置及延迟装配的列表、详情；静态字段配置只读复用。
+     * @returns 独立表单配置及延迟组合的列表、详情；静态字段配置只读复用。
      * @example
      * const viewConfig = customerModule.createViewConfig(navigation, "edit");
      */
@@ -359,7 +359,7 @@ export function defineBusinessModule<T extends BusinessModuleContract>() {
     };
     // 仅参与推导，不创建运行时状态。
     const marker: {
-      /** 模块命名合同；业务不读写。 */ readonly __contract?: T;
+      /** 仅用于 TypeScript 推导模块类型，业务代码无需读写。 */ readonly __contract?: T;
     } = {};
     return { ...config, model, createViewConfig, ...marker };
   };

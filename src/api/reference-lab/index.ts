@@ -48,7 +48,7 @@ function createLabApi<Row, Id extends ReferenceId, F extends ReferenceFilters>(
       controls?: LabControls
     ) {
       const result: ReferenceResolveResult<Row, Id> = { items: [], unavailableIds: [] };
-      // Mock 单次最多 100 项；组件仍使用一次批量 source.resolve 合同。
+      // Mock 单次最多 100 项；组件仍使用一次批量 source.resolve 接口约定。
       for (let offset = 0; offset < ids.length; offset += 400) {
         context.signal.throwIfAborted();
         const batches: (readonly Id[])[] = [];

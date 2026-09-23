@@ -56,16 +56,19 @@ const emit = defineEmits<{
    */
   "update:modelValue": [value: Record<string, QueryValue>];
 }>();
+/** 把条件值限制为文本/数字输入可用的类型，未填写时返回空值。 */
 function textValue(key: string) {
   const value = props.modelValue[key];
   return typeof value === "string" ? value : "";
 }
+/** 读取可供选择控件使用的条件值，避免直接传入不兼容对象。 */
 function selectValue(key: string) {
   const value = props.modelValue[key];
   return typeof value === "string" || typeof value === "number" || typeof value === "boolean"
     ? value
     : undefined;
 }
+/** 仅接受完整的日期区间，其他值转为空区间。 */
 function dateValue(key: string): [string, string] | null {
   const value = props.modelValue[key];
   return Array.isArray(value) &&
@@ -75,9 +78,11 @@ function dateValue(key: string): [string, string] | null {
     ? [value[0], value[1]]
     : null;
 }
+/** 复制条件对象并修改指定字段，通过事件回写查询草稿。 */
 function set(key: string, value: QueryValue) {
   emit("update:modelValue", { ...props.modelValue, [key]: value });
 }
+/** 整理日期控件的返回值，清空或无效范围按空条件处理。 */
 function setDates(key: string, value: unknown) {
   set(
     key,

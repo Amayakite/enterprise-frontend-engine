@@ -67,6 +67,7 @@ const emit = defineEmits<{
    */
   click: [];
 }>();
+/** 只有可操作时才通知点击；禁用时保留原因提示而不执行业务操作。 */
 function click() {
   if (!props.disabled && !props.disabledReason && !props.loading) emit("click");
 }

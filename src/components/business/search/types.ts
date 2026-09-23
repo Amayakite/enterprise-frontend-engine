@@ -358,9 +358,9 @@ export interface QueryDraft<S extends QuerySchema> {
    */
   advanced: QueryDraftGroup<S> | null;
 }
-/** QueryPanel 的公开事件合同，供调用方获得模板事件参数提示。 */
+/** QueryPanel 的公开事件参数说明，供调用方获得模板事件参数提示。 */
 export type QueryApplyReason = "apply" | "remove" | "clear" | "reset";
-/** 查询面板事件合同；草稿变化不等于已应用查询，宿主分别处理。 */
+/** 查询面板事件参数说明；草稿变化不等于已应用查询，调用方分别处理。 */
 export type QueryPanelEmits<S extends QuerySchema> = {
   /**
    * 已应用的查询条件变更；值已通过查询组件校验。
@@ -375,7 +375,7 @@ export type QueryPanelEmits<S extends QuerySchema> = {
    */
   apply: [value: AppliedQuery<S>, reason: QueryApplyReason];
   /**
-   * 用户请求按当前已应用条件重新加载列表；不携带查询参数，宿主应使用当前 modelValue。
+   * 用户请求按当前已应用条件重新加载列表；不携带查询参数，调用方应使用当前 modelValue。
    * @example
    * `<QueryPanel @refresh="reload" />`
    */
@@ -481,7 +481,7 @@ export interface QueryPageRequest<S extends QuerySchema, Scope> extends QueryEnv
   } | null;
 }
 /**
- * useSearchQuery 的数据源合同。
+ * useSearchQuery 的数据源配置。
  *
  * @typeParam Row 列表行类型。
  * @typeParam S 查询 schema。

@@ -33,26 +33,37 @@ export interface BusinessOpenRequest {
 }
 
 /** 所有业务入口共用的打开策略；按需挂载，超过两层容器转路由页。
- * @param host 来源页的宿主；省略从标准 CRUD 页面注入。
+ * @param host 来源页的弹窗/抽屉容器；省略从标准 CRUD 页面注入。
  * @returns openBusiness 供跨模块调用，openPage 供当前模块内部使用。
  * @remarks 不绕过路由可达性；表单和详情仍执行自身业务权限检查。来源卸载后不再回写。
  * @example
  * `await openBusiness({ target: "sale", view: "add" });`
  */
 export function useBusinessOpen(host?: BusinessPresentation) {
+  /** 可选路由实例；独立组件没有提供路由时，打开操作会给出明确错误。 */
   const router = inject(routerKey, undefined);
+  /** 来源页的路由信息，用于校验导航环境和记录返回地址。 */
   const route = inject(routeLocationKey, undefined);
+  /** 创建 hook 时固定的来源地址，目标保存后可返回该页。 */
   const source = route?.fullPath ?? "";
+  /** 上层标准业务页提供的弹窗/抽屉宿主。 */
   const injectedHost = inject(businessPresentationKey, undefined);
+  /** 本组件已经处在容器中时的目标和层数信息。 */
   const embedded = inject(embeddedEditorKey, undefined);
+  /** 优先使用显式传入宿主，否则使用上层提供的宿主。 */
   const presentation = host ?? injectedHost;
+  /** 本来源页登记过的跨页保存回调清理函数，页面销毁后统一释放。 */
   const disposers = new Set<() => void>();
+  /** 来源实例是否仍存在，防止销毁后接收回写或继续打开。 */
   let alive = true;
+  /** 导航进行中标记，防止重复点击创建多个容器或路由跳转。 */
   let opening = false;
+  /** 来源销毁后注销跨页完成回调，后续保存不再回写来源。 */
   onScopeDispose(() => {
     alive = false;
     for (const dispose of disposers) dispose();
   });
+  /** 按目标配置打开页面；复用同记录容器，嵌套超过两层则转路由，失败清理返回回调。 */
   async function openPage(target: BusinessTarget, request: BusinessOpenRequest, replace = false) {
     if (opening || !alive) return false;
     if (!router || !route) throw new Error("当前宿主没有配置页面导航");
@@ -66,6 +77,7 @@ export function useBusinessOpen(host?: BusinessPresentation) {
       const options = resolveBusinessPresentation(target.page, request.view, {
         mode: request.mode,
       });
+      // 同一记录的详情转编辑可复用原容器；跨模块或不同记录才增加嵌套层数。
       const sameModule =
         embedded &&
         embedded.target.mode !== "add" &&
@@ -77,6 +89,7 @@ export function useBusinessOpen(host?: BusinessPresentation) {
       const onSaved = async (id: string) => {
         if (alive) await request.onSaved?.(id);
       };
+      // 弹窗/抽屉只在两层以内使用；更深的操作走下面的路由页分支。
       if (options.mode !== "tab" && depth <= 2) {
         if (!owner) throw new Error("当前页面未挂载业务页面宿主");
         if (!options.component) throw new Error("目标页面缺少 components 懒加载配置");
@@ -95,6 +108,7 @@ export function useBusinessOpen(host?: BusinessPresentation) {
         );
       }
       if (sameModule && !(await embedded.presentation.canLeave())) return false;
+      // 需要返回来源时登记临时完成回调；导航失败或来源销毁时必须释放它。
       const session =
         request.completion === "return-to-source"
           ? registerBusinessCompletion({ source, saved: onSaved })
@@ -122,6 +136,7 @@ export function useBusinessOpen(host?: BusinessPresentation) {
       opening = false;
     }
   }
+  /** 按模块 key 查找已登记目标，再交给统一打开流程；未登记时明确报错。 */
   async function openBusiness(request: BusinessOpenRequest) {
     const target = getBusinessTarget(request.target);
     if (!target) throw new Error("目标页面未配置");

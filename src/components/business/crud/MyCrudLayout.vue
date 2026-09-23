@@ -1,4 +1,5 @@
 <template>
+  <!-- 安排页头、正文、侧栏和页脚的位置。通过 toolbar/default/aside/footer 插槽放内容；这里只管布局，不读取或保存数据。 -->
   <div
     class="crud-layout"
     :class="[
@@ -25,6 +26,7 @@ defineProps<{
    */
   layout?: CrudLayoutOptions;
 }>();
+/** 读取弹窗/抽屉的嵌入标记，切换为容器内布局，避免再次套独立页面的间距和边框。 */
 const embedded = inject(embeddedEditorKey, undefined);
 defineSlots<{
   /** 固定顶部工具栏；省略不占空间。 */ toolbar?: () => unknown;

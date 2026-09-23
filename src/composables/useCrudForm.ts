@@ -40,7 +40,7 @@ import type {
 } from "@/components/business/crud/types";
 
 /**
- * 将模块 CrudFormConfig 装配为新增/编辑页的单实体控制器。
+ * 管理新增或编辑表单的加载、修改、校验、保存和草稿，返回值可直接传给 MyCrudForm。
  *
  * @typeParam Model 页面编辑模型。
  * @typeParam Entity 服务端详情实体。
@@ -50,7 +50,8 @@ import type {
  * @returns 可传给 MyCrudForm 的 CrudFormController。
  * @remarks 控制器固定当前 target；不会监听全局路由而在后台 KeepAlive 页面加载其他实体。
  * 草稿仅保存 config.draft.fields 白名单和已登记子表快照。
- * @example `const controller = useCrudForm(config.form, { context: () => pageContext, invalidateViewKey: "base.customer.list" });`
+ * @example
+ * `const controller = useCrudForm(config.form, { context: () => pageContext, invalidateViewKey: "base.customer.list" });`
  */
 export function useCrudForm<
   Model extends object,
@@ -63,79 +64,132 @@ export function useCrudForm<
 >(
   config: CrudFormConfig<Model, Entity, Id, CreateDTO, UpdateDTO, SaveResult, C>,
   options: {
+    /** 返回当前组织、权限等业务信息的只读对象；变化时旧加载和校验失效。 */
     context: () => DeepReadonly<C>;
+    /** 保存成功或关闭时执行的导航方法；省略时由外部自行处理页面切换。 */
     navigation?: CrudNavigation<Id>;
+    /** 本实例首次新增或编辑的目标；省略为新增，编辑需提供稳定 ID。 */
     initialTarget?: CrudTarget<Id>;
     /** 保存成功后标记所属列表；列表恢复时才刷新。 */
     invalidateViewKey?: string;
+    /** 返回本机草稿的账号、组织及新增实例身份；启用草稿时需要提供。 */
     draftIdentity?: () => CrudDraftIdentity | undefined;
   }
 ): CrudFormController<Model, Entity, Id> {
   // shallowRef 保留 Model 的字段关联；对外通过深只读视图暴露。
   const model = shallowRef(config.createInitial(options.context()));
+  /** 最近一次从接口读取的完整记录；编辑 DTO 和版本校验以它为准，新增时为 null。 */
   const baseline = shallowRef<Entity | null>(null);
+  /** 整份模型被加载或恢复的次数，通知字段组件重新同步输入缓存。 */
   const hydrationRevision = shallowRef(0);
+  /** 复制并替换整份表单模型，同时通知字段组件清理上一份输入状态。 */
   function hydrateModel(value: Model) {
     model.value = cloneModel(value);
     hydrationRevision.value++;
   }
+  /** 固定本实例首次打开的新增/编辑目标，避免跟随其他标签页的路由变化。 */
   const initialTarget = cloneModel<CrudTarget<Id>>(options.initialTarget ?? { mode: "add" });
+  /** 当前正在编辑的目标；新增保存成功后改为带真实 ID 的编辑目标。 */
   const target = shallowRef<CrudTarget<Id>>(initialTarget);
   // 编辑深链首屏直接进入加载态，避免先挂载可编辑控件再于同一周期卸载。
   const status = shallowRef<CrudFormStatus>({
     phase: initialTarget.mode === "edit" || config.beforeOpen ? "loading" : "ready",
     mutationOutcome: "none",
   });
+  /** 当前加载、校验、提交或回填阶段，供界面和操作限制使用。 */
   const phase = computed(() => status.value.phase);
+  /** 接口写入是否已确认成功；与界面阶段分开记录，避免回填失败后重复提交。 */
   const mutationOutcome = computed(() => status.value.mutationOutcome);
   // 阶段与写入结果原子更新，同步 watcher 不会看到一半转换的状态。
   function transition(next: CrudFormStatus["phase"], outcome = mutationOutcome.value) {
     status.value = { phase: next, mutationOutcome: outcome };
   }
+  /** 根据阶段和提交结果计算忙碌、离开限制及保存禁用原因。 */
   const activity = computed(() => crudFormActivity(status.value));
+  /** 本轮主表和子表校验问题，供错误列表及定位字段使用。 */
   const issues = shallowRef<readonly CrudIssue<Model>[]>([]);
+  /** 当前加载、保存或关闭失败的提示；开始下一次操作时清空。 */
   const error = shallowRef<string | null>(null);
+  /** 加载或保存成功后的模型副本，用于判断是否存在未保存修改。 */
   const cleanModel = shallowRef(cloneModel(model.value));
+  /** revision 记录模型及子表登记变化；session 区分打开目标，异步结果必须仍属于当前版本。 */
   let revision = 0,
+    /** 每次打开或重置目标递增，使上一轮保存结果不能回填当前表单。 */
     session = 0;
+  /** alive 表示实例尚未卸载；closing 防止离开确认期间重复关闭或保存。 */
   let alive = true,
+    /** 正在等待离开检查，期间禁止再次关闭或保存。 */
     closing = false;
   // 活跃状态属于当前组件实例；后台 KeepAlive 页不弹提示、不抢走前台路由。
   let active = true;
+  /** 当前成功提示所属的保存操作；切到后台时用它撤下该提示。 */
   let feedbackOperation: object | undefined;
+  /** 缓存页重新显示后，允许保存提示和后续导航。 */
   onActivated(() => {
     active = true;
   });
+  /** 切到其他标签时停止前台提示，后台请求仍按自身版本规则处理。 */
   onDeactivated(() => {
     active = false;
     if (feedbackOperation) dismissFeedback(feedbackOperation);
   });
+  /** 记录已经通过的离开确认，供紧接着的路由或容器关闭复用，避免连续询问。 */
   let approvedNavigation = false;
+  /** 用户选择丢弃草稿后的待办标记；实际关闭时才删除本机草稿。 */
   let discardDraftOnLeave = false;
+  /** 每次保存或上下文重置递增，避免旧保存的 finally 解开新操作的锁。 */
   let flightVersion = 0;
+  /** saveFlight 覆盖完整保存流程；registryRevision 让普通 Map 的子表增删参与响应式计算。 */
   const saveFlight = ref(false),
+    /** 子表 Map 增删时递增，让 dirty 和 childrenReady 重新计算。 */
     registryRevision = ref(0);
+  /** 加载与保存共用的请求通道；启动新操作会使前一操作过期。 */
   const channel = createRequestChannel();
+  /** 已挂载子表的提交、校验、定位和草稿方法；主表保存时按登记顺序调用。 */
   const children = new Map<
     FieldKey<Model>,
     {
-      commit: (signal: AbortSignal) => Promise<{ proceed: boolean; reason?: string }>;
+      /** 确认子表正在编辑的行；接收本轮取消信号，返回能否继续整单保存。 */
+      commit: (signal: AbortSignal) => Promise<{
+        /** 是否允许继续保存；false 时保留行输入并显示 reason。 */
+        proceed: boolean;
+        /** 不能确认子表输入的原因；省略时显示“请完成明细草稿”。 */
+        reason?: string;
+      }>;
+      /** 校验本轮整单快照中的子表；接收取消信号及模型版本，返回错误清单。 */
       validate: (
         value: Model,
         signal: AbortSignal,
         revision: number
       ) => Promise<CrudValidation<Model>>;
+      /** 取消子表尚未确认的行编辑，不向服务端写入。 */
       cancel: () => void;
+      /** 设置子表保存期间的只读锁，true 锁定、false 释放。 */
       lock: (value: boolean) => void;
+      /** 按错误中的行 ID 和字段聚焦子表控件，供整单错误定位使用。 */
       focus: (issue: CrudIssue<Model>) => Promise<void>;
+      /** 是否还有未确认的子表输入；参与表单离开提示和草稿保存判断。 */
       dirty: () => boolean;
+      /** 返回子表草稿快照；未提供时不保存该子表草稿。 */
       snapshotDraft?: () => unknown;
+      /** 恢复子表快照，成功返回 true；缺失或返回 false 会阻止整份草稿恢复成功。 */
       restoreDraft?: (snapshot: unknown) => Promise<boolean>;
+      /** 解除子表草稿变化订阅的函数，解绑或卸载时调用；未订阅时省略。 */
       stopDraft?: () => void;
     }
   >();
+  /** 主字段表单登记的校验及聚焦方法；组件卸载后解除引用。 */
   let form: CrudFormPort<Model> | undefined;
-  let receipt: { result: SaveResult; input: CrudSaveInput<Model, Entity, Id, C> } | undefined;
+  /** 接口成功后保留返回值和提交快照；回填失败可用它重试读取，无需再次写接口。 */
+  let receipt:
+    | {
+        /** 接口已成功返回的保存结果，供 resolveSaved 读取完整记录。 */
+        result: SaveResult;
+        /** 发起该次成功保存时的只读快照和上下文，回填重试继续使用它。 */
+        input: CrudSaveInput<Model, Entity, Id, C>;
+      }
+    | undefined;
+  /** 比较主表当前值与已保存值，并检查子表是否还有未确认的行编辑。 */
   const dirty = computed(() => {
     registryRevision.value;
     return (
@@ -143,10 +197,12 @@ export function useCrudForm<
       [...children.values()].some((child) => child.dirty())
     );
   });
+  /** 配置声明的所有子表是否都已挂载，防止缺少明细时保存或恢复草稿。 */
   const childrenReady = computed(() => {
     registryRevision.value;
     return (config.childKeys ?? []).every((key) => children.has(key));
   });
+  /** 向组件提供同一份表单状态；对外读取时再包装成只读对象。 */
   const state = computed(() => ({
     phase: phase.value,
     mutationOutcome: mutationOutcome.value,
@@ -158,7 +214,9 @@ export function useCrudForm<
     issues: issues.value,
     error: error.value,
   }));
+  /** 当前是否处于不能离开的提交关键阶段。 */
   const critical = () => activity.value.critical;
+  /** 本表单的本机草稿管理器；只读取配置白名单，并通过 patch 恢复可编辑字段。 */
   const drafts = useCrudDraft(config.draft, {
     identity: () => options.draftIdentity?.(),
     moduleKey: options.invalidateViewKey ?? "",
@@ -177,6 +235,7 @@ export function useCrudForm<
       !config.readonlyReason?.(snapshot(model.value), options.context()),
     children: () => children.entries(),
     patch: (value) => {
+      // 恢复草稿前按当前模型重新判断只读字段，避免旧草稿覆盖现在不允许编辑的值。
       const readonlyFields = new Set(
         normalizeFields(config.fields, {
           model: model.value,
@@ -194,16 +253,22 @@ export function useCrudForm<
       if (model.value !== previous) hydrationRevision.value++;
     },
   });
+  /** 当前阶段是否忙碌，供修改模型和草稿自动保存判断使用。 */
   const busy = () => activity.value.busy;
+  /** 把传给业务回调的数据变成只读视图，要求修改统一经过 patch。 */
   const snapshot = readonlyModel;
+  /** 将未知异常转换成可展示文字，保留 Error 提供的具体原因。 */
   const message = (cause: unknown) => (cause instanceof Error ? cause.message : "操作失败，请重试");
+  /** 同步设置所有已登记子表的只读锁，保证整单校验与提交期间明细稳定。 */
   function lock(value: boolean) {
     children.forEach((child) => child.lock(value));
   }
+  /** 递增数据版本并取消当前请求，使等待中的校验或加载结果失效。 */
   function invalidate() {
     revision++;
     channel.cancel();
   }
+  /** 合并允许的字段修改；有实际变化时递增版本、清理旧校验并安排草稿保存。 */
   function patch(value: Partial<Model>) {
     if (!alive || !activity.value.canPatch) return;
     if (config.readonlyReason?.(snapshot(model.value), options.context())) return;
@@ -214,6 +279,7 @@ export function useCrudForm<
     issues.value = [];
     drafts.changed();
   }
+  /** 按错误的 section 定位主表字段或子表行；不传时定位首个校验问题。 */
   async function focusFirst(
     input: CrudIssue<Model> | DeepReadonly<CrudIssue<Model>> | undefined = issues.value[0]
   ) {
@@ -225,6 +291,7 @@ export function useCrudForm<
     if (child) await child.focus(issue);
     else await form?.focus(issue);
   }
+  /** 依次执行业务关闭检查和未保存提示；返回是否允许离开，并记录草稿保留选择。 */
   async function guardLeave() {
     if (approvedNavigation) return true;
     // saved 后的自动导航仍处于 saveFlight 内；离开守卫按流程阶段判断，不能拦截成功导航。
@@ -232,6 +299,7 @@ export function useCrudForm<
     closing = true;
     const version = revision;
     try {
+      // 先给模块机会阻止离开；通过后才询问如何处理未保存内容。
       const guard = await config.beforeClose?.(
         { dirty: dirty.value, target: cloneModel(target.value) },
         { context: snapshot<C>(options.context()), signal: new AbortController().signal }
@@ -256,6 +324,7 @@ export function useCrudForm<
             distinguishCancelAndClose: !!config.draft,
             type: "warning",
           });
+          // 选择保留草稿时先确保落盘成功，失败则留在当前页，避免关闭后丢失输入。
           if (
             config.draft &&
             !activity.value.reconciliationReason &&
@@ -270,6 +339,7 @@ export function useCrudForm<
           else throw cause;
         }
       }
+      // 确认框等待期间可能又有修改或开始提交，需要重新核对，不能沿用旧许可。
       return alive && version === revision && !critical();
     } catch (cause) {
       error.value = message(cause);
@@ -278,8 +348,10 @@ export function useCrudForm<
       closing = false;
     }
   }
+  /** 等待用户处理已有草稿后再执行 afterOpen；请求取消时停止监听并拒绝等待。 */
   function waitForDraftDecision(signal: AbortSignal): Promise<void> {
     return new Promise((resolve, reject) => {
+      // 这里只等待草稿决策结束；真正恢复或丢弃由草稿控制器执行。
       const stop = watch(
         () => [drafts.state.phase, drafts.pending] as const,
         ([, pending]) => {
@@ -291,6 +363,7 @@ export function useCrudForm<
         stop();
         reject(signal.reason);
       };
+      /** 草稿待处理状态结束后解除监听和取消事件，完成本次等待。 */
       function finish() {
         stop();
         signal.removeEventListener("abort", abort);
@@ -301,10 +374,12 @@ export function useCrudForm<
       else if (!drafts.pending) finish();
     });
   }
+  /** 切换到指定新增或编辑目标，清理旧输入后加载数据；过期响应不回填，失败进入加载错误态。 */
   async function open(next: CrudTarget<Id>) {
     if (saveFlight.value) return false;
     if (approvedNavigation) approvedNavigation = false;
     else if (!(await guardLeave())) return false;
+    // 通过离开检查后再清空上一目标，同时让旧目标的请求和行编辑失效。
     session++;
     drafts.reset();
     invalidate();
@@ -327,6 +402,7 @@ export function useCrudForm<
       if (!alive || !run.isCurrent()) return false;
       if (next.mode === "edit" && defaults) throw new Error("编辑初始化不能返回新增默认值");
       hydrateModel({ ...config.createInitial(options.context()), ...defaults });
+      // 新增使用初始值；编辑读取完整记录，分别保留接口基线和可编辑模型。
       if (next.mode === "edit") {
         const entity = await config.load(next.id, input);
         if (!alive || !run.isCurrent()) return false;
@@ -337,6 +413,7 @@ export function useCrudForm<
       transition("ready");
       await drafts.open();
       if (!alive || !run.isCurrent()) return false;
+      // 发现本机草稿时，先等用户决定，再让 afterOpen 读取最终的模型。
       if (config.afterOpen) {
         if (drafts.pending) await waitForDraftDecision(run.signal);
         if (!alive || !run.isCurrent()) return false;
@@ -358,10 +435,12 @@ export function useCrudForm<
       return false;
     }
   }
+  /** 根据成功回执读取完整记录并回填表单，再通知列表及执行保存后导航；失败保留回执。 */
   async function synchronize(
     saved: NonNullable<typeof receipt>,
     run: ReturnType<typeof channel.start>
   ) {
+    // 到这里接口已经写入成功；后续失败只允许重试回填，不应重新提交。
     transition("resolving", "committed");
     try {
       await drafts.mark("committed");
@@ -371,6 +450,7 @@ export function useCrudForm<
         signal: run.signal,
       });
       if (!alive || !run.isCurrent()) return;
+      // 完整记录读取成功后，一起更新编辑基线、表单值和目标 ID，清除旧校验与行草稿。
       const value = config.toModel(cloneModel(entity), saved.input.context);
       baseline.value = cloneModel(entity);
       hydrateModel(value);
@@ -384,6 +464,7 @@ export function useCrudForm<
       await drafts.discard();
       await drafts.open();
       receipt = undefined;
+      // 模型回填已完成；后处理和跳转失败单独提示，不把保存状态退回写入失败。
       const synchronizedRevision = revision;
       try {
         if (options.invalidateViewKey) invalidateView(options.invalidateViewKey);
@@ -409,6 +490,7 @@ export function useCrudForm<
       }
     }
   }
+  /** 确认子表行编辑、校验整单后发送一次保存；写入成功与回填失败分别处理。 */
   async function save() {
     if (!alive || saveFlight.value || closing || activity.value.saveDisabledReason) return;
     if (config.draft && drafts.pending) {
@@ -440,6 +522,7 @@ export function useCrudForm<
       if (config.fields.length && !form) throw new Error("主表单尚未登记，不能保存");
       for (const key of config.childKeys ?? [])
         if (!children.has(key)) throw new Error(`子模块尚未登记：${key}`);
+      // 先确认子表正在编辑的行，使其输入进入主模型，再取得整单校验快照。
       for (const [key, child] of children) {
         const result = await child.commit(run.signal);
         if (!current()) return;
@@ -454,6 +537,7 @@ export function useCrudForm<
       if (!current()) return;
       lock(true);
       transition("validating");
+      // 锁住子表并固定本轮数据版本，异步校验期间有任何新修改就丢弃本轮结果。
       const version = revision;
       const modelSnapshot = cloneModel(model.value);
       const input: CrudSaveInput<Model, Entity, Id, C> = {
@@ -464,6 +548,7 @@ export function useCrudForm<
         context: snapshot<C>(options.context()),
       };
       const valid = () => current() && revision === version;
+      // 依次收集主表、子表和模块整单校验，统一生成可定位的错误清单。
       const results: CrudValidation<Model>[] = [];
       if (form) results.push(await form.validate());
       if (!valid()) return;
@@ -481,6 +566,7 @@ export function useCrudForm<
         focusValidationIssue = true;
         return;
       }
+      // 校验全部通过后再执行保存前业务检查；等待结束后还要复查数据版本和权限。
       const guard = await config.beforeSave?.(input);
       if (!valid()) return;
       if (guard && !guard.proceed) {
@@ -493,6 +579,7 @@ export function useCrudForm<
         transition("ready");
         return;
       }
+      // 按新增/编辑转换对应 DTO，先准备请求函数，保护标记写好后才真正发出。
       let request: () => Promise<SaveResult>;
       if (input.target.mode === "add") {
         const dto = config.toCreate({ ...input, target: input.target, baseline: null });
@@ -504,6 +591,7 @@ export function useCrudForm<
         request = () => config.update(id, dto, input);
       }
       if (!valid()) return;
+      // 先持久记录“即将提交”，防止页面中断后把这份草稿当成从未提交而重复写入。
       if (!(await drafts.mark("pending"))) {
         error.value = "草稿提交保护标记写入失败，请重试后再提交";
         transition("ready");
@@ -514,6 +602,7 @@ export function useCrudForm<
       submitted = true;
       const result = await request();
       if (!current()) return;
+      // 保留接口成功回执，再开始读回完整记录；读回失败仍可使用此回执重试。
       receipt = { result, input };
       await synchronize(receipt, run);
     } catch (cause) {
@@ -541,6 +630,7 @@ export function useCrudForm<
       }
     }
   }
+  /** 仅使用上次成功回执重试回填，绝不再次调用 create/update。 */
   async function retrySync() {
     if (!alive || closing || saveFlight.value || !receipt || phase.value !== "committed-needs-sync")
       return;
@@ -556,6 +646,7 @@ export function useCrudForm<
       if (run.isCurrent()) lock(false);
     }
   }
+  /** 登记一个子表的公开方法并返回解绑函数；重复字段 key 直接报错。 */
   function registerChild<K extends FieldKey<Model>>(module: CrudChildModule<Model, K>) {
     if (children.has(module.key)) throw new Error(`子模块重复登记：${module.key}`);
     const child = {
@@ -585,11 +676,13 @@ export function useCrudForm<
       }
     };
   }
+  /** 组织或权限上下文变化时取消旧工作并清空旧数据；提交中的结果保留为待核实。 */
   watch(
     options.context,
     () => {
       flightVersion++;
       saveFlight.value = false;
+      // 取消前先记录是否已经发出写请求；切换上下文无法证明服务端写入被撤销。
       const outcomeUnknown = phase.value === "saving";
       session++;
       drafts.reset();
@@ -609,6 +702,7 @@ export function useCrudForm<
     },
     { deep: true, flush: "sync" }
   );
+  /** 关闭实例时清理草稿选择、请求和子表订阅，阻止异步结果继续回填。 */
   onBeforeUnmount(() => {
     if (discardDraftOnLeave) void drafts.discard();
     alive = false;
@@ -618,6 +712,7 @@ export function useCrudForm<
     children.forEach((child) => child.stopDraft?.());
     children.clear();
   });
+  /** 提供给 MyCrudForm 的状态与受控操作；界面通过这些方法修改模型或执行保存。 */
   const controller: CrudFormController<Model, Entity, Id> = {
     draft: config.draft ? drafts : undefined,
     get state() {

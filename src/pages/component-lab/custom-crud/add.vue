@@ -26,7 +26,7 @@
         :closable="false"
       />
       <el-skeleton v-if="state.phase === 'loading'" animated :rows="6" />
-      <!-- 保持主表和子表端口挂载，读取/草稿等待时仅隐藏。 -->
+      <!-- 保持主表和子表操作接口挂载，读取/草稿等待时仅隐藏。 -->
       <div v-show="state.phase !== 'loading'">
         <el-alert
           title="定制布局使用客户 Mock；保存后进入定制详情，关闭返回客户列表。"

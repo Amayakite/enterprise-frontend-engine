@@ -20,6 +20,7 @@ import type {
   QueryValueEditor,
 } from "./types";
 
+/** 查询树的深度、节点数量等限制，编辑器与解析器共用，避免构造过大的条件。 */
 export const QUERY_LIMITS = {
   depth: 3,
   groups: 20,
@@ -27,19 +28,22 @@ export const QUERY_LIMITS = {
   members: 100,
   text: 256,
 } as const;
-/** 只覆盖输入呈现，保留 API schema 的字段/值/运算符合同与泛型身份。 */
+/** 只覆盖输入显示，保留 API schema 的字段/值/运算符接口约定与泛型身份。 */
 export function withQueryInputs<S extends QuerySchema>(
   schema: S,
   inputs: Partial<Record<Extract<keyof S, string>, QueryValueEditor>>
 ): S {
+  /** 复制查询定义后追加输入组件，不修改 API 模块共享的 schema。 */
   const result = { ...schema };
   for (const key in inputs) {
+    /** 当前字段声明的自定义输入，存在时才覆盖默认编辑方式。 */
     const input = inputs[key];
     if (input && Object.hasOwn(schema, key))
       Object.assign(result, { [key]: { ...schema[key], input } });
   }
   return result;
 }
+/** 运算符代码对应的中文名称，查询输入和摘要显示保持一致。 */
 export const QUERY_OPERATORS: Readonly<Record<string, string>> = {
   eq: "等于",
   ne: "不等于",
@@ -73,12 +77,15 @@ export function checkQuerySort<Key extends string>(
 } | null {
   if (value === null || value === undefined) return null;
   if (!record(value)) throw new Error("排序参数不正确");
+  /** 只接受排序白名单中的字段，拒绝未知字段或错误的排序参数。 */
   const key = keys.find((item) => item === value.key);
   if (key === undefined || (value.order !== "asc" && value.order !== "desc"))
     throw new Error("不支持的排序字段或方向");
   return { key, order: value.order };
 }
+/** 无需输入值的判空运算符，解析时不能套用普通值校验。 */
 const emptyOperators = new Set(["isEmpty", "isNotEmpty"]);
+/** 各查询字段类型允许的运算符列表，防止给日期等字段使用不匹配操作。 */
 const kindOperators: Record<QueryField["kind"], readonly string[]> = {
   text: ["eq", "ne", "contains", "notContains", "startsWith", "endsWith"],
   number: ["eq", "ne", "gt", "gte", "lt", "lte", "between"],
@@ -89,6 +96,7 @@ const kindOperators: Record<QueryField["kind"], readonly string[]> = {
   enum: ["eq", "ne", "in", "notIn"],
   reference: ["eq", "ne", "in", "notIn"],
 };
+/** 判断未知输入是否为可读取属性的对象，为后续查询结构检查做准备。 */
 function record(value: unknown): value is Record<string, unknown> {
   return !!value && typeof value === "object" && !Array.isArray(value);
 }
@@ -112,6 +120,7 @@ export function isEmptyQueryValue(value: unknown) {
 export function queryField(schema: QuerySchema, key: unknown): QueryField | undefined {
   return typeof key === "string" && Object.hasOwn(schema, key) ? schema[key] : undefined;
 }
+/** 检查单个条件值是否符合字段类型，区分用户输入与已编码的接口值。 */
 function scalarValid(field: QueryField, value: unknown, input = true): boolean {
   if (isEmptyQueryValue(value)) return false;
   switch (field.kind) {
@@ -160,6 +169,7 @@ export function compareQueryValues(
   if (field.kind === "decimal" && typeof left === "string" && typeof right === "string")
     return toDecimal(left).comparedTo(toDecimal(right));
   if (field.kind === "date" || field.kind === "datetime") {
+    /** 按日期或日期时间选择解析格式，避免直接按不统一的字符串比较。 */
     const format = field.kind === "date" ? DATE_FORMAT : DATE_TIME_FORMAT;
     const a = parseDate(String(left), format)!.valueOf();
     const b = parseDate(String(right), format)!.valueOf();
@@ -185,6 +195,7 @@ export function createQueryDraft<S extends QuerySchema>(
   schema: S,
   applied: AppliedQuery<S> = emptyAppliedQuery<S>()
 ): QueryDraft<S> {
+  /** 复制一个已应用条件作为可编辑节点，数组等值也单独复制。 */
   const condition = (item: QueryCondition<S>): QueryDraftCondition<S> => ({
     kind: "condition",
     id: item.id,
@@ -192,6 +203,7 @@ export function createQueryDraft<S extends QuerySchema>(
     operator: item.operator,
     value: "value" in item ? cloneModel(item.value) : undefined,
   });
+  /** 保留已应用条件，并为当前入口配置但尚未填写的字段补上空输入。 */
   const flat = (entry: "quick" | "normal"): QueryDraftCondition<S>[] => {
     const values = applied[entry].map(condition);
     for (const key of Object.keys(schema).filter((key) => schema[key]!.entries.includes(entry))) {
@@ -206,7 +218,7 @@ export function createQueryDraft<S extends QuerySchema>(
     }
     return values;
   };
-  // 通过已应用合同重建可写草稿；不共享子数组。
+  // 通过已应用接口约定重建可写草稿；不共享子数组。
   const group = (node: QueryGroup<S>): QueryDraftGroup<S> => ({
     kind: "group",
     id: node.id,
@@ -220,6 +232,7 @@ export function createQueryDraft<S extends QuerySchema>(
   };
 }
 
+/** 按 schema 创建查询树解析器，统一检查字段、运算符、数量限制并收集错误。 */
 function parser<S extends QuerySchema>(schema: S, wire = false) {
   const issues: QueryIssue[] = [];
   const ids = new Set<string>();
@@ -229,6 +242,7 @@ function parser<S extends QuerySchema>(schema: S, wire = false) {
     issues.push({ nodeId, message });
     return null;
   };
+  /** 递归检查条件或分组，剔除空节点，并在出错时记录具体节点位置。 */
   function parse(value: unknown, entry?: QueryEntry, depth = 1, root = false): QueryNode<S> | null {
     if (!record(value)) return fail("query", "查询节点格式不正确");
     const id = typeof value.id === "string" ? value.id : "query";
@@ -320,6 +334,7 @@ function parser<S extends QuerySchema>(schema: S, wire = false) {
 export function combineQuery<S extends QuerySchema>(
   applied: AppliedQuery<S>
 ): QueryGroup<S> | null {
+  /** 收集快捷、普通和高级条件，统一以 AND 组合为接口查询树。 */
   const children: QueryNode<S>[] = [
     ...applied.quick,
     ...applied.normal,
@@ -339,7 +354,9 @@ export function applyQueryDraft<S extends QuerySchema>(
   schema: S,
   draft: QueryDraft<S>
 ): QueryApplyResult<S> {
+  /** 为本次应用创建独立解析器和错误集合，不保留上一轮错误。 */
   const { parse, issues } = parser(schema);
+  /** 校验快捷和普通入口的平铺条件，同时拒绝同一入口重复字段。 */
   const flat = (entry: "quick" | "normal") => {
     const seen = new Set<string>();
     if (!Array.isArray(draft[entry]) || draft[entry].length > QUERY_LIMITS.conditions) {
@@ -360,12 +377,15 @@ export function applyQueryDraft<S extends QuerySchema>(
       return condition?.kind === "condition" ? [condition] : [];
     });
   };
+  /** 分别校验快捷和普通条件，结果只保留有效且有内容的项。 */
   const quick = flat("quick"),
     normal = flat("normal");
+  /** 递归校验高级条件，并要求根节点为条件组。 */
   const advanced = draft.advanced === null ? null : parse(draft.advanced, "advanced", 1, true);
   if (advanced && advanced.kind !== "group")
     issues.push({ nodeId: advanced.id, message: "高级查询根必须为条件组" });
   if (issues.length) return { valid: false, issues };
+  /** 所有检查通过后生成正式条件；页面请求只使用这份结果，不直接发送草稿。 */
   const applied: AppliedQuery<S> = {
     quick,
     normal,
@@ -399,7 +419,9 @@ export function parseQueryWhere<S extends QuerySchema>(
       issues: QueryIssue[];
     } {
   if (value === null) return { valid: true, where: null };
+  /** 按接口数据格式解析未知条件，收集节点结构和字段值错误。 */
   const { parse, issues } = parser(schema, true);
+  /** 验证后的查询根节点，非空时必须为条件组，不能把单个条件冒充整棵查询树。 */
   const where = parse(value);
   if (!where || where.kind !== "group")
     issues.push({ nodeId: "query", message: "where 必须为非空条件组或 null" });
@@ -412,6 +434,7 @@ export function removeQueryNode<S extends QuerySchema>(
   applied: AppliedQuery<S>,
   id: string
 ): AppliedQuery<S> {
+  /** 递归删除目标节点，并清除删除后为空的组，保留其余条件的独立副本。 */
   const remove = (node: QueryNode<S>): QueryNode<S> | null => {
     if (node.id === id) return null;
     if (node.kind === "condition") return cloneModel(node);
@@ -420,6 +443,7 @@ export function removeQueryNode<S extends QuerySchema>(
       ? { ...node, children: children as [QueryNode<S>, ...QueryNode<S>[]] }
       : null;
   };
+  /** 删除指定节点后的高级条件树，没有剩余条件时回到 null。 */
   const advanced = applied.advanced ? remove(applied.advanced) : null;
   return {
     quick: applied.quick.filter((node) => node.id !== id).map(cloneModel),
@@ -431,7 +455,9 @@ export function removeQueryNode<S extends QuerySchema>(
 export function querySummary<S extends QuerySchema>(schema: S, node: QueryNode<S>): string {
   if (node.kind === "group")
     return `（${node.children.map((child) => querySummary(schema, child)).join(node.operator === "and" ? " 且 " : " 或 ")}）`;
+  /** 读取字段中文名和枚举选项，生成用户看得懂的查询说明。 */
   const field = schema[node.field];
+  /** 优先把枚举值转换为标签，把布尔值转换为是/否，其余值保留文字。 */
   const label = (value: unknown) =>
     field?.kind === "enum"
       ? (field.options.find((option) => option.value === value)?.label ?? String(value))
@@ -440,6 +466,7 @@ export function querySummary<S extends QuerySchema>(schema: S, node: QueryNode<S
           ? "是"
           : "否"
         : String(value);
+  /** 判空运算符没有 value，其余条件读取单值、集合或区间用于摘要。 */
   const value = "value" in node ? node.value : undefined;
   return `${field?.label ?? node.field} ${QUERY_OPERATORS[node.operator] ?? node.operator}${value === undefined ? "" : ` ${Array.isArray(value) ? value.map(label).join(node.operator === "between" ? " 至 " : "、") : label(value)}`}`;
 }

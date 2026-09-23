@@ -18,7 +18,12 @@ import { computed, ref } from "vue";
  * const { selectedIds, hasSelection, handleSelectionChange } = useTableSelection<RoleItem>();
  * ```
  */
-export function useTableSelection<T extends { id?: string | number }>() {
+export function useTableSelection<
+  T extends {
+    /** 行的可选主键；当前选择提取逻辑仅收集真值 ID，0 和空字符串不会加入。 */
+    id?: string | number;
+  },
+>() {
   /** 选中的数据项 ID 列表。 */
   const selectedIds = ref<(string | number)[]>([]);
 

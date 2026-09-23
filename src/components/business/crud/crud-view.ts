@@ -26,7 +26,7 @@ export interface CrudHookState<S> {
   /** state 工厂的实例数据快照；不可直接修改，beforeOpen 通过返回 state 补丁更新。 */
   readonly custom: S;
 }
-/** 当前模块的组件参数缩写；避免在拆分绑定中重复声明字段合同。 */
+/** 当前模块的组件参数缩写；避免在拆分绑定中重复声明字段配置。 */
 type FormProps<T extends BusinessModuleContract> = CrudFormProps<
   T["Model"],
   T["Entity"],
@@ -93,7 +93,7 @@ export interface CrudListViewOptions<
   /** 固定列表场景。 */ view: "list";
   /** 可选查询规则；参数的 state.custom 为只读快照。 */
   hooks?: CrudPageListHooks<T, NoInfer<S>>;
-  /** 按需创建批量控制器，命令权限仍由原合同管理。 */
+  /** 按需创建批量控制器，命令权限仍由原接口约定管理。 */
   batch?: {
     /** 当前模块的批量 API 适配。 */ request: BatchExecutor<T["Query"]>;
     /** 命令、权限与允许操作的记录范围。 */ commands: readonly BatchCommand<T["Model"]>[];
@@ -139,7 +139,7 @@ export interface CrudViewState<S extends object> {
 export interface CrudListView<T extends BusinessModuleContract, S extends object> {
   /** 公共及列表只读状态，custom 可编辑。 */ state: CrudViewState<S> &
     CrudListController<T["Model"], T["Id"], T["Schema"]>["state"] & {
-      /** 分页快照端口；修改通过 actions.setPage，页码从 1 开始。 */ readonly pagination: {
+      /** 当前页码、每页条数和总数；修改通过 actions.setPage，页码从 1 开始。 */ readonly pagination: {
         /** 当前页码。 */ readonly pageNum: number;
         /** 每页条数。 */ readonly pageSize: number;
         /** 查询总条数。 */ readonly total: number;
@@ -185,9 +185,9 @@ export interface CrudFormView<T extends BusinessModuleContract, S extends object
       T["Entity"],
       T["Id"]
     >["close"];
-    /** 高级导航覆盖后的实际端口；日常关闭应使用 back。 */ navigation: CrudNavigation<T["Id"]>;
+    /** 实际使用的跳转方法；日常关闭应使用 back。 */ navigation: CrudNavigation<T["Id"]>;
   };
-  /** 实际表单 props 和同一子表编辑端口。 */ bindings: {
+  /** 实际表单 props 和子表的编辑参数和方法。 */ bindings: {
     /** 真实表单 props，含可选字段完成通知与保存保护；未配置 change 时回调为空。 */
     readonly form: FormProps<T>;
     /** 原主表字段及联动参数；交给 MyCrudFormFields，不新建控制器。 */
@@ -205,7 +205,7 @@ export interface CrudFormView<T extends BusinessModuleContract, S extends object
       FormProps<T>,
       "controller" | "readonlyReason" | "changePending" | "changeError" | "retryChange"
     >;
-    /** 按模型数组 key 取得已装配的绑定；在 setup 读取一次，不创建另一份子表。
+    /** 按模型数组 key 取得已组合的绑定；在 setup 读取一次，不创建另一份子表。
      * @example
      * const contacts = bindings.child("contacts");
      */ child: CrudChildBinding<T>;
@@ -224,9 +224,9 @@ export interface CrudDetailView<T extends BusinessModuleContract, S extends obje
   > & {
     /** 编辑当前记录；复核权限、只读原因与忙碌状态。 */ edit: () => Promise<void>;
     /** 返回列表；沿用当前模块关闭导航。 */ back: () => Promise<void>;
-    /** 当前导航合同，保留 ID 类型。 */ navigation: CrudNavigation<T["Id"]>;
+    /** 当前导航接口约定，保留 ID 类型。 */ navigation: CrudNavigation<T["Id"]>;
   };
-  /** 传给真实详情组件与可选宿主。 */ bindings: {
+  /** 传给真实详情组件与可选弹窗容器。 */ bindings: {
     /** 当前详情 props，读取同一控制器。 */ readonly detail: CrudDetailBinding<T>;
     /** 独立动作工具栏；复用原详情动作与编辑权限。 */
     readonly toolbar: Pick<CrudDetailBinding<T>, "controller" | "actions" | "back"> & {
@@ -243,6 +243,6 @@ export interface CrudDetailView<T extends BusinessModuleContract, S extends obje
         })
       | undefined;
 
-    /** 嵌入编辑宿主；未启用时 undefined。 */ readonly host: CrudViewEnvironment["host"];
+    /** 嵌入编辑容器；未启用时 undefined。 */ readonly host: CrudViewEnvironment["host"];
   };
 }

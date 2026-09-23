@@ -81,7 +81,7 @@ const emit = defineEmits<{
    */
   "update:modelValue": [value: boolean];
   /**
-   * 用户确认；组件不自行提交数据，宿主负责保存。
+   * 用户确认；组件不自行提交数据，调用方负责保存。
    * @example `<MyDrawer @confirm="save" />`
    */
   confirm: [];
@@ -96,10 +96,13 @@ defineSlots<{
   footer?: (props: { close: () => void }) => unknown;
 }>();
 
+/** 通过事件通知父页面改变抽屉开关，不直接改传入值。 */
 function updateVisible(value: boolean) {
   emit("update:modelValue", value);
 }
+/** 锁住正在执行的关闭确认，避免连续点击导致重复询问。 */
 let checkingClose = false;
+/** 先执行业务关闭检查，允许后才真正关闭抽屉，保护未保存输入。 */
 async function guardClose(done: () => void) {
   if (checkingClose) return;
   checkingClose = true;
@@ -109,6 +112,7 @@ async function guardClose(done: () => void) {
     checkingClose = false;
   }
 }
+/** 取消按钮沿用同一关闭检查，通过后通知取消并更新开关。 */
 function cancel() {
   return guardClose(() => {
     emit("cancel");

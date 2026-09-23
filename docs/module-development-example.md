@@ -8,6 +8,27 @@
 [sale/config.ts](../src/pages/base/sale/config.ts)：四个路由页只选择 view，
 不包含 Customer 的业务演示钩子；复杂主子表仍按本文组织。
 
+## 从设计到文件的编写顺序
+
+先按[设计说明要求](./business-module-standard.md#设计说明先于字段和实现)写清结构。
+随后按依赖顺序落地，缺少业务需要的文件可以省略：
+
+| 顺序 | 文件                      | 具体写什么                                        | 完成后核对                                 |
+| ---- | ------------------------- | ------------------------------------------------- | ------------------------------------------ |
+| 1    | API types.ts              | 读取实体、创建/编辑 DTO、子行 DTO、查询与固定范围 | ID/空值/版本/保存回执符合约定              |
+| 2    | API index.ts、query.ts    | 请求适配、signal、错误归属、查询/排序白名单       | 不导入页面配置；不直接弹页面提示           |
+| 3    | 页面 types.ts             | 必要的编辑模型、上下文与显式模块类型定义          | 与 API 相同的结构直接复用，不复制          |
+| 4    | children/\*/config.ts     | 每个子表自己的字段、行键、初始行、校验、DTO 映射  | 不反向引用父 config；新行也有稳定键        |
+| 5    | adapters.ts 或 model      | 回显、空值归一化、提交白名单、编辑基线版本        | 简单映射内联 model，复杂映射才拆文件       |
+| 6    | config.ts、按需 page.ts   | 汇总模块成员；page.ts 供跨模块导航轻量引用        | 设计说明在配置之前，每个大区块说明职责     |
+| 7    | index/add/edit/detail.vue | 各调用一次 useCrudView；组合公开 bindings         | 模型不直接修改，返回走 actions.back        |
+| 8    | 专属子组件/插槽           | 仅实现配置不能表达的布局或交互                    | 复用原控制器与子表操作接口，不再建一份模型 |
+| 9    | 菜单与路由登记            | 实际页面、隐藏详情/编辑路径、权限和标签缓存       | 列表、参照跳转与返回路径能闭环             |
+
+字段配置中每一项的职责见[配置成员怎么写](./business-module-standard.md#配置成员怎么写)；
+组件能独立用到哪一层见[独立使用与组合](./business-components-guide.md#独立使用与组合)。
+后端未提供的接口按现有 Mock 边界演示，并明确待确认项，不把前端类型当作已联调协议。
+
 ## 1. 默认结构
 
 ```text
@@ -17,22 +38,22 @@ src/api/base/customer/
   query.ts              查询字段、运算符、排序白名单
 src/pages/base/customer/
   config.ts             唯一模块入口；主 fields/links/children 直接内联
-  types.ts              页面模型、上下文、继承公共合同的 CustomerContract
+  types.ts              页面模型、上下文、继承公共接口约定的 CustomerContract
   adapters.ts           初始值、回显、整单白名单转换
   index.vue/detail.vue   各自调用 useCrudView，直接使用列表/详情组件
-  add.vue/edit.vue       各自调用 useCrudView，显式装配表单和子表
+  add.vue/edit.vue       各自调用 useCrudView，显式组合表单和子表
   children/
-    types.ts            客户专属子表合同
+    types.ts            客户专属子表接口约定
     contacts/config.ts  联系人自己的字段、编辑方式、校验、行 DTO 转换
     addresses/config.ts 地址自己的完整配置
 ```
 
-复杂子表可有自己的 Vue 呈现组件。主字段只有明显过大且确有维护收益才拆 fields.config.ts；
+复杂子表可有自己的 Vue 显示组件。主字段只有明显过大且确有维护收益才拆 fields.config.ts；
 简单示例不要为了“解耦”预建配置分片。子表配置独立是业务职责边界，不能取消。
 
-## 2. 类型：明确继承，不在 config 顶部堆合同
+## 2. 类型：明确继承，不在 config 顶部堆接口约定
 
-完整合同见 [types.ts](../src/pages/base/customer/types.ts)，以下为节选：
+完整接口约定见 [types.ts](../src/pages/base/customer/types.ts)，以下为节选：
 
 ```ts
 export interface CustomerContract extends BusinessModuleContract {
@@ -46,8 +67,8 @@ export interface CustomerContract extends BusinessModuleContract {
 }
 ```
 
-公共合同定义“需要哪些角色”，业务合同填入“每个角色是什么类型”。
-不能直接用宽泛的 BusinessModuleContract 替代具体合同，否则字段和 API 提示会丢失。
+公共接口约定定义“需要哪些角色”，业务接口约定填入“每个角色是什么类型”。
+不能直接用宽泛的 BusinessModuleContract 替代具体接口约定，否则字段和 API 提示会丢失。
 
 ## 3. 配置大字段保持固定顺序并逐段说明
 
@@ -108,10 +129,10 @@ export const customerModule = defineBusinessModule<CustomerContract>()({
 新增/编辑默认继承 form，场景差异写 scenes.add/edit；false 不展示、不执行该场景字段校验。
 保存白名单不由可见性推导。列表与详情同样派生，不再维护三份字段数组。
 
-model 工厂参数 children 就是该模块内联登记的绑定；模块初始化时装配一次，不产生共享表单。
+model 工厂参数 children 就是该模块内联登记的绑定；模块初始化时组合一次，不产生共享表单。
 公共工厂提供默认副本隔离、toCreate/toUpdate 包装；toPayload 不需要自己 clone readonly 模型。
 特殊新增协议可填 overrides.toCreate；未覆盖的步骤继续使用公共默认流程。
-覆盖方法的返回值必须满足具体 DTO 合同。
+覆盖方法的返回值必须满足具体 DTO 接口约定。
 
 ## 4. 动作声明与默认行为
 
@@ -168,8 +189,8 @@ Vue 文件顶部说明本页用途；template 直接写真实组件和插槽；s
 `useCrudView`，按需解构 `state/actions/bindings`。正常页面不写 style，复用公共样式。
 `config.ts` 仍是字段、子表和公共规则入口，没有 template/style。
 
-以下是核心接法节选；模块提示、非法 ID 提示的完整装配见四个实际源码文件。
-标准列表/详情组件会从 bindings 自动挂载弹窗宿主，页面不要重复挂载。
+以下是核心接法节选；模块提示、非法 ID 提示的完整组合见四个实际源码文件。
+标准列表/详情组件会使用 bindings 自动创建弹窗容器，页面不要重复挂载。
 不要把省略布局的片段当作完整 customer 路由直接替换，尤其不能漏掉已配置子表分区。
 
 ### index.vue：列表状态和操作
@@ -249,7 +270,7 @@ const addresses = bindings.child("addresses");
 初始化返回 `{ state: { reviewed: false }, defaults: { remark: "..." } }` 时，
 state 只合并到 custom；defaults 先于草稿恢复，不覆盖恢复内容。
 
-### edit.vue：独立装配，复用原模型与草稿
+### edit.vue：独立组合，复用原模型与草稿
 
 [edit.vue](../src/pages/base/customer/edit.vue) 同样显式导入 MyCrudForm 与两个子表组件，
 调用 `useCrudView(customerModule, { view: "edit", state, hooks })`。
@@ -258,7 +279,7 @@ state 只合并到 custom；defaults 先于草稿恢复，不覆盖恢复内容�
 
 编辑 ID 在实例创建时固定。beforeOpen 只能返回辅助 state，不能用 defaults 覆盖服务端回显。
 客户编辑页还通过 `form.references.provinceId` 调用共享参照的 `withMap`，只替换本页省份名称回写；
-新增页继续使用默认 map，原省市区 links 不变。合同见[组件指南](./business-components-guide.md#页面局部回写覆盖)。
+新增页继续使用默认 map，原省市区 links 不变。接口约定见[组件指南](./business-components-guide.md#页面局部回写覆盖)。
 示例还展示载入版本、条件校验、联系人分区扩展，以及 afterSave 成功信息；
 保存仍执行同一控制器的版本、子表、草稿和默认导航流程。
 
@@ -295,8 +316,8 @@ state 只合并到 custom；defaults 先于草稿恢复，不覆盖恢复内容�
 配置的职责不变：context/parseId 适配实例身份，fields/links/children/views 提供共享规则。
 客户 ID 仍为字符串；数字 ID 模块自行验证数值及安全范围。
 
-`bindings.child("contacts")` 返回已按子配置创建的同一个端口，必须传给对应子表，
-不在页面另建 useCrudTableChild。页面显式写 section/tab 插槽装配子表；
+`bindings.child("contacts")` 返回子表的行数据和编辑方法，必须传给对应子表，
+不在页面另建 useCrudTableChild。页面显式写 section/tab 插槽组合子表；
 不再提供额外的自动渲染页面入口，生命周期和绑定继续由共享运行时负责。
 
 可以自由增加业务组件、事件、custom 状态、生命周期、导航覆盖和字段/子表插槽。
@@ -304,7 +325,7 @@ state 只合并到 custom；defaults 先于草稿恢复，不覆盖恢复内容�
 但需要自行接回主表校验、保存和离开保护，不能同一模型创建第二个控制器。
 
 仅在确有需要时追加 `<style scoped>`，只选择自己的业务 class；
-不覆盖 .el-\*、:deep() 或私有 DOM。生命周期与失败语义见
+不覆盖 .el-\*、:deep() 或私有 DOM。打开、保存和失败后的处理方式见
 [CRUD 指南](./crud-development-guide.md#统一页面入口与可选生命周期)。
 
 ## 7. 验证与悬停

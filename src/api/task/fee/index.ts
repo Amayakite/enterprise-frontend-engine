@@ -10,7 +10,7 @@ import type {
   FeeSearchRequest,
 } from "./types";
 
-// 前端先行临时合同；真实后端 URL 和 DTO 由本模块统一适配。
+// 前端先行临时接口约定；真实后端 URL 和 DTO 由本模块统一适配。
 const BASE_URL = "/api/v1/pilot/task-fees";
 
 const FeeAPI = {

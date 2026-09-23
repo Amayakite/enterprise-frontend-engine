@@ -97,26 +97,38 @@ const props = defineProps({
 
 const emit = defineEmits(["update:modelValue"]);
 
+/** 图标选择触发器，点击外部时以它判断是否应收起弹层。 */
 const iconSelectRef = ref();
+/** 图标弹层内容元素，点击内部不应被外部点击监听误判为关闭。 */
 const popoverContentRef = ref();
+/** 控制图标面板的打开状态，选中后自动收起。 */
 const popoverVisible = ref(false);
+/** 当前查看项目 SVG 还是 Element Plus 图标，影响筛选数据及保存名称格式。 */
 const activeTab = ref("svg");
 
+/** 从项目 icons 目录读取的 SVG 文件名列表，不包含扩展名。 */
 const svgIcons = ref<string[]>([]);
+/** Element Plus 导出的图标组件名称，作为内置图标候选。 */
 const elementIcons = ref<string[]>(Object.keys(ElementPlusIconsVue));
+/** 父页面双向绑定的图标名称，Element Plus 图标使用 el-icon- 前缀。 */
 const selectedIcon = defineModel("modelValue", {
   type: String,
   required: true,
   default: "",
 });
 
+/** 图标名称搜索关键词，只过滤当前页签的候选。 */
 const filterText = ref("");
+/** 符合关键词的项目 SVG 图标，用于面板展示。 */
 const filteredSvgIcons = ref<string[]>([]);
+/** 符合关键词的 Element Plus 图标，用于面板展示。 */
 const filteredElementIcons = ref<string[]>(elementIcons.value);
+/** 根据名称前缀选择正确的图标渲染方式，避免把内置图标当作 SVG 文件。 */
 const isElementIcon = computed(() => {
   return selectedIcon.value && selectedIcon.value.startsWith("el-icon");
 });
 
+/** 读取构建工具发现的 SVG 路径，提取名称并初始化候选列表。 */
 function loadIcons() {
   const icons = import.meta.glob("/src/assets/icons/*.svg");
   for (const path in icons) {
@@ -126,12 +138,14 @@ function loadIcons() {
   filteredSvgIcons.value = svgIcons.value;
 }
 
+/** 只接受两个已知页签，切换后按当前关键词刷新候选。 */
 function handleTabClick(tabPane: TabsPaneContext) {
   if (tabPane.props.name !== "svg" && tabPane.props.name !== "element") return;
   activeTab.value = tabPane.props.name;
   filterIcons();
 }
 
+/** 忽略大小写过滤当前类型的图标名称，空关键词显示全部。 */
 function filterIcons() {
   if (activeTab.value === "svg") {
     filteredSvgIcons.value = filterText.value
@@ -146,16 +160,19 @@ function filterIcons() {
   }
 }
 
+/** 给内置图标补上保存前缀，通知父页面并关闭面板。 */
 function selectIcon(icon: string) {
   const iconName = activeTab.value === "element" ? "el-icon-" + icon : icon;
   emit("update:modelValue", iconName);
   popoverVisible.value = false;
 }
 
+/** 切换图标面板开关，不改变当前选中的图标。 */
 function togglePopover() {
   popoverVisible.value = !popoverVisible.value;
 }
 
+/** 点击触发器和弹层之外时收起面板，弹层内选择图标不被提前打断。 */
 onClickOutside(iconSelectRef, () => (popoverVisible.value = false), {
   ignore: [popoverContentRef],
 });
@@ -167,6 +184,7 @@ function clearSelectedIcon() {
   selectedIcon.value = "";
 }
 
+/** 加载项目 SVG 图标，并按已有值自动选中对应的图标类型页签。 */
 onMounted(() => {
   loadIcons();
   if (selectedIcon.value) {

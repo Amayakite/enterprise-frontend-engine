@@ -11,19 +11,24 @@ import type { ChangeReason, FieldEnvironment, FieldKey, FieldLink } from "./type
  * const next = apply(env, createInitialModel, { name: "新名称" }, "user");
  */
 export function compileLinks<M, C>(links: readonly FieldLink<M, C>[]) {
+  /** 记录某字段变化后会写入哪些下游字段，用于检查循环并安排执行顺序。 */
   const edges = new Map<FieldKey<M>, Set<FieldKey<M>>>();
   for (const link of links) {
     if (!link.watch.length) throw new Error("字段联动 watch 不得为空");
     for (const target of link.clear ?? [])
       if (!link.writes.includes(target)) throw new Error(`clear 未声明写字段：${target}`);
     for (const key of link.watch) {
+      /** 当前被监听字段对应的下游写入集合，多条规则的目标合并去重。 */
       const targets = edges.get(key) ?? new Set<FieldKey<M>>();
       link.writes.forEach((target) => targets.add(target));
       edges.set(key, targets);
     }
   }
+  /** 按依赖生成的执行顺序，确保上游先完成再计算下游。 */
   const order: FieldKey<M>[] = [];
+  /** 已完成依赖检查的字段，避免重复遍历相同分支。 */
   const seen = new Set<FieldKey<M>>();
+  /** 沿字段依赖检查是否形成循环，并记录路径，避免输入后联动永远相互触发。 */
   function visit(key: FieldKey<M>, path: FieldKey<M>[]) {
     if (path.includes(key)) throw new Error(`字段联动环路：${[...path, key].join(" → ")}`);
     if (seen.has(key)) return;
@@ -55,10 +60,15 @@ export function compileLinks<M, C>(links: readonly FieldLink<M, C>[]) {
   } => {
     // 只替换声明写入的字段；未变分支共享只读输入，业务 apply 仍接收隔离快照。
     const model = { ...env.model } as M;
+    /** 仅当联动真的需要清空字段时才创建初始模型，避免每次输入都分配默认数据。 */
     let defaults: M | undefined;
+    /** 本轮真正发生变化的字段补丁，不把未变字段重复发布。 */
     const changes: Partial<M> = {};
+    /** 记录当前仍与输入前不同的字段，判断哪些下游规则需要执行。 */
     const changed = new Set<FieldKey<M>>();
+    /** 记住联动规则对字段写入的值，用于拒绝多条规则产生矛盾结果。 */
     const writers = new Map<FieldKey<M>, unknown>();
+    /** 汇总联动要回写的字段，检查同一字段是否被不同规则写入冲突值，再生成最终补丁。 */
     function write(key: FieldKey<M>, value: M[FieldKey<M>], linked: boolean) {
       if (linked && writers.has(key) && !sameModelValue(writers.get(key), value))
         throw new Error(`字段联动多写冲突：${key}`);

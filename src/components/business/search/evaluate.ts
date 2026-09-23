@@ -4,6 +4,7 @@ import type { PageResult } from "@/types/http";
 import { checkQuerySort, compareQueryValues, isEmptyQueryValue, parseQueryWhere } from "./model";
 import type { QueryCondition, QueryField, QueryNode, QuerySchema } from "./types";
 
+/** 递归判断一条记录是否满足条件组，AND 要全部成立、OR 只需一项成立。 */
 function matches<S extends QuerySchema>(
   field: QueryField,
   condition: QueryCondition<S>,

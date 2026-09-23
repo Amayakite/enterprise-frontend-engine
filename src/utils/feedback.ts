@@ -4,7 +4,7 @@ import { summarizeFeedback, type FeedbackTone } from "./feedback-policy";
 
 /** 全局轻提示的展示数据；不携带表单、路由或写入回调。 */
 export interface FeedbackNotice {
-  /** 单次呈现 ID；关闭句柄固定此 ID，不会关闭后来更新的提示。 */
+  /** 单次显示 ID；关闭句柄固定此 ID，不会关闭后来更新的提示。 */
   id: number;
   /** 结果严重度，不按文本长度推断。 */
   tone: FeedbackTone;
@@ -69,7 +69,7 @@ export function resumeFeedback(id: number, reason: "hover" | "focus") {
   if (!lifetime.pauses.size) schedule(id);
 }
 
-/** 全局宿主销毁时清理展示及计时器，不触碰任何保存/草稿状态。 */
+/** 全局调用方销毁时清理展示及计时器，不触碰任何保存/草稿状态。 */
 export function clearFeedback() {
   for (const id of lifetimes.keys()) closeFeedback(id);
 }
@@ -79,7 +79,7 @@ export function clearFeedback() {
  * @param tone 业务结果严重度；高风险状态应由当前页 MyFeedback 持久展示。
  * @param message 纯文本；长文不自动关闭，点击详情后使用 MyDialog 阅读。
  * @param operation 可选的单次操作对象；只替换同一操作的提示，不按文案跨页合并。
- * @returns 固定本次呈现的 close 句柄；可以重复关闭。
+ * @returns 固定本次显示的 close 句柄；可以重复关闭。
  * @example
  * `notifyFeedback("success", "客户资料已保存", operation)`
  */

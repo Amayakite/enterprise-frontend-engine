@@ -51,12 +51,14 @@
           </el-button>
         </el-space>
       </template>
+      <!-- 显示联系人和地址子表。各自传入 bindings.child 返回的参数，行修改会随客户一起保存。 -->
       <template #section-contacts>
         <CustomerContacts :binding="contacts" />
       </template>
       <template #section-addresses>
         <CustomerAddresses :binding="addresses" />
       </template>
+      <!-- 勾选核对后才允许保存；勾选状态不发给接口。下方人数和地址数直接从当前表单读取。 -->
       <template #footer="{ state: formState }">
         <el-space wrap>
           <el-checkbox v-model="state.custom.reviewed" :disabled="state.busy">
@@ -86,7 +88,7 @@ import type { CrudValidation } from "@/components/business/crud/types";
 import type { CustomerFormModel } from "./types";
 import { customerModule } from "./config";
 
-/** 本页辅助状态；模型由 state.model 只读呈现，以下成员不进入 DTO 或草稿。 */
+/** 本页辅助状态；模型由 state.model 只读显示，以下成员不进入 DTO 或草稿。 */
 interface AddState {
   /** 最近一次已确认的字段调整说明；初始为空，不进入 DTO。 */
   changeSummary: string;
@@ -100,7 +102,7 @@ interface AddState {
   remarkTemplates: {
     /** 面向用户的模板名称，也是当前静态模板的唯一键。 */
     label: string;
-    /** 点击后替换备注的纯文本；最多 500 字，与字段合同一致。 */
+    /** 点击后替换备注的纯文本；最多 500 字，与字段配置一致。 */
     content: string;
   }[];
 }

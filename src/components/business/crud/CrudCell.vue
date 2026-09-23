@@ -28,7 +28,7 @@ const props = defineProps<{
    */
   column: CrudColumn<Row>;
   /**
-   * 对应字段合同；传入后使用 FieldDisplay 格式化。
+   * 对应字段配置；传入后使用 FieldDisplay 格式化。
    * @example `<CrudCell :field="field" ... />`
    */
   field?: FieldDefinition<Row, C>;
@@ -55,6 +55,7 @@ const emit = defineEmits<{
    */
   navigate: [];
 }>();
+/** 把当前行作为字段模型，并传入列表上下文，供金额、字典和参照等显示器读取。 */
 const environment = computed<FieldEnvironment<Row, C>>(() => ({
   model: props.row,
   context: props.context,

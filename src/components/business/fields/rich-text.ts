@@ -1,6 +1,6 @@
 import DOMPurify from "dompurify";
 
-/** 富文本独立控件合同；字段模型保存 HTML 字符串，空值使用空字符串或 null。 */
+/** 富文本独立控件接口约定；字段模型保存 HTML 字符串，空值使用空字符串或 null。 */
 export interface RichTextProps {
   /** 编辑区域 CSS 高度；默认 240px，不含工具栏。
    * @example
@@ -79,6 +79,7 @@ export interface RichTextContent {
  * `richTextContent("<p><br></p>").hasContent // false`
  */
 export function richTextContent(html: unknown): RichTextContent {
+  /** 用浏览器解析富文本后读取内容，避免用正则猜测嵌套 HTML 结构。 */
   const doc = new DOMParser().parseFromString(
     sanitizeRichText(typeof html === "string" ? html : ""),
     "text/html"
@@ -87,6 +88,7 @@ export function richTextContent(html: unknown): RichTextContent {
   doc
     .querySelectorAll("p,div,li,blockquote,h1,h2,h3,h4,h5,h6,tr")
     .forEach((node) => node.append("\n"));
+  /** 去掉 HTML 标签及零宽字符后的可见文字，用于摘要和空内容判断。 */
   const text = (doc.body.textContent ?? "").replace(/[\u200B-\u200D\uFEFF]/g, "").trim();
   return {
     text,

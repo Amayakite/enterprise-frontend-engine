@@ -24,6 +24,7 @@ export function checkReferencePage<Row, Id extends ReferenceId>(
   ) {
     throw new Error("参照分页结果不符合合同");
   }
+  /** 把当前页记录的原始 ID 编码为可比较键，检查是否存在重复行。 */
   const keys = result.list.map((row) => serializeStableKey(getKey(row)));
   if (new Set(keys).size !== keys.length) throw new Error("参照返回重复 ID");
   return result;
@@ -38,7 +39,9 @@ export function checkReferenceResolve<Row, Id extends ReferenceId>(
   if (!result || !Array.isArray(result.items) || !Array.isArray(result.unavailableIds)) {
     throw new Error("参照回显结果不符合合同");
   }
+  /** 本次要求解析的 ID 集合，接口不能遗漏也不能返回未请求的记录。 */
   const expected = new Set(ids.map(serializeStableKey));
+  /** 合并成功记录和不可用 ID，检查每个请求 ID 只能出现一次。 */
   const returned = [...result.items.map(getKey), ...result.unavailableIds].map(serializeStableKey);
   if (
     returned.length !== expected.size ||
@@ -49,7 +52,7 @@ export function checkReferenceResolve<Row, Id extends ReferenceId>(
   return result;
 }
 
-/** filters 为扁平 JSON 条件合同；键顺序变化不产生新的缓存上下文。 */
+/** filters 为扁平 JSON 条件接口约定；键顺序变化不产生新的缓存上下文。 */
 export function referenceFilterKey(filters: ReferenceFilters): string {
   return JSON.stringify(
     Object.fromEntries(
@@ -64,6 +67,7 @@ export function checkReferenceConditions(
   fields: readonly ReferenceSearchField[],
   conditions: readonly ReferenceCondition[]
 ) {
+  /** 记录已经出现的筛选字段，防止同一字段重复或互相覆盖。 */
   const seen = new Set<string>();
   for (const condition of conditions) {
     const field = fields.find(

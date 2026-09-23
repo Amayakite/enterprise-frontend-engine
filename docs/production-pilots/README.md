@@ -10,7 +10,7 @@
 
 ## 新模块开发依据
 
-新模块统一遵守 [业务模块开发规范](../business-module-standard.md) 和 [模块开发实操](../module-development-example.md)，结构均以 [客户管理](../customer-example.md) 为参照；无子表时精简对应装配，不再维护另一套试点开发规则。
+新模块统一遵守 [业务模块开发规范](../business-module-standard.md) 和 [模块开发实操](../module-development-example.md)，结构均以 [客户管理](../customer-example.md) 为参照；无子表时精简对应组合，不再维护另一套试点开发规则。
 
 删除试点前同时检查 API、菜单、隐藏路由、专属权限和文档引用；被其他模块使用的公共组件与工具不能一起删除。本说明不表示已经执行删除。
 

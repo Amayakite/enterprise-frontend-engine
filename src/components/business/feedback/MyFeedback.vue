@@ -44,10 +44,13 @@ const props = withDefaults(defineProps<FeedbackProps>(), {
   closable: false,
 });
 const emit = defineEmits<FeedbackEmits>();
+/** 根据提示级别选择对应图标，文字和颜色表达同一个结果。 */
 const icon = computed(
   () => ({ success: Check, info: InfoFilled, warning: WarningFilled, error: Close })[props.tone]
 );
+/** 将长错误整理为简短摘要与可展开详情，避免一大段内容挤满页面。 */
 const content = computed(() => summarizeFeedback(props.message));
+/** 控制完整错误详情的展开状态，不改变原始错误内容。 */
 const detailOpen = ref(false);
 </script>
 <style scoped>

@@ -11,6 +11,7 @@ export function cloneModel<T>(value: T): T {
   if (value instanceof Date) return new Date(value.getTime()) as T;
   if (Array.isArray(value)) return value.map((item) => cloneModel(item)) as T;
   if (value !== null && typeof value === "object") {
+    /** 逐字段复制普通对象，避免表单草稿与父页面共享可变对象。 */
     const result: Record<string, unknown> = {};
     for (const [key, item] of Object.entries(value)) result[key] = cloneModel(item);
     return result as T;
@@ -25,6 +26,7 @@ export function sameModelValue(left: unknown, right: unknown): boolean {
   if (left === null || right === null || typeof left !== "object" || typeof right !== "object")
     return false;
   if (Array.isArray(left) !== Array.isArray(right)) return false;
+  /** 取左侧对象的字段名，与右侧检查字段数量及逐项值是否相同。 */
   const keys = Object.keys(left);
   return (
     keys.length === Object.keys(right).length &&
@@ -42,7 +44,7 @@ export function sameModelValue(left: unknown, right: unknown): boolean {
  * `const input = readonlyModel(model);`
  */
 export function readonlyModel<T>(value: T): DeepReadonly<T>;
-/** 接受已有深只读输入；显式泛型保留原模型合同，不叠加 DeepReadonly。 */
+/** 接受已有深只读输入；显式泛型保留原模型接口约定，不叠加 DeepReadonly。 */
 export function readonlyModel<T>(value: DeepReadonly<T>): DeepReadonly<T>;
 /** 快照实现；克隆后再施加只读代理，不共享输入的可变对象。 */
 export function readonlyModel<T>(value: T | DeepReadonly<T>): DeepReadonly<T> {

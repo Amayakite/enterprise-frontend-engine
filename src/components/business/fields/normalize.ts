@@ -46,7 +46,7 @@ export function testCondition<M, C>(
  * 将字段声明归一化为当前模式可用的表单/详情/表格描述；不负责网络请求。
  * @param fields 统一字段声明；函数不修改原数组。
  * @param env 当前模型、业务上下文与 add/edit 模式。
- * @param readonly 宿主是否只读；与字段自己的只读条件合并。
+ * @param readonly 调用方是否只读；与字段自己的只读条件合并。
  * @returns 归一化数组；默认 span 为 1，group 为空，rules 为空数组。
  */
 export function normalizeFields<M, C>(

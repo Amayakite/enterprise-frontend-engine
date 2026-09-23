@@ -40,10 +40,15 @@ const emit = defineEmits<{
    */
   "update:modelValue": [value: string];
 }>();
+/** 按需加载的富文本组件，加载完成前不创建重量编辑器。 */
 const editor = shallowRef<typeof WangEditor>();
+/** 富文本模块正在加载，防止重复导入并显示等待提示。 */
 const loading = ref(false);
+/** 记录模块加载失败，使界面可以提示用户重试。 */
 const error = ref(false);
+/** 卸载标记，异步导入完成后先检查，避免更新已经离开的输入框。 */
 let alive = true;
+/** 按需导入富文本编辑器，捕获模块加载失败并保留重试机会。 */
 async function load() {
   if (loading.value) return;
   loading.value = true;
@@ -57,10 +62,13 @@ async function load() {
     if (alive) loading.value = false;
   }
 }
+/** 编辑器内容与当前值不同且组件尚未卸载时通知父页面，避免重复回写或卸载后继续更新。 */
 function onChange(value: string) {
   if (alive && value !== props.modelValue) emit("update:modelValue", value);
 }
+/** 需要真正显示输入时才加载编辑器，普通字段不会提前承担这部分开销。 */
 onMounted(load);
+/** 标记组件已离开，之后的异步模块加载结果不再更新界面。 */
 onBeforeUnmount(() => {
   alive = false;
 });

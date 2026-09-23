@@ -80,7 +80,7 @@ import { createQueryReference } from "@/components/business/search/reference";
 import { withQueryInputs } from "@/components/business/search/model";
 import type { QuerySchema } from "@/components/business/search/types";
 import { useSearchQuery } from "@/composables/useSearchQuery";
-// 独立查询组件示例，仅展示名称/省份，不依赖客户页面装配。
+// 独立查询组件示例，仅展示名称/省份，不依赖客户页面组合。
 const customerSchema = withQueryInputs<QuerySchema>(
   {
     customerName: { label: "客户名称", kind: "text", entries: ["quick"], operators: ["contains"] },

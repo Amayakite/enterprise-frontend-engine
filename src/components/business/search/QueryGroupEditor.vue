@@ -121,27 +121,34 @@ const emit = defineEmits<{
    */
   remove: [];
 }>();
+/** 可用于高级查询的字段选项，不把仅允许快捷查询的字段放进下拉列表。 */
 const advancedFields = computed(() =>
   Object.entries(props.schema).filter(([, field]) => field.entries.includes("advanced"))
 );
+/** 按条件或分组 ID 显示对应校验错误。 */
 const issue = (id: string) => props.issues.find((item) => item.nodeId === id)?.message;
+/** 查找条件对应的字段定义，用于选择运算符和输入控件。 */
 const fieldFor = (node: QueryDraftCondition<S>) => queryField(props.schema, node.field);
+/** 切换当前组的“全部满足/任一满足”，只接受 and 或 or。 */
 function setOperator(value: string) {
   if (value === "and" || value === "or")
     emit("update:modelValue", { ...props.modelValue, operator: value });
 }
+/** 替换当前组中的一个条件或子组，通过事件回写而不直接修改父对象。 */
 function replace(index: number, value: QueryDraftCondition<S> | QueryDraftGroup<S>) {
   emit("update:modelValue", {
     ...props.modelValue,
     children: props.modelValue.children.map((node, i) => (i === index ? value : node)),
   });
 }
+/** 删除指定条件或子组，保留其他节点的 ID 和顺序。 */
 function remove(index: number) {
   emit("update:modelValue", {
     ...props.modelValue,
     children: props.modelValue.children.filter((_, i) => i !== index),
   });
 }
+/** 追加一个尚未选字段的空条件，用户填写完整后才能应用查询。 */
 function addCondition() {
   emit("update:modelValue", {
     ...props.modelValue,
@@ -151,6 +158,7 @@ function addCondition() {
     ],
   });
 }
+/** 在允许的最大嵌套深度内新增 AND 子组，避免无限嵌套。 */
 function addGroup() {
   if (props.depth >= QUERY_LIMITS.depth) return;
   emit("update:modelValue", {
@@ -161,6 +169,7 @@ function addGroup() {
     ],
   });
 }
+/** 选择新字段时使用它的第一个允许运算符，并清除与旧字段类型不兼容的值。 */
 function changeField(index: number, key: string) {
   const node = props.modelValue.children[index];
   const field = queryField(props.schema, key);
@@ -173,6 +182,7 @@ function changeField(index: number, key: string) {
     value: operator?.startsWith("is") ? undefined : null,
   });
 }
+/** 更换运算符时重置旧值；判空运算符不需要输入值。 */
 function changeOperator(index: number, operator: string) {
   const node = props.modelValue.children[index];
   if (node?.kind === "condition")

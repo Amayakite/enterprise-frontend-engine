@@ -1,4 +1,5 @@
 <template>
+  <!-- 按 field.type 显示一个输入控件，从 env.model[field.key] 取值；监听 change 回写。需要标签和校验时使用 MyForm。 -->
   <div class="field-input"><component :is="renderInput" /></div>
 </template>
 
@@ -17,9 +18,11 @@ import { fieldPlaceholder } from "./presentation";
 import type { ChangeReason, FieldDefinition, FieldEnvironment, FieldKey } from "./types";
 import type { FileInfo } from "@/api/file/types";
 
+/** 检查值是否为图片 URL 字符串数组，避免把错误形状传给上传组件。 */
 function isImageList(value: unknown): value is string[] {
   return Array.isArray(value) && value.every((item: unknown) => typeof item === "string");
 }
+/** 检查附件列表至少具备 name/url 字符串，供上传组件安全读取。 */
 function isFileList(value: unknown): value is FileInfo[] {
   return (
     Array.isArray(value) &&
@@ -37,23 +40,27 @@ function isFileList(value: unknown): value is FileInfo[] {
 
 const props = defineProps<{
   /**
-   * 字段合同，决定输入控件、值类型、校验和联动。
-   * @example `<FieldInput :field="fields[0]" ... />`
+   * 选择要显示的输入控件。普通文本至少传 key、label、type；选择框还需 options。
+   * 此组件不自动执行 form 中的校验和联动，完整表单请使用 MyForm。
+   * @example
+   * `<FieldInput :field="nameField" ... />`
    */
   field: FieldDefinition<M, C>;
   /**
-   * 当前模型和页面上下文。
-   * @example `<FieldInput :env="{ model: form, context, mode: 'edit' }" ... />`
+   * model 提供字段当前值；context 提供组织等额外信息，不需要时传 undefined；mode 为 add 或 edit。
+   * @example
+   * `<FieldInput :env="{ model: form, context: undefined, mode: 'edit' }" ... />`
    */
   env: FieldEnvironment<M, C>;
   /**
    * 是否只读；只读时改用字段展示组件。
-   * @example `<FieldInput :readonly="detailMode" ... />`
+   * @example
+   * `<FieldInput :readonly="detailMode" ... />`
    */
   readonly: boolean;
 }>();
 const emit = defineEmits<{
-  /** 字段值及映射补丁实时回写；不是用户完成编辑的通知。
+  /** 输入值变化时触发。value 是新值，mapped 是需要一起回填的其他字段，reason 说明变化来源；由页面更新模型。
    * @example
    * <FieldInput @change="applyFieldChange" />
    */ change: [value: M[FieldKey<M>], mapped: Partial<M>, reason: ChangeReason];
@@ -67,12 +74,14 @@ const inputValue = computed<M[FieldKey<M>]>((previous) => {
   const next = props.env.model[props.field.key];
   return previous !== undefined && sameModelValue(previous, next) ? previous : next;
 });
+/** 把控件的新值通知外层字段；选择类立即确认，文本/数字等待完成输入再确认。 */
 function update(value: unknown) {
   if (props.readonly) return;
   // field 的判别联合约束模型值；各原生控件在此统一 clear 为约定空值。
   emit("change", value as M[FieldKey<M>], {}, "user");
   if (!["text", "textarea", "amount", "number", "rich"].includes(props.field.type)) emit("commit");
 }
+/** 按字段类型选择实际输入组件，统一传入当前值、提示和回写事件；只读时改为显示组件。 */
 function renderInput() {
   const { field, env, readonly } = props;
   const value = inputValue.value;
@@ -249,6 +258,7 @@ function renderInput() {
   }
 }
 
+/** 地区选择同时回写末级 ID 和省市区等关联字段，再通知本次选择已完成。 */
 function updateRegion(value: unknown, mapped: Partial<M>) {
   if (props.readonly) return;
   emit("change", value as M[FieldKey<M>], mapped, "user");

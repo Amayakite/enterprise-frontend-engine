@@ -1,5 +1,6 @@
 import type { FieldDefinition, FieldEnvironment } from "./types";
 
+/** 集中维护字段格式提示与示例，标签帮助和输入说明使用同一套文案。 */
 const formats: Readonly<
   Record<
     string,
@@ -48,6 +49,7 @@ export function fieldPlaceholder(field: {
    */
   props?: object;
 }) {
+  /** 兼容旧字段 props 中的 placeholder，优先使用新的字段级配置。 */
   const legacy =
     field.props && "placeholder" in field.props && typeof field.props.placeholder === "string"
       ? field.props.placeholder
@@ -64,6 +66,7 @@ export function fieldHelpText<M, C>(
   env?: FieldEnvironment<M, C>,
   readonly = false
 ) {
+  /** 从格式提示代码取得中文说明，未知格式保留原文供用户参考。 */
   const format = field.formatHint ? (formats[field.formatHint]?.hint ?? field.formatHint) : "";
   return [
     ...new Set(

@@ -135,28 +135,35 @@ const props = defineProps<{
   disabled?: boolean;
 }>();
 const emit = defineEmits<{
-  /** 打开保存/管理窗口或成功应用方案时通知宿主关闭筛选弹层；不改变查询内容。 */
+  /** 打开保存/管理窗口或成功应用方案时通知调用方关闭筛选弹层；不改变查询内容。 */
   navigate: [];
 }>();
+/** 保存方案窗口、方案管理窗口的开关，以及待保存方案名称；尚未确认时不写存储。 */
 const saving = ref(false),
   managing = ref(false),
   name = ref("");
+/** 当前正在重命名的方案 ID 和输入的新名称，确认后才更新方案。 */
 const renameId = ref(""),
   renameName = ref("");
+/** 从方案列表取得当前应用方案的名称，找不到时不显示旧标题。 */
 const activeName = computed(
   () => props.controller.items.find((item) => item.id === props.controller.activeId)?.name
 );
+/** 打开保存方案窗口，并通知外层收起筛选菜单。 */
 function openSave() {
   saving.value = true;
   emit("navigate");
 }
+/** 打开方案管理窗口，并通知外层收起筛选菜单。 */
 function openManager() {
   managing.value = true;
   emit("navigate");
 }
+/** 应用选中方案，成功后关闭外层菜单；失败保留错误供用户处理。 */
 async function apply(id: string) {
   if (await props.controller.apply(id)) emit("navigate");
 }
+/** 保存当前查询为命名方案，成功后关闭输入窗口并清空名称。 */
 async function save() {
   if (props.disabled || props.controller.busy) return;
   if (await props.controller.save(name.value)) {
@@ -164,6 +171,7 @@ async function save() {
     name.value = "";
   }
 }
+/** 提交方案的新名称，成功后结束这条方案的重命名状态。 */
 async function rename() {
   if (await props.controller.rename(renameId.value, renameName.value)) renameId.value = "";
 }

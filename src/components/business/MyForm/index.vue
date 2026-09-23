@@ -1,4 +1,5 @@
 <template>
+  <!-- 根据 fields 显示输入项，通过 v-model 更新表单数据。传入初始值和 context 后可使用校验、联动；保存 API 由页面调用。 -->
   <el-form
     ref="formRef"
     class="my-form"
@@ -10,6 +11,7 @@
     @submit.prevent
   >
     <div ref="gridRef">
+      <!-- 默认自动排版；替换 default 插槽时复用 field(key)，保留同一套校验和字段状态。 -->
       <slot :field="field">
         <div class="my-form-grid" :style="{ '--form-columns': columns ?? 2 }">
           <template v-for="(entry, index) in visibleFields" :key="entry.field.key">
@@ -36,6 +38,7 @@
         </div>
       </slot>
     </div>
+    <!-- footer 用于放确认等按钮。页面先调用 validate 检查填写内容，再决定是否保存。 -->
     <slot name="footer" />
   </el-form>
 </template>
@@ -70,7 +73,7 @@ const props = defineProps<{
    */
   modelValue: M | DeepReadonly<M>;
   /**
-   * 宿主保证根对象替换、未变分支引用稳定时设为 true，关闭深监听；默认 false 兼容原位修改。
+   * 调用方保证根对象替换、未变分支引用稳定时设为 true，关闭深监听；默认 false 兼容原位修改。
    * 挂载后不切换策略；本组件仍不修改输入，CRUD 适配器自动启用。
    * @example
    * <MyForm :immutable-model="true" :model-value="model" />
@@ -116,7 +119,7 @@ const props = defineProps<{
    */
   disabled?: boolean;
   /**
-   * 宿主正在加载或保存时禁用重复交互。
+   * 调用方正在加载或保存时禁用重复交互。
    * @example `<MyForm :loading="controller.busy" ... />`
    */
   loading?: boolean;
@@ -134,11 +137,11 @@ const emit = defineEmits<{
    */
   "update:modelValue": [model: M];
   /**
-   * 本次变更的最小字段补丁；CRUD 宿主用 changes 回写，避免替换未修改的子表。
+   * 本次变更的最小字段补丁；CRUD 调用方用 changes 回写，避免替换未修改的子表。
    * @example `<MyForm @patch="({ changes }) => controller.patch(changes)" />`
    */
   patch: [patch: FormPatch<M>];
-  /** 当前可见分组变化时通知宿主；只传字段键和标题，首次挂载也触发，不修改模型。
+  /** 当前可见分组变化时通知调用方；只传字段键和标题，首次挂载也触发，不修改模型。
    * @example
    * <MyForm @groups-change="groups = $event" />
    */
@@ -167,6 +170,7 @@ useFieldDictionaries(
   () => props.fields,
   () => props.context
 );
+/** 维护当前填写内容、初始数据和同步联动；统一发布 v-model、patch 以及可选的 change 事件。 */
 const state = useFormModel(
   props,
   (model, patch) => {
@@ -175,10 +179,15 @@ const state = useFormModel(
   },
   { enabled: () => !!props.change, emit: (event) => props.change?.(event) }
 );
+/** Element Plus 表单实例，仅用于同步清除它内部保存的校验提示。 */
 const formRef = ref<FormInstance>();
+/** 字段所在容器，错误定位时从这里查找目标输入框。 */
 const gridRef = ref<HTMLElement>();
+/** 按字段名保存公共校验器返回的错误，供默认及自定义布局一致显示。 */
 const errors = shallowRef<Record<string, string>>({});
+/** 每次开始或取消校验时递增，防止较慢的旧校验覆盖新输入的结果。 */
 let validationVersion = 0;
+/** 结合当前模型和页面只读状态，计算每个字段的可见、只读、必填及布局配置。 */
 const normalized = computed(() =>
   normalizeFields(
     props.fields,
@@ -186,15 +195,18 @@ const normalized = computed(() =>
     !!(props.readonly || props.disabled || props.loading)
   )
 );
+/** 按字段名建立索引，field(key) 和回写时无需反复扫描整个字段数组。 */
 const entriesByKey = computed(
   () => new Map(normalized.value.map((entry) => [entry.field.key, entry]))
 );
+/** 只保留当前允许显示的表单字段，默认布局和整表校验共用这份结果。 */
 const visibleFields = computed(() =>
   normalized.value.filter(
     (entry): entry is typeof entry & { form: NonNullable<typeof entry.form> } =>
       !!entry.form?.visible
   )
 );
+/** 字段显隐或分组变化时通知上层更新分区导航；分组内容没变就不重复通知。 */
 watch(
   () => {
     const groups: FormVisibleGroup<M>[] = [];
@@ -211,7 +223,9 @@ watch(
   },
   { immediate: true }
 );
+/** 记录已经显示的字段，防止自定义布局把同一个字段放两次导致回写和校验混乱。 */
 const mountedFields = new Set<FieldKey<M>>();
+/** 为 MyFormField 生成该字段的值、错误和操作方法，并登记其挂载/卸载。 */
 function field<K extends FieldKey<M>>(key: K): FormFieldBinding<M, C, M[K]> {
   const entry = entriesByKey.value.get(key);
   if (!entry) throw new Error("未配置表单字段：" + key);
@@ -234,6 +248,7 @@ function field<K extends FieldKey<M>>(key: K): FormFieldBinding<M, C, M[K]> {
     },
   };
 }
+/** 检查字段可编辑性和参照回填冲突，再把主值与额外回填一起交给联动处理。 */
 function change(
   field: FieldDefinition<M, C>,
   value: M[FieldKey<M>],
@@ -247,6 +262,7 @@ function change(
   const patch = { ...mapped, [field.key]: value } as Partial<M>;
   state.applyPatch(patch, reason, field.key);
 }
+/** 清除全部或指定字段的错误，同时作废尚未完成的校验，避免错误提示再次出现。 */
 function clearValidate(keys?: readonly FieldKey<M>[]) {
   validationVersion++;
   if (!keys) errors.value = {};
@@ -257,10 +273,12 @@ function clearValidate(keys?: readonly FieldKey<M>[]) {
   }
   formRef.value?.clearValidate(keys ? [...keys] : undefined);
 }
+/** 字段值、模式或配置变化时清除旧错误；用户修改后不继续显示上一次校验结论。 */
 watch([state.version, () => props.mode, () => props.fields], () => clearValidate(), {
   flush: "sync",
   deep: true,
 });
+/** 按指定字段执行校验，结果返回时核对版本；输入已变化则标记过期，不写入错误列表。 */
 async function validateFields(keys: readonly FieldKey<M>[]): Promise<FieldValidationResult<M>> {
   const run = ++validationVersion;
   const modelVersion = state.version.value;
@@ -281,6 +299,7 @@ async function validateFields(keys: readonly FieldKey<M>[]): Promise<FieldValida
   result.valid = result.errors.length === 0;
   return result;
 }
+/** 滚动到目标字段并尝试聚焦输入；只读字段没有输入框时也能定位到它的位置。 */
 function focusField(key: FieldKey<M>) {
   const wrapper = Array.from(
     gridRef.value?.querySelectorAll<HTMLElement>("[data-field]") ?? []
@@ -304,6 +323,7 @@ defineExpose<MyFormExpose<M>>({
   clearValidate,
   focusField,
 });
+/** 把字段名转换为 field-*，供页面替换某个字段的输入内容。 */
 function fieldSlotName(key: string) {
   return `field-${key}` as Exclude<keyof typeof slots, "footer" | "default">;
 }

@@ -1,6 +1,6 @@
 import type { OrganizationId } from "@/api/reference-lab/types";
 
-/** 开发实验合同，非正式后端协议。clientKey 不进入 DTO。 */
+/** 开发实验接口约定，非正式后端协议。clientKey 不进入 DTO。 */
 export interface OrderLabPayload {
   id: string | null;
   organizationId: OrganizationId;

@@ -10,21 +10,30 @@ import type { QuerySchema } from "@/components/business/search/types";
 import type { CrudColumnIdentity } from "./useCrudColumns";
 
 interface StoredPreset {
+  /** 本机方案的稳定随机 ID，重命名时保持不变。 */
   id: string;
+  /** 用户设置的名称，1–40 个字，同一集合内不能重名。 */
   name: string;
+  /** 保存时的方案语义版本，与当前配置不一致时禁止应用。 */
   version: number;
+  /** 保存的条件和排序；读取时保持 unknown，应用前按当前 schema 验证。 */
   snapshot: unknown;
 }
 interface PresetCollection {
+  /** 同一用户、模块和范围内保存的方案，最多 20 个。 */
   items: StoredPreset[];
+  /** 进入列表自动应用的方案 ID，null 表示不设置默认方案。 */
   defaultId: string | null;
 }
+/** 判断存储值是否为普通对象形状，排除空值和数组后才能继续读成员。 */
 function record(value: unknown): value is Record<string, unknown> {
   return !!value && typeof value === "object" && !Array.isArray(value);
 }
+/** 检查本机方案集合的数量、名称、ID 和默认项，损坏时明确报错。 */
 function collection(value: unknown): PresetCollection {
   if (!record(value) || !Array.isArray(value.items) || value.items.length > 20)
     throw new Error("查询方案数据损坏，请联系管理员检查本机数据");
+  /** 校验后的存储方案，保留原快照供使用时再按查询规则解析。 */
   const items: StoredPreset[] = value.items.map((item: unknown) => {
     if (
       !record(item) ||
@@ -72,15 +81,25 @@ export function useQueryPresets<Row, S extends QuerySchema>(options: {
   /** 原子应用快照并查询；返回是否成功，不能拆成筛选/排序两次请求。 */
   apply: (snapshot: QueryPresetSnapshot<Row, S>) => Promise<boolean>;
 }) {
+  /** 当前身份已读取的方案集合及默认方案 ID。 */
   const data = shallowRef<PresetCollection>({ items: [], defaultId: null });
+  /** busy 防止并发读写；error 显示失败原因，notice 说明保存范围及降级情况。 */
   const busy = ref(false),
+    /** 查询方案读取、保存或应用失败的原因，开始下一次操作时清空。 */
     error = ref(""),
+    /** 说明方案仅保存在本机，或当前已降级为内存保存。 */
     notice = ref("");
+  /** 最近成功应用的方案 ID；手动改条件或删除该方案后清空。 */
   const activeId = ref<string | null>(null);
+  /** alive 标记实例存活；epoch 区分读取轮次，loadedKey 记录已读身份，revision 防止多窗口覆盖。 */
   let alive = true,
+    /** 每次重读递增，使上一轮读取或写入不能更新当前集合。 */
     epoch = 0,
+    /** 最近已成功读取的身份键，写入前必须与当前身份一致。 */
     loadedKey = "",
+    /** 最近读取或写入的存储版本，用于检测其他窗口的并发修改。 */
     revision: string | null = null;
+  /** 按账号、模块和范围生成本机方案存储键，不把固定范围写进可应用条件。 */
   const key = computed(() => {
     const identity = options.identity();
     return createUserDataKey({
@@ -90,10 +109,12 @@ export function useQueryPresets<Row, S extends QuerySchema>(options: {
       slot: `query-presets:${identity.scope ?? "default"}`,
     });
   });
+  /** 按当前方案版本及查询规则解析快照；过期字段、排序或版本会报错。 */
   const parse = (item: StoredPreset) => {
     if (item.version !== options.config.version) throw new Error("查询配置已升级，请重新保存方案");
     return parseQueryPreset<Row, S>(item.snapshot, options.schema, options.sortKeys);
   };
+  /** 给菜单显示的方案名称与失效原因，保留失效项方便用户辨认和删除。 */
   const items = computed(() =>
     data.value.items.map((item) => {
       let issue = "";
@@ -105,15 +126,18 @@ export function useQueryPresets<Row, S extends QuerySchema>(options: {
       return { id: item.id, name: item.name, issue };
     })
   );
+  /** 提取异常原因；未知异常使用统一的方案操作失败提示。 */
   function message(cause: unknown) {
     return cause instanceof Error ? cause.message : "查询方案操作失败";
   }
+  /** 根据实际存储级别告知用户是否仅内存有效。 */
   function storageNotice(level: string) {
     notice.value =
       level === "memory"
         ? "仅保存在当前内存中，刷新或关闭后可能丢失"
         : "查询方案保存在本机，不会同步到其他设备";
   }
+  /** 清空旧身份数据并读取本机方案；只接受本轮且同一身份的结果。 */
   async function reload() {
     const run = ++epoch,
       ownKey = key.value;
@@ -137,6 +161,7 @@ export function useQueryPresets<Row, S extends QuerySchema>(options: {
       if (alive && run === epoch) busy.value = false;
     }
   }
+  /** 去除方案名称首尾空格，并检查长度和重名；重命名时可排除自己。 */
   function nameOf(name: string, except?: string) {
     const value = name.trim();
     if (!value || value.length > 40) throw new Error("方案名称请填写 1–40 个字");
@@ -144,6 +169,7 @@ export function useQueryPresets<Row, S extends QuerySchema>(options: {
       throw new Error("已存在同名查询方案");
     return value;
   }
+  /** 按已读取版本保存一份新集合；成功后更新界面，冲突或失败时保留原集合。 */
   async function write(update: () => PresetCollection) {
     if (busy.value || !alive) return false;
     const ownKey = key.value,
@@ -151,6 +177,7 @@ export function useQueryPresets<Row, S extends QuerySchema>(options: {
     busy.value = true;
     error.value = "";
     try {
+      // 必须先读取当前身份的集合和版本，不能用上一账号的数据直接写入新身份。
       if (loadedKey !== ownKey) throw new Error("查询方案尚未读取，请重试读取后操作");
       const next = update();
       const result = await userDataStore.write(ownKey, next, {
@@ -159,6 +186,7 @@ export function useQueryPresets<Row, S extends QuerySchema>(options: {
         ttlMs: 365 * 86400000,
       });
       if (!alive || run !== epoch || key.value !== ownKey) return false;
+      // 存储确认成功后才替换菜单数据；发生版本冲突时保留原集合供重新读取。
       data.value = next;
       revision = result.record?.revision ?? null;
       storageNotice(result.level);
@@ -173,11 +201,13 @@ export function useQueryPresets<Row, S extends QuerySchema>(options: {
       if (alive && run === epoch) busy.value = false;
     }
   }
+  /** 按 ID 找到已读取方案；不存在时提示重新读取。 */
   function find(id: string) {
     const item = data.value.items.find((item) => item.id === id);
     if (!item) throw new Error("查询方案已不存在，请重试读取");
     return item;
   }
+  /** 校验指定方案并一次性应用查询和排序；只有成功后才标记为当前方案。 */
   async function apply(id: string) {
     if (busy.value || !alive) return false;
     const ownKey = key.value,
@@ -197,6 +227,7 @@ export function useQueryPresets<Row, S extends QuerySchema>(options: {
       if (alive && run === epoch) busy.value = false;
     }
   }
+  /** 供方案菜单使用的读写入口，新增、重命名、删除都经同一版本检查。 */
   const controller: QueryPresetController = {
     get items() {
       return items.value;
@@ -266,6 +297,7 @@ export function useQueryPresets<Row, S extends QuerySchema>(options: {
       if (!busy.value) await reload();
     },
   };
+  /** 销毁后使未完成的存储读写回调失效。 */
   onScopeDispose(() => {
     alive = false;
     epoch++;
@@ -281,6 +313,7 @@ export function useQueryPresets<Row, S extends QuerySchema>(options: {
       const loading = reload(),
         run = epoch;
       await loading;
+      // 读取失败或已切换身份时也视为已处理初始化，避免意外发出不带默认筛选的查询。
       if (!alive || run !== epoch || loadedKey !== key.value) return true;
       if (data.value.defaultId) {
         await apply(data.value.defaultId);

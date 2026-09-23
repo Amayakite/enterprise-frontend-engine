@@ -1,4 +1,5 @@
 <template>
+  <!-- 显示保存和关闭按钮。自定义布局时传入 bindings.toolbar，可单独放在页头或页脚；此组件本身不监听 Ctrl+S。 -->
   <div class="page-toolbar" :class="{ 'crud-form-toolbar--footer': footerMode }">
     <div class="page-toolbar__left">
       <strong v-if="!footerMode">
@@ -65,11 +66,15 @@ const props = defineProps<
   }
 >();
 defineSlots<{ /** 保存按钮前追加业务操作；不替换内置保存保护。 */ actions?: () => unknown }>();
+/** 加载或保存进行中时，让保存按钮显示忙碌状态并限制重复操作。 */
 const busy = computed(() => props.controller.busy);
+/** 当前用户是否具备保存权限，控制是否提供保存操作。 */
 const permitted = computed(() => props.controller.savePermission);
+/** 汇总表单、字段异步处理等禁止保存的原因，供按钮旁提示用户。 */
 const readonlyReason = computed(() =>
   crudFormDisabledReason(props.controller, props.readonlyReason)
 );
+/** 有禁止保存的原因时禁用按钮，保持按钮状态和提示一致。 */
 const blocked = computed(() => !!readonlyReason.value);
 </script>
 <style scoped>

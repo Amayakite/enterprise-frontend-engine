@@ -23,23 +23,30 @@ export const FIELD_QUERY_OPERATORS = {
  * `const query = compileFieldQuery(fields);`
  */
 export function compileFieldQuery<M, C>(fields: readonly ModuleField<M, C, QuerySchema>[]) {
+  /** 由字段生成的查询白名单，限定后续允许的字段类型和运算符。 */
   const schema: Record<string, QueryField> = {};
+  /** 参与顶部关键词搜索的字段名，后续把一个关键词展开为多个 OR 条件。 */
   const keywords: string[] = [];
   for (const field of fields) {
+    /** 当前字段的查询设置，没有声明则不出现在查询界面。 */
     const scene = field.scenes.query;
     if (!scene) continue;
+    /** 查询使用的字段名，可由 scene.key 映射到接口字段，不能重复或占用 keyword。 */
     const key = scene.key ?? field.key;
     if (key === "keyword" || Object.hasOwn(schema, key))
       throw new Error(`重复或保留的查询字段：${key}`);
+    /** 记录当前字段允许出现的普通/高级查询入口。 */
     const entries: QueryEntry[] = [];
     if (scene.normal) entries.push("normal");
     if (scene.advanced) entries.push("advanced");
+    /** 各输入类型共用的标签、入口、提示和自定义输入配置。 */
     const base = {
       label: field.label,
       entries,
       input: scene.input,
       placeholder: scene.placeholder,
     };
+    /** 根据字段类型生成的查询定义，后续再校验业务覆盖的运算符。 */
     let definition: QueryField;
     switch (field.type) {
       case "text":
@@ -97,6 +104,7 @@ export function compileFieldQuery<M, C>(fields: readonly ModuleField<M, C, Query
         throw new Error(`字段 ${key} 的 ${field.type} 暂不支持自动查询，请使用独立 schema 接法`);
     }
     if (scene.operators) {
+      /** 该查询类型允许的操作，用来拒绝与字段类型不匹配的覆盖配置。 */
       const allowed: readonly string[] = definition.operators;
       if (
         !scene.operators.length ||
@@ -129,6 +137,7 @@ export function compileFieldQuery<M, C>(fields: readonly ModuleField<M, C, Query
    * `const request = { ...input, where: query.expand(input.where) };`
    */
   function expand(where: QueryNode<QuerySchema> | null): QueryGroup<QuerySchema> | null {
+    /** 递归展开关键词节点为多个字段的 OR 条件，其他节点保持原意。 */
     const visit = (node: QueryNode<QuerySchema>): unknown => {
       if (node.kind === "group") return { ...node, children: node.children.map(visit) };
       if (node.field !== "keyword") return node;

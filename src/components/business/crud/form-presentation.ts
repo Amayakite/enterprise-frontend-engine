@@ -4,16 +4,17 @@ import type { FormChange, FieldDefinition, FieldDensity, FieldLink } from "../fi
 import type { CrudFormController, CrudDetailController } from "./types";
 import type { CrudLayoutOptions, CrudDetailSummary } from "./layout";
 
-/** 完整表单及其拆分组件共用的唯一 props 合同；子组件通过 Pick 选取所需部分。 */
+/** MyCrudForm 及其字段、按钮、错误提示组件使用的参数；完整表单通常直接传 bindings.form。 */
 export type CrudFormProps<Model extends object, Entity, Id extends string | number, C> = {
-  /** 跨模块新增/详情容器；标准装配自动提供，省略不创建宿主。 */
+  /** 跨模块新增/详情容器；标准组合自动提供，省略时不创建容器。 */
   host?: CrudViewEnvironment["host"];
   /** 内容布局；省略保持原顶部操作栏。新预设将操作放到底部，复用同一控制器。 */
   layout?: CrudLayoutOptions;
   /** 模块实体名，用于生成新增/编辑标题；省略不追加实体名。 */
   entityLabel?: string;
   /**
-   * 表单加载、保存、草稿和离开保护的控制器。
+   * useCrudForm 创建的表单数据和操作方法，负责加载、保存、草稿与未保存确认。
+   * 使用 useCrudView 时已经包含在 bindings.form 中，不需要自己构造。
    * @example
    * `<MyCrudForm :controller="formController" ... />`
    */
@@ -25,19 +26,19 @@ export type CrudFormProps<Model extends object, Entity, Id extends string | numb
   /** 字段异步处理失败文案；null/省略不显示。 */ changeError?: string | null;
   /** 重试失败字段处理，不重新保存；省略不显示重试按钮。 */ retryChange?: () => Promise<void>;
   /**
-   * 表单字段定义。
+   * 要编辑的字段配置，包含字段名、标签、输入类型及 form 校验规则；未开启 form 的字段不显示。
    * @example
    * `<MyCrudForm :fields="config.fields" ... />`
    */
   fields: readonly FieldDefinition<Model, C>[];
   /**
-   * 字段渲染、联动和保存适配所需的页面上下文。
+   * 当前组织、权限等额外信息，供字段条件和联动使用；字段不依赖额外信息时传 undefined。
    * @example
    * `<MyCrudForm :context="pageContext" ... />`
    */
   context: C;
   /**
-   * 表单分区定义；每个分区通过同名 section 插槽装配。
+   * 表单分区定义；每个分区通过同名 section 插槽组合。
    * @example
    * `<MyCrudForm :sections="[{ key: 'contact', label: '联系人' }]" ... />`
    */
@@ -47,7 +48,7 @@ export type CrudFormProps<Model extends object, Entity, Id extends string | numb
     /** 分区标题。 */
     label: string;
   }[];
-  /** 宿主强制只读时显示给用户的原因。 */
+  /** 调用方强制只读时显示给用户的原因。 */
   readonlyReason?: string;
   /** 当前实体稳定标识，用于草稿等局部状态隔离。 */
   entityKey?: string | number;
@@ -62,7 +63,7 @@ export type CrudFormProps<Model extends object, Entity, Id extends string | numb
 /**
  * 读取原控制器的交互禁用原因，不创建状态副本；undefined 表示可以开始编辑/校验。
  * @param controller 当前表单控制器。
- * @param reason 可选宿主只读原因，覆盖控制器只读文案。
+ * @param reason 可选弹窗容器只读原因，覆盖控制器只读文案。
  * @returns 给用户显示的原因；保存仍执行控制器内的权限、校验及并发保护。
  */
 export function crudFormDisabledReason<M, E, I extends string | number>(
@@ -78,7 +79,7 @@ export function crudFormDisabledReason<M, E, I extends string | number>(
   return crudFormActivity(controller.state).saveDisabledReason;
 }
 
-/** 标准详情及拆分呈现组件共用合同，复用原详情控制器。 */
+/** MyCrudDetail、详情工具栏和错误提示组件使用的参数；通常通过 bindings.detail 传入。 */
 export type CrudDetailProps<Model extends object, Entity, Id extends string | number, C> = {
   /** 默认编辑命令；省略无默认编辑按钮，调用仍须经过原控制器权限保护。 */
   edit?: () => Promise<void>;
@@ -93,25 +94,26 @@ export type CrudDetailProps<Model extends object, Entity, Id extends string | nu
   /** 详情摘要字段；省略不提取摘要，已展示字段不在资料区重复。 */
   summary?: CrudDetailSummary<Model>;
   /**
-   * 详情加载与业务动作的控制器。
+   * useCrudDetail 创建的详情数据和操作方法，负责读取记录、刷新和执行按钮操作。
+   * 使用 useCrudView 时已经包含在 bindings.detail 中，不需要自己构造。
    * @example
    * `<MyCrudDetail :controller="detailController" ... />`
    * */
   controller: CrudDetailController<Model, Entity, Id>;
   /**
-   * 主详情区域使用的字段定义。
+   * 详情中要显示的字段配置；字段需开启 detail，可设置标签、分组和格式化方式。
    * @example
    * `<MyCrudDetail :fields="config.fields" ... />`
    */
   fields: readonly FieldDefinition<Model, C>[];
   /**
-   * 字段格式化与详情插槽所需的页面上下文。
+   * 当前组织、权限等额外信息，供字段格式化和插槽使用；不需要时传 undefined。
    * @example
    * `<MyCrudDetail :context="pageContext" ... />`
    */
   context: C;
   /**
-   * 附加详情页签；通过对应 tab 插槽装配内容。
+   * 详情下方的附加页签。例如 key 为 history 时，在 tab-history 插槽放历史记录内容；省略不添加页签。
    * @example
    * `<MyCrudDetail :tabs="[{ key: 'history', label: '历史' }]" ... />`
    */

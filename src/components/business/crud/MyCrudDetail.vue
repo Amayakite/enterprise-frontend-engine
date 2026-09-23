@@ -1,4 +1,5 @@
 <template>
+  <!-- 显示一条记录的详情、操作按钮和附加页签。传入 bindings.detail 即可使用；tab-* 插槽用于补充子表等内容。 -->
   <MyCrudLayout
     :layout="layout"
     class="crud-detail"
@@ -98,18 +99,20 @@ import type { CrudViewEnvironment } from "./crud-page";
 const props = defineProps<
   CrudDetailProps<Model, Entity, Id, C> & {
     /**
-     * 当前详情自动消费的弹窗/抽屉宿主；标准 useCrudView 会提供，独立详情省略时不挂载。
+     * 用于在详情中打开其他模块的弹窗或抽屉。useCrudView 会随 bindings.detail 提供；省略时不创建容器。
      * @example
      * `<MyCrudDetail v-bind="bindings.detail" />`
      */
     host?: CrudViewEnvironment["host"];
   }
 >();
+// 提前读取本页字段用到的字典，避免多个字段各自请求同一份选项。
 useFieldDictionaries(
   () => props.fields,
   () => props.context
 );
 const slots = defineSlots<CrudDetailSlots<Model, Entity, Id> & { actions?: () => unknown }>();
+// 页面挂载后检查传入的插槽名称；拼错 tab-* 等名称时给出开发提示，避免内容悄悄不显示。
 onMounted(() =>
   diagnoseCrudSlots("MyCrudDetail", slots, [
     "actions",
@@ -117,18 +120,22 @@ onMounted(() =>
     ...(props.tabs ?? []).map((tab) => `tab-${tab.key}`),
   ])
 );
+/** 当前打开的页签。新布局的主信息在页签外，默认选第一个附加页签；旧布局默认选“主信息”。 */
 const activeTab = ref(props.layout ? (props.tabs?.[0]?.key ?? "main") : "main");
+/** 当前记录的只读数据，供详情和插槽使用；尚未加载时为 null，复制后不会让显示代码修改原记录。 */
 const model = computed(() =>
   props.controller.state.model === null
     ? null
     : cloneReadonlyModel<Model>(props.controller.state.model)
 );
+// 切换到另一条记录时重置页签，避免沿用上一条记录正在查看的子表。
 watch(
   () => props.controller.state.id,
   () => {
     activeTab.value = props.layout ? (props.tabs?.[0]?.key ?? "main") : "main";
   }
 );
+// 页签配置变化后，如果原来选中的页签已被移除，就回到默认页签，避免正文为空。
 watch(
   () => props.tabs,
   () => {
@@ -136,17 +143,21 @@ watch(
       activeTab.value = props.layout ? (props.tabs?.[0]?.key ?? "main") : "main";
   }
 );
+/** 为标题、状态和其他摘要字段提供当前记录及组织等信息；数据未加载时不创建，避免格式化空记录。 */
 const environment = computed(() =>
   model.value ? { model: model.value, context: props.context, mode: "edit" as const } : undefined
 );
+/** 根据 summary 配置挑出页头标题、状态和说明，并保留剩余字段给正文，避免一项内容出现两次。 */
 const summaryParts = computed(() =>
   environment.value
     ? resolveDetailSummary(props.fields, environment.value, props.summary)
     : undefined
 );
+/** 正文要显示的字段：新布局排除已放进页头的字段，旧布局仍显示完整字段列表。 */
 const displayFields = computed(() =>
   props.layout ? (summaryParts.value?.fields ?? props.fields) : props.fields
 );
+/** 将页签 key 转为插槽名，例如 contacts → tab-contacts，让页面在该页签内放联系人等内容。 */
 const tabSlot = (key: string) => `tab-${key}` as Exclude<keyof typeof slots, "actions" | "footer">;
 </script>
 <style scoped>

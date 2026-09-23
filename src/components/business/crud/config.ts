@@ -2,7 +2,7 @@ import type { QuerySchema } from "@/components/business/search/types";
 import type { CrudConfig } from "./types";
 
 /**
- * 校验配置键非空且唯一；静态字段在模块定义时检查，动态动作在实例装配时检查。
+ * 校验配置键非空且唯一；静态字段在模块定义时检查，动态动作在实例组合时检查。
  * @param owner 模块稳定 key，用于错误定位。
  * @param values 当前配置的键列表；不修改输入。
  * @param label 配置名称，用于错误提示。
@@ -22,7 +22,7 @@ export function validateCrudKeys(owner: string, values: readonly string[], label
  * @typeParam Entity 服务端详情实体。
  * @typeParam Model 页面编辑模型。
  * @typeParam Id 实体稳定主键。
- * @remarks 只校验配置合同与重复 key；不请求接口，也不替代后端 DTO 校验。
+ * @remarks 只校验配置接口约定与重复 key；不请求接口，也不替代后端 DTO 校验。
  * @example
  * `export default defineCrudConfig<CustomerRow, Customer, CustomerForm, string, CustomerSchema, Scope, QueryDTO, CreateDTO, UpdateDTO, SaveResult, Context>({ key: "base.customer", ... })`
  */
@@ -54,9 +54,11 @@ export function defineCrudConfig<
   >
 ) {
   if (!config.key.trim()) throw new Error("CRUD 模块 key 不能为空");
+  /** 检查配置中的标识是否重复，重复时直接指出配置项，避免后写覆盖前写。 */
   const unique = (values: readonly string[], label: string) => {
     validateCrudKeys(config.key, values, label);
   };
+  /** 检查指定配置成员是否确实是函数，启动时暴露错误而不是等点击后才报错。 */
   const functions = (value: object, keys: readonly string[]) => {
     for (const key of keys)
       if (typeof Reflect.get(value, key) !== "function")

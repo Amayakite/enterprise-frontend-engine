@@ -1,4 +1,5 @@
 <template>
+  <!-- 按 fields 显示 modelValue 中的详情数据；字段需开启 detail。context 提供格式化所需的组织等信息，不需要时传 undefined。加载和按钮由页面处理。 -->
   <div class="my-desc" :class="`my-desc--${density ?? 'compact'}`">
     <template v-if="appearance === 'plain'">
       <section v-for="(group, index) in groups" :key="index" class="my-desc__section">
@@ -105,17 +106,21 @@ const slots = defineSlots<{
     field: FieldDefinition<M, C>;
   }) => unknown;
 }>();
+/** 屏幕宽度不超过 640px 时，让带边框的详情表改为单列，字段也不再跨列；plain 外观由下方容器 CSS 处理。 */
 const narrow = useMediaQuery("(max-width: 640px)");
+/** 把详情数据和额外信息传给字段格式化、提示及参照显示；edit 只是字段规则使用的模式，不会开启编辑。 */
 const environment = computed<FieldEnvironment<M, C>>(() => ({
   model: props.modelValue,
   context: props.context,
   mode: "edit",
 }));
+/** 补齐字段跨度、分组等默认配置，只留下开启 detail 的字段，供下面两种详情外观共同使用。 */
 const entries = computed(() =>
   normalizeFields(props.fields, environment.value, true).filter(
     (entry): entry is typeof entry & { detail: NonNullable<typeof entry.detail> } => !!entry.detail
   )
 );
+/** 按字段顺序划分详情区块：声明 group 的字段开启新组，后续没有 group 的字段接在上一组。 */
 const groups = computed(() => {
   const result: { title: string; entries: typeof entries.value }[] = [];
   for (const entry of entries.value) {
@@ -125,6 +130,7 @@ const groups = computed(() => {
   }
   return result;
 });
+/** 将字段名转为插槽名，例如 name → field-name，让页面可以单独替换该字段的显示内容。 */
 function fieldSlotName(key: string) {
   return `field-${key}` as Exclude<keyof typeof slots, "footer">;
 }

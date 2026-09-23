@@ -2,7 +2,7 @@ import type { FieldDefinition } from "@/components/business/fields/types";
 import type { TableEdit } from "@/components/table/types";
 import type { CrudChildTableChange } from "@/components/business/crud/types";
 
-/** 当前运行时只支持整单聚合保存；独立端点与按模式切换须在真实协议确认后另建合同。 */
+/** 当前运行时只支持整单聚合保存；独立端点与按模式切换须在真实协议确认后另建接口约定。 */
 export interface CustomerAggregateChildConfig<Row extends object, Key extends string | number> {
   /** 子模块自己的稳定身份；父模型实际归属以主 config 的 modelKey 为准。 */
   key: "contacts" | "addresses";

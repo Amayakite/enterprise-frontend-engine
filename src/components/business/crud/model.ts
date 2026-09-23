@@ -1,12 +1,12 @@
 import { cloneModel, cloneReadonlyModel } from "../fields/model";
 import type { BusinessModuleContract, BusinessModuleConfig } from "./module";
 
-/** 模块的已装配模型方法；输入/输出由模块合同关联，不要求继承类。 */
+/** 模块的已组合模型方法；输入/输出由模块类型定义关联，不要求继承类。 */
 export type BusinessModel<T extends BusinessModuleContract> = BusinessModuleConfig<T>["model"];
 
 /**
  * 常见整单模型的声明方式。业务只负责初始值、字段白名单及编辑 DTO 的差异。
- * @typeParam T 模块合同；例如 CustomerContract extends BusinessModuleContract。
+ * @typeParam T 模块类型定义；例如 CustomerContract extends BusinessModuleContract。
  * @remarks 工厂负责隔离模型快照，不猜测后端字段、版本或响应类型。
  */
 export interface BusinessModelOptions<T extends BusinessModuleContract> {
@@ -44,7 +44,7 @@ export interface BusinessModelOptions<T extends BusinessModuleContract> {
 
 /**
  * 封装默认模型流程：初始值复制、回显复制、只读模型复制、公共保存转换和编辑差异。
- * @returns 可直接传给 module.model 的完整合同；没有共享响应式状态，不发接口请求。
+ * @returns 可直接传给 module.model 的完整接口约定；没有共享响应式状态，不发接口请求。
  * @example
  * `model: children => defineBusinessModel<Contract>()({ create, fromRecord, getKey, toPayload, updatePayload, resolveSaved })`
  */

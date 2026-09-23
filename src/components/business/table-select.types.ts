@@ -12,7 +12,7 @@ export interface TableSelectQuery {
   /** 用户输入的动态条件；数据源应显式转换为业务 DTO，不直接断言。 */
   [key: string]: unknown;
 }
-/** 旧表格选择器公开合同；保留兼容用途，不增加第二套参照框架。
+/** 旧表格选择器公开接口说明；保留兼容用途，不增加第二套参照框架。
  * @typeParam Query 数据源接受的查询模型，默认 TableSelectQuery。
  * @typeParam Row 完整行类型，默认未知字段记录；确认事件保持同一行类型。
  * @example

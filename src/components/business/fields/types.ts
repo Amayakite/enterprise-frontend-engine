@@ -15,13 +15,13 @@ import type {
  * `FieldKey<CustomerForm> // "name" | "status" | ...`
  */
 export type FieldKey<M> = Extract<keyof M, string>;
-/** 当前可见主字段分组；由 MyForm 计算，供宿主导航使用，不保存模型副本。 */
+/** 当前可见主字段分组；由 MyForm 计算，供调用方导航使用，不保存模型副本。 */
 export interface FormVisibleGroup<M> {
   /** 当前连续分组首个可见字段键，用于定位；同名但不连续的分组保持独立。 */
   key: FieldKey<M>;
   /** 配置的 group 文案；首段未分组时为“基本信息”，后续未声明 group 的字段沿用前段。 */
   label: string;
-  /** 此分组实际可见的字段键，按呈现顺序排列；用于错误数量归属。 */
+  /** 此分组实际可见的字段键，按显示顺序排列；用于错误数量归属。 */
   fields: readonly FieldKey<M>[];
 }
 /**
@@ -30,7 +30,7 @@ export interface FormVisibleGroup<M> {
  * - `user`：用户直接输入或选择，最常用。
  * - `dependency`：字段联动回填，可在受控只读场景下执行。
  * - `hydrate` / `reset`：实体加载或重置，不应触发业务副作用。
- * - `external`：宿主通过 applyPatch 注入值。
+ * - `external`：调用方通过 applyPatch 注入值。
  */
 export type ChangeReason = "user" | "external" | "hydrate" | "reset" | "dependency";
 /**
@@ -95,7 +95,7 @@ export interface RegionCascaderSource {
   ) => Promise<readonly RegionOption[]>;
 }
 /**
- * 字段规则、联动和动态选项的只读执行上下文。
+ * 字段读取数据和判断条件时使用的参数。model 是当前表单数据，context 放组织等额外信息，mode 区分新增和编辑。
  *
  * @typeParam M 页面模型。
  * @typeParam C 页面业务上下文。
@@ -164,7 +164,7 @@ export interface FormFieldOptions<M, C> {
   group?: string;
 }
 /**
- * `reference` 字段的渲染、回显和提交校验合同。
+ * `reference` 字段的渲染、回显和提交校验接口约定。
  *
  * @typeParam V 字段保存的 ID 值类型。
  * @typeParam M 所属页面模型。
@@ -450,7 +450,7 @@ type Editor<V, M, C> =
            */
           placeholder?: string;
           /**
-           * 是否显示清空入口；清空值由 emptyValue/模型合同决定。
+           * 是否显示清空入口；清空值由 emptyValue/模型接口约定决定。
            */
           clearable?: boolean;
           /**
@@ -779,7 +779,7 @@ type Editor<V, M, C> =
          */
         region: {
           /**
-           * 省市区级联数据源；选择全量树或逐层加载合同，禁止在 map 中请求下级数据。
+           * 省市区级联数据源；选择全量树或逐层加载接口约定，禁止在 map 中请求下级数据。
            */
           source: RegionCascaderSource;
 
@@ -841,7 +841,7 @@ type Editor<V, M, C> =
       props?: never;
     };
 /**
- * 页面字段的唯一配置合同，同时驱动表单、详情、表格、校验和联动。
+ * 页面字段的唯一配置接口约定，同时驱动表单、详情、表格、校验和联动。
  *
  * @typeParam M 页面模型；字段 key 与值类型由此自动关联。
  * @typeParam C 页面业务上下文。
@@ -973,13 +973,13 @@ export type SearchField<Q, C = undefined> = FieldDefinition<Q, C> & {
   };
 };
 
-/** 同一 MyForm 中单个字段的呈现绑定；只通过 field(key) 获取，不创建第二份表单状态。 */
+/** MyFormField 需要的参数。在 MyForm 插槽中调用 field(key) 获取，即可显示该字段并保留校验和回写，不要逐项手动构造。 */
 export interface FormFieldBinding<M, C, Value = M[FieldKey<M>]> {
   /** 原字段配置，保留类型、规则与参照定义。 */ field: FieldDefinition<NoInfer<M>, NoInfer<C>>;
   /** 原表单实时模型与业务上下文，不直接修改。 */ env: FieldEnvironment<M, C>;
   /** 当前字段值，类型由 field(key) 推导。 */ value: Value;
   /** 归一化可见性；隐藏字段不显示控件。 */ visible: boolean;
-  /** 归一化只读状态，包含宿主限制。 */ readonly: boolean;
+  /** 归一化只读状态，包含调用方限制。 */ readonly: boolean;
   /** 当前字段校验错误，undefined 表示无错误。 */ error?: string;
   /** 整体回填版本，变更时重建内部控件。 */ entityVersion: number;
   /** 回写字段及参照映射；默认 user 来源，不直接提交到服务器。 */ update: (
@@ -988,5 +988,5 @@ export interface FormFieldBinding<M, C, Value = M[FieldKey<M>]> {
     reason?: ChangeReason
   ) => void;
   /** 确认本次交互已完成；文本失焦或参照回填后调用。 */ commit: () => void;
-  /** 登记呈现实例并返回卸载清理；重复呈现同一字段会报错。 */ register: () => () => void;
+  /** 登记显示实例并返回卸载清理；重复显示同一字段会报错。 */ register: () => () => void;
 }

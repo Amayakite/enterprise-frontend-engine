@@ -29,7 +29,7 @@ export interface QueryPresetItem {
   issue: string;
 }
 
-/** 列表查询方案端口；动作自行呈现错误，不修改业务数据。 */
+/** 列表查询方案端口；动作自行显示错误，不修改业务数据。 */
 export interface QueryPresetController {
   /** 当前范围内的方案；最多 20 个，按创建顺序展示。 */
   readonly items: readonly QueryPresetItem[];
@@ -57,6 +57,7 @@ export interface QueryPresetController {
   reload: () => Promise<void>;
 }
 
+/** 确认读取的方案数据是普通对象形状，再检查内部字段，避免损坏存储导致访问异常。 */
 function record(value: unknown): value is Record<string, unknown> {
   return !!value && typeof value === "object" && !Array.isArray(value);
 }
@@ -75,10 +76,13 @@ export function parseQueryPreset<Row, S extends QuerySchema>(
   sortKeys: readonly Extract<keyof Row, string>[]
 ): QueryPresetSnapshot<Row, S> {
   if (!record(value) || !record(value.query)) throw new Error("查询方案结构不正确");
+  /** 从已确认是对象的存储内容中读取查询部分，仍需逐项检查其条件。 */
   const input = value.query;
+  /** 检查快捷和普通条件必须是平铺条件数组，拒绝嵌套组及非法字段/运算符。 */
   const conditions = (nodes: unknown): QueryCondition<S>[] => {
     if (!Array.isArray(nodes)) throw new Error("查询条件结构不正确");
     if (!nodes.length) return [];
+    /** 把全部分区一起校验总节点限制，防止每区合法但合并后超限。 */
     const parsed = parseQueryWhere(schema, {
       kind: "group",
       id: "preset",
@@ -93,8 +97,10 @@ export function parseQueryPreset<Row, S extends QuerySchema>(
     if (result.length !== nodes.length) throw new Error("普通条件中不能包含分组");
     return result;
   };
+  /** 解析保存的高级查询树，非法内容直接报错，避免静默扩大筛选范围。 */
   const advanced = parseQueryWhere(schema, input.advanced);
   if (!advanced.valid) throw new Error(advanced.issues.map((item) => item.message).join("；"));
+  /** 将分别验证过的快捷、普通和高级条件重新组合为当前查询结构。 */
   const query: AppliedQuery<S> = {
     quick: conditions(input.quick),
     normal: conditions(input.normal),
@@ -103,6 +109,7 @@ export function parseQueryPreset<Row, S extends QuerySchema>(
   // 合并后再次检查总条件数，避免分区各自通过却超出整个查询的上限。
   const all = [...query.quick, ...query.normal, ...(query.advanced ? [query.advanced] : [])];
   if (all.length) {
+    /** 把全部分区一起校验总节点限制，防止每区合法但合并后超限。 */
     const parsed = parseQueryWhere(schema, {
       kind: "group",
       id: "preset-all",
@@ -111,6 +118,7 @@ export function parseQueryPreset<Row, S extends QuerySchema>(
     });
     if (!parsed.valid) throw new Error(parsed.issues.map((item) => item.message).join("；"));
   }
+  /** 最后按当前 schema 应用一遍草稿检查，确保保存方案仍适用于现有查询界面。 */
   const validated = applyQueryDraft(schema, createQueryDraft(schema, query));
   if (!validated.valid) throw new Error(validated.issues.map((item) => item.message).join("；"));
   return { query: validated.applied, sort: checkQuerySort(value.sort, sortKeys) };

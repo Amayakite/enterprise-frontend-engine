@@ -21,6 +21,7 @@ export function toTableColumns<Row, C>(
     });
 }
 
+/** 检查同名表头组的配置是否一致，避免多列引用同一组却声明不同的标题或样式。 */
 function assertHeaderGroup(group: TableHeaderGroup, definitions: Map<string, TableHeaderGroup>) {
   if (!group.key.trim() || !group.label.trim()) throw new Error("多级表头的 key 与标题不能为空");
   const known = definitions.get(group.key);
@@ -39,7 +40,9 @@ function assertHeaderGroup(group: TableHeaderGroup, definitions: Map<string, Tab
 export function buildTableColumnBands<Row>(
   columns: readonly TableViewColumn<Row>[]
 ): TableViewColumnBand<Row>[] {
+  /** 按原列顺序收集普通列或表头组，供表格生成连续的表头结构。 */
   const bands: TableViewColumnBand<Row>[] = [];
+  /** 记住已遇到的表头组定义，同名组再次出现时检查配置一致性。 */
   const definitions = new Map<string, TableHeaderGroup>();
   columns.forEach((column, index) => {
     const group = column.headerGroup;

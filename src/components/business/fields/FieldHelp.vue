@@ -6,7 +6,7 @@ import { fieldHelpText } from "./presentation";
 import type { FieldDefinition, FieldEnvironment } from "./types";
 const props = defineProps<{
   /**
-   * 字段合同，用于读取动态帮助文案。
+   * 字段配置，用于读取动态帮助文案。
    * @example `<FieldHelp :field="field" ... />`
    */
   field: FieldDefinition<M, C>;
@@ -21,6 +21,7 @@ const props = defineProps<{
    */
   readonly?: boolean;
 }>();
+/** 根据字段说明、当前数据和只读状态生成帮助文字，没有内容时不显示。 */
 const text = computed(() => fieldHelpText(props.field, props.env, props.readonly));
 </script>
 <style scoped lang="scss">

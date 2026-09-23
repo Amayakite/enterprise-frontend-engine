@@ -3,7 +3,7 @@ import type { PageResult } from "@/types/http";
 import type { ReferenceResolveResult } from "@/components/business/MyReference/types";
 import type { SalePayload, SaleRecord, SaleSearchRequest, SaleUpdate, SaleScope } from "./types";
 const base = "/api/v1/pilot/sales";
-/** Sale 的传输边界；请求透传取消信号，错误由页面局部呈现。 */
+/** Sale 的传输边界；请求透传取消信号，错误由页面局部显示。 */
 export default {
   /** 按固定范围、AST 与分页读取；不在客户端扫描数据。 */
   search(data: SaleSearchRequest, signal?: AbortSignal) {

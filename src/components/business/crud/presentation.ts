@@ -79,9 +79,9 @@ export interface BusinessTabEditorOptions {
 export interface BusinessContainerEditorOptions {
   /** 容器确认关闭或保存结束后的收尾；省略无动作，失败保留容器供重试。 */
   onClosed?: () => Promise<void>;
-  /** 跨模块打开时的目标列表路径；省略使用宿主模块路径。 */
+  /** 跨模块打开时的目标列表路径；省略使用调用方模块路径。 */
   basePath?: string;
-  /** 目标实体名称；省略使用宿主模块标题。 */
+  /** 目标实体名称；省略使用调用方模块标题。 */
   title?: string;
   /** 容器层数，从 1 开始；省略为 1，公共导航最多允许两层。 */
   depth?: number;
@@ -96,7 +96,7 @@ export interface BusinessContainerEditorOptions {
 }
 
 /**
- * 单个新增/编辑入口的呈现策略；默认 tab，非标签模式必须有 loader。
+ * 单个新增/编辑入口的显示策略；默认 tab，非标签模式必须有 loader。
  * @example
  * `edit: { mode: "dialog", component: () => import("./edit.vue") }`
  */
@@ -118,7 +118,7 @@ export interface EmbeddedEditorContext {
   mode: "dialog" | "drawer";
   /** 当前容器层数，最多两层。 */
   depth: number;
-  /** 同模块场景切换复用所属宿主，而不是叠加一层。 */
+  /** 在同一模块的新增、编辑和详情之间切换时，继续使用当前弹窗或抽屉，不再打开一层。 */
   presentation: BusinessPresentation;
   /** 实例的稳定草稿身份，与同一实体路由页使用相同路径。 */
   instanceKey: string;
@@ -144,7 +144,7 @@ export interface PresentedEditor {
   /** 提供给嵌入页的固定上下文。 */
   context: EmbeddedEditorContext;
 }
-/** 公共容器与导航 hook 的交互合同。 */
+/** 公共容器与导航 hook 的交互接口约定。 */
 export interface BusinessPresentation {
   /** 当前编辑页；null 不挂载任何表单。 */
   readonly current: PresentedEditor | null;

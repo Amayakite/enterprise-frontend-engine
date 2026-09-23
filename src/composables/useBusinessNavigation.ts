@@ -13,21 +13,30 @@ import { navigationMailbox, stripNavigationQuery } from "@/router/navigation-int
 
 /** 发起参照导航；不创建单据、不检查菜单来隐藏入口。
  * @param focus 返回来源后可选的公开聚焦方法。
- * @returns open、busy、error；失败留在来源，错误由局部 UI 呈现。
+ * @returns open、busy、error；失败留在来源，错误由局部 UI 显示。
  * @example
  * `const navigation = useBusinessNavigation(() => reference.focus());`
  */
 export function useBusinessNavigation(focus?: () => void) {
+  /** 用于打开目标列表和返回来源的路由实例，独立使用时可能未提供。 */
   const router = inject(routerKey, undefined);
+  /** 发起跳转时的来源页面信息，临时导航参数会先清理。 */
   const route = inject(routeLocationKey, undefined);
+  /** 复用新增/详情的统一展示策略，不在参照控件中另写容器逻辑。 */
   const { openBusiness } = useBusinessOpen();
+  /** 一次导航是否进行中，防止重复点击参照导航。 */
   const busy = ref(false);
+  /** 导航失败原因，保留在来源控件旁供用户重试。 */
   const error = ref("");
+  /** 来源控件是否仍存在，目标保存后只向存活控件回写。 */
   let alive = true;
+  /** 曾成功打开目标页；来源缓存页下次激活时恢复参照焦点。 */
   let returning = false;
+  /** 来源卸载后禁用回写和焦点恢复。 */
   onBeforeUnmount(() => {
     alive = false;
   });
+  /** 从目标页返回缓存来源时，等待 DOM 更新后恢复参照控件焦点。 */
   onActivated(async () => {
     if (returning) {
       returning = false;
@@ -35,6 +44,7 @@ export function useBusinessNavigation(focus?: () => void) {
       if (alive) focus?.();
     }
   });
+  /** 新增或指定 ID 时按统一方式打开目标；否则跳列表并传递一次性引导信息。 */
   async function open(request: BusinessNavigationRequest, saved?: (id: string) => Promise<void>) {
     if (busy.value) return false;
     if (!router || !route) {

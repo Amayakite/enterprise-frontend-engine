@@ -24,13 +24,20 @@ import type { BaseQueryParams, PageResult } from "@/types/http";
 export function usePageTable<T, Q extends BaseQueryParams = BaseQueryParams>(
   options: UsePageTableOptions<T, Q>
 ): UsePageTableReturn<T, Q> {
+  /** 取出初始参数、分页接口及重置前同步 UI 的可选回调。 */
   const { initialParams, request, onBeforeReset } = options;
 
+  /** 最近一次分页请求是否进行中，旧请求结束不会清除新请求的忙碌状态。 */
   const loading = ref(false);
+  /** 当前成功请求得到的一页记录，保留泛型行类型供表格读取。 */
   const list = ref<T[]>([]) as Ref<T[]>;
+  /** 接口返回的总条数，供分页控件计算总页数。 */
   const total = ref(0);
+  /** 当前可修改的查询参数，初始值来自 initialParams，重置时保留对象引用。 */
   const params = reactive({ ...initialParams }) as Q;
+  /** 取消并标记过期分页请求，只让最新请求回填列表。 */
   const channel = createRequestChannel();
+  /** 页面销毁时取消请求并结束加载状态。 */
   onScopeDispose(() => {
     channel.cancel();
     loading.value = false;

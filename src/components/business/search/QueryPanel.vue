@@ -311,7 +311,7 @@ const props = defineProps<{
    */
   scopeKey: string;
   /**
-   * 宿主正在加载查询结果时禁用会重复提交的操作。
+   * 调用方正在加载查询结果时禁用会重复提交的操作。
    * @example `<QueryPanel :loading="controller.state.loading" ... />`
    */
   loading?: boolean;
@@ -346,10 +346,13 @@ const slots = defineSlots<
     }) => unknown;
   }
 >();
+/** 把查询字段名转成 query-* 插槽名，允许页面替换某个筛选输入。 */
 const querySlot = (key: string | null) => `query-${key}` as keyof typeof slots;
+/** 父页面没有接管 draft 时在本地保留未应用输入，初始值从已应用条件生成。 */
 const localDraft = shallowRef<QueryDraft<S> | undefined>(
   props.draft === undefined ? createQueryDraft(props.schema, props.modelValue) : undefined
 );
+/** 统一读写查询草稿：外部提供 draft 时通过事件更新，否则维护本地副本。 */
 const draft = computed({
   get: () => props.draft ?? localDraft.value!,
   set: (value: QueryDraft<S>) => {
@@ -357,9 +360,11 @@ const draft = computed({
     else emit("update:draft", value);
   },
 });
+/** 复制传入草稿后再接收，避免查询方案或子组件与当前输入共用可变对象。 */
 function setDraft(value: QueryDraft<S>) {
   draft.value = cloneModel(value);
 }
+/** 只有一个默认文本快捷条件时使用紧凑搜索框；自定义输入或多个条件仍使用完整布局。 */
 const inlineSearch = computed(() => {
   const node = draft.value.quick[0];
   const field = node ? queryField(props.schema, node.field) : undefined;
@@ -371,29 +376,41 @@ const inlineSearch = computed(() => {
     !slots[querySlot(node!.field ?? "")]
   );
 });
+/** 待应用查询中的错误，按条件节点 ID 对应到具体输入。 */
 const issues = shallowRef<readonly QueryIssue[]>([]);
+/** 控制筛选菜单的展开状态，与普通/高级查询弹窗独立。 */
 const filterOpen = ref(false);
+/** 选择查询方案等入口后收起筛选菜单，避免菜单盖住下一步操作。 */
 function closeFilter() {
   filterOpen.value = false;
 }
+/** 普通和高级查询窗口的开关，分别维护以免相互覆盖输入。 */
 const normalOpen = ref(false),
   advancedOpen = ref(false);
+/** 快捷、普通及高级查询的根元素，校验失败时在对应区域找到输入并聚焦。 */
 const root = ref<HTMLElement>(),
   normalRoot = ref<HTMLElement>(),
   advancedRoot = ref<HTMLElement>();
+/** 把已经应用的各类条件合成一棵查询树，用于显示当前筛选摘要。 */
 const where = computed(() => combineQuery(props.modelValue));
+/** 递归统计真正的条件条数，条件组本身不计入数量。 */
 const countConditions = (node: QueryNode<S> | null): number =>
   !node
     ? 0
     : node.kind === "condition"
       ? 1
       : node.children.reduce((sum, child) => sum + countConditions(child), 0);
+/** 已应用条件总数，用于筛选按钮上的数量提示，不统计尚未确认的草稿。 */
 const conditionCount = computed(() => countConditions(where.value));
+/** 只在 schema 声明了高级查询字段时显示高级入口。 */
 const hasAdvanced = computed(() =>
   Object.values(props.schema).some((field) => field.entries.includes("advanced"))
 );
+/** 根据条件节点的字段名查找输入配置，未选择字段时可能为空。 */
 const fieldFor = (node: QueryDraftCondition<S>) => queryField(props.schema, node.field);
+/** 按条件 ID 取得错误文案，同名字段在不同条件中不会共用错误。 */
 const issue = (id: string) => issues.value.find((item) => item.nodeId === id)?.message;
+/** 外部应用了新条件后同步草稿并清空旧错误，例如切换查询方案。 */
 watch(
   () => props.modelValue,
   (value) => {
@@ -401,6 +418,7 @@ watch(
     issues.value = [];
   }
 );
+/** 用户或组织范围变化时关闭查询窗口、重新生成草稿，避免沿用旧范围的未确认条件。 */
 watch(
   () => props.scopeKey,
   () => {
@@ -411,12 +429,14 @@ watch(
     issues.value = [];
   }
 );
+/** 只修改快捷或普通查询中指定条件的值，其他入口的输入保持不变。 */
 function updateFlat(entry: "quick" | "normal", id: string, value: unknown) {
   draft.value = {
     ...draft.value,
     [entry]: draft.value[entry].map((node) => (node.id === id ? { ...node, value } : node)),
   };
 }
+/** 从已应用条件恢复普通查询草稿，再打开窗口，放弃上次取消的未确认输入。 */
 function openNormal() {
   if (props.loading) return;
   filterOpen.value = false;
@@ -424,6 +444,7 @@ function openNormal() {
   issues.value = [];
   normalOpen.value = true;
 }
+/** 从已应用条件准备高级查询树；尚无高级条件时创建空的 AND 条件组。 */
 function openAdvanced() {
   if (props.loading) return;
   filterOpen.value = false;
@@ -461,10 +482,12 @@ function resetEntry(entry: "normal" | "advanced") {
     };
   issues.value = [];
 }
+/** 取消普通查询时恢复已经应用的条件，不触发列表请求。 */
 function cancelNormal() {
   draft.value = { ...draft.value, normal: createQueryDraft(props.schema, props.modelValue).normal };
   issues.value = [];
 }
+/** 取消高级查询时恢复原条件树，不让未确认修改进入下一次查询。 */
 function cancelAdvanced() {
   draft.value = {
     ...draft.value,
@@ -472,6 +495,7 @@ function cancelAdvanced() {
   };
   issues.value = [];
 }
+/** 校验整份查询草稿；失败定位错误，成功才发布已应用条件和操作原因。 */
 async function publish(value: QueryDraft<S>, reason: "apply" | "remove" | "clear" | "reset") {
   if (props.loading) return false;
   const result = applyQueryDraft(props.schema, value);
@@ -493,6 +517,7 @@ async function publish(value: QueryDraft<S>, reason: "apply" | "remove" | "clear
   emit("apply", cloneModel(result.applied), reason);
   return true;
 }
+/** 仅应用本次入口的草稿，与其他入口已应用条件合并；成功后关闭对应窗口。 */
 async function applyEntry(entry: QueryEntry) {
   const candidate = {
     ...createQueryDraft(props.schema, props.modelValue),
@@ -503,15 +528,19 @@ async function applyEntry(entry: QueryEntry) {
     if (entry === "advanced") advancedOpen.value = false;
   }
 }
+/** 从当前已应用条件中删除指定节点，再通过统一校验和通知流程应用。 */
 function removeCondition(id: string) {
   void publish(createQueryDraft(props.schema, removeQueryNode(props.modelValue, id)), "remove");
 }
+/** 清空全部已应用条件，并通知页面执行无额外筛选的查询。 */
 function clear() {
   void publish(createQueryDraft(props.schema, emptyAppliedQuery<S>()), "clear");
 }
+/** 恢复模块配置的初始条件，再通知页面重新查询。 */
 function restoreDefaults() {
   void publish(createQueryDraft(props.schema, props.initial ?? emptyAppliedQuery<S>()), "reset");
 }
+/** 仅在普通文本/数字快捷输入中响应 Enter，避免拦截输入法及其他控件的确认行为。 */
 function quickEnter(event: KeyboardEvent) {
   if (
     event.isComposing ||

@@ -53,6 +53,7 @@ const props = defineProps<{
   /** useBatchActions 返回的页面级控制器；组件不直接调用接口。 */
   controller: BatchController;
 }>();
+/** 控制批量执行结果窗口，让用户查看各条记录的成功或失败原因。 */
 const feedbackOpen = ref(false);
 /** 执行并打开持久反馈面板；取消确认且无结果时不弹空面板。 */
 async function run(key: string) {

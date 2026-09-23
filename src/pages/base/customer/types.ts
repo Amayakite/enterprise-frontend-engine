@@ -18,8 +18,11 @@ export interface CustomerFormModel extends Omit<
 > {
   /** 未选择销售组织时为 null，保存前必填校验。 */
   saleId: string | null;
+  /** 省份参照 ID；未选择为 null，变化时清空下级，由主模块 links 处理。 */
   provinceId: string | null;
+  /** 城市参照 ID；受省份约束，未选择为 null。 */
   cityId: string | null;
+  /** 区县参照 ID；受城市约束，未选择为 null。 */
   districtId: string | null;
 }
 
@@ -31,7 +34,7 @@ export interface CustomerPageContext {
 }
 
 /**
- * 客户对公共模块合同的具体化；不是另一套框架类型，不产生运行时对象。
+ * 客户对公共模块类型定义的具体化；不是另一套框架类型，不产生运行时对象。
  * @remarks 放在页面 types.ts，由 config 引用；API DTO 仍归 API 目录。
  * @see BusinessModuleContract
  */

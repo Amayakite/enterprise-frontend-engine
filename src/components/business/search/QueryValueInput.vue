@@ -135,19 +135,25 @@ const emit = defineEmits<{
    */
   "update:modelValue": [value: unknown];
 }>();
+/** 读取查询面板提供的用户/组织范围标识，传给自定义参照输入。 */
 const inheritedScope = inject(queryScopeKey, undefined);
+/** in/notIn 运算符需要多值选择，其他运算符使用单值输入。 */
 const multiple = computed(() => props.operator === "in" || props.operator === "notIn");
+/** 区间输入统一使用两个位置，空值时先显示两个空输入。 */
 const range = computed<unknown[]>(() =>
   Array.isArray(props.modelValue) ? props.modelValue : [null, null]
 );
+/** 只把字符串或日期范围数组传给日期控件，其他值按空值处理。 */
 const dateValue = computed(() =>
   typeof props.modelValue === "string" || Array.isArray(props.modelValue)
     ? (props.modelValue as string | string[])
     : null
 );
+/** 数字控件仅接收 number，空条件转为 undefined，避免显示无效数值。 */
 const numberValue = computed(() =>
   typeof props.modelValue === "number" ? props.modelValue : undefined
 );
+/** 整理选项输入可接收的标量或数组，过滤不适合选择控件的对象。 */
 const selectionValue = computed(() => {
   const value = props.modelValue;
   return Array.isArray(value)
@@ -156,6 +162,7 @@ const selectionValue = computed(() => {
       ? value
       : undefined;
 });
+/** 枚举使用声明的选项，布尔查询生成“是/否”，其他类型不提供默认选项。 */
 const options = computed(() =>
   props.field.kind === "enum"
     ? props.field.options
@@ -166,12 +173,15 @@ const options = computed(() =>
         ]
       : []
 );
+/** 字典只接收字符串或数字，避免把布尔条件误传给字典控件。 */
 const dictionaryValue = computed(() =>
   typeof selectionValue.value === "boolean" ? undefined : selectionValue.value
 );
+/** 禁用时不回写，其他情况下将控件空值统一为 null 后通知父条件。 */
 function change(value: unknown) {
   if (!props.disabled) emit("update:modelValue", value ?? null);
 }
+/** 数字 ID 的多值参照按声明还原类型，其余选择保留原值。 */
 function selectionChange(value: unknown) {
   if (
     props.field.kind === "reference" &&
@@ -181,6 +191,7 @@ function selectionChange(value: unknown) {
     change(value.map((item) => (typeof item === "number" ? item : Number(item))));
   else change(value);
 }
+/** 按字典声明的 valueType 转换单值或数组，清空时回写 null。 */
 function dictionaryChange(value: unknown) {
   if (props.field.kind !== "enum" || !props.field.dictionary) return;
   const type = props.field.dictionary.valueType;
@@ -193,6 +204,7 @@ function dictionaryChange(value: unknown) {
         : decode(value)
   );
 }
+/** 调用字段提供的自定义输入，并传入值、多选状态、禁用状态、范围及回写方法。 */
 function customInput() {
   return props.field.input!.render({
     value: props.modelValue,

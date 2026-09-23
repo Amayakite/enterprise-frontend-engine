@@ -38,7 +38,7 @@ export interface TableEdit<Row, C> {
     width?: string | number;
     columns?: 1 | 2 | 3;
   };
-  /** 受控 row-add/row-remove 由宿主同步更新 rows，默认不生成按钮以兼容旧页面。 */
+  /** 受控 row-add/row-remove 由调用方同步更新 rows，默认不生成按钮以兼容旧页面。 */
   allowAdd?: boolean;
   allowRemove?: boolean;
 }
@@ -121,7 +121,7 @@ export interface TableViewRowEvent<Row, Key extends string | number> {
   rowKey: Key;
 }
 
-/** MyTable 的公开事件合同，供模板事件悬停和调用方适配使用。 */
+/** MyTable 的公开事件参数说明，供模板事件悬停和调用方适配使用。 */
 export type MyTableEmits<Row extends object, Key extends string | number> = {
   /**
    * 内置分页器切换页码或每页条数；pageNum 从 1 开始。
@@ -139,17 +139,17 @@ export type MyTableEmits<Row extends object, Key extends string | number> = {
    */
   "selection-change": [value: { keys: Key[]; currentPageRows: Row[] }];
   /**
-   * 行内编辑提交字段改动；宿主负责将 changes 合并回受控 rows。
+   * 行内编辑提交字段改动；调用方负责将 changes 合并回受控 rows。
    * @example `<MyTable @row-patch="({ rowKey, changes }) => patchRow(rowKey, changes)" />`
    */
   "row-patch": [value: { rowKey: Key; changes: Partial<Row> }];
   /**
-   * 用户请求新增一行；宿主负责将 row 加入受控 rows。
+   * 用户请求新增一行；调用方负责将 row 加入受控 rows。
    * @example `<MyTable @row-add="(row) => rows.push(row)" />`
    */
   "row-add": [row: Row];
   /**
-   * 用户请求删除一行；宿主负责从受控 rows 中移除。
+   * 用户请求删除一行；调用方负责从受控 rows 中移除。
    * @example `<MyTable @row-remove="(key) => removeRow(key)" />`
    */
   "row-remove": [key: Key];
@@ -164,7 +164,7 @@ export type MyTableEmits<Row extends object, Key extends string | number> = {
    */
   "row-dblclick": [value: TableViewRowEvent<Row, Key>];
   /**
-   * 用户调整列宽；宿主可将结果写入用户列偏好。
+   * 用户调整列宽；调用方可将结果写入用户列偏好。
    * @example `<MyTable @column-resize="({ key, width }) => preferences.update(key, { width })" />`
    */
   "column-resize": [value: { key: FieldKey<Row>; width: number }];

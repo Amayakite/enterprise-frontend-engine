@@ -54,13 +54,16 @@ const props = defineProps<
   }
 >();
 defineSlots<{ /** 附加详情业务操作。 */ actions?: () => unknown }>();
+/** 为每个详情业务按钮计算当前权限及禁用原因，数据或状态变化时重新判断。 */
 const actionViews = computed(() =>
   (props.actions ?? []).map((action) => ({
     ...action,
     availability: props.controller.actionAvailability(action.key),
   }))
 );
+/** 返回失败时显示的局部错误，避免页面无响应却没有提示。 */
 const navigationError = ref("");
+/** 调用配置的返回方法，捕获跳转失败并显示原因，不擅自切换路由。 */
 async function leave() {
   navigationError.value = "";
   try {

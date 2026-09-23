@@ -70,12 +70,19 @@ const emit = defineEmits<{
   /** 点击、Escape、超时或目标失效后结束；不执行业务操作。 */
   finish: [];
 }>();
+/** 给 SVG 聚光遮罩生成唯一 ID，避免同页多个引导引用错遮罩。 */
 const maskId = `page-guide-${useId().replace(/:/g, "")}`;
+/** 沿用 Element Plus 的层级分配，避免引导被已有弹层盖住。 */
 const { nextZIndex } = useZIndex();
+/** 当前引导固定使用的层级，测量位置时不反复提升 z-index。 */
 const layer = nextZIndex();
+/** 被引导按钮当前在视口中的矩形，光圈和说明都按它定位。 */
 const rect = shallowRef<DOMRect>();
+/** 当前视口宽度，限制说明框不溢出右边缘。 */
 const viewportWidth = ref(window.innerWidth);
+/** 当前视口高度，限制说明框不溢出下边缘。 */
 const viewportHeight = ref(window.innerHeight);
+/** 在目标四周增加 6px 留白生成光圈位置，不改变按钮本身布局。 */
 const haloStyle = computed(() =>
   rect.value
     ? {
@@ -86,6 +93,7 @@ const haloStyle = computed(() =>
       }
     : {}
 );
+/** 把说明放到目标下方，并限制在视口内留出边距。 */
 const hintStyle = computed(() =>
   rect.value
     ? {
@@ -94,17 +102,24 @@ const hintStyle = computed(() =>
       }
     : {}
 );
+/** 引导是否已经结束，防止重复通知或旧测量继续显示。 */
 let disposed = false;
+/** 待执行的测量动画帧，同一帧内只安排一次位置更新。 */
 let frame = 0;
+/** 自动结束引导的计时器，清理时取消，避免页面离开后再触发。 */
 let timeout: ReturnType<typeof setTimeout> | undefined;
+/** 监听目标按钮自身尺寸变化的观察器，目标切换时重新绑定。 */
 let observer: ResizeObserver | undefined;
+/** 只在首次发现目标不在视口时主动滚动，避免后续用户滚动被反复拉回。 */
 let scrolled = false;
+/** 结束并清理引导后通知外层；重复调用不再发出事件。 */
 function finish() {
   if (!disposed) {
     cleanup();
     emit("finish");
   }
 }
+/** 读取可见目标的位置，必要时首次滚动到视口内，并更新光圈和说明的位置。 */
 function measure() {
   frame = 0;
   if (disposed || !props.ready) {
@@ -130,12 +145,15 @@ function measure() {
   viewportHeight.value = window.innerHeight;
   rect.value = bounds;
 }
+/** 把滚动、缩放等频繁事件合并为下一帧的位置测量。 */
 function schedule() {
   if (!disposed && props.ready && !frame) frame = requestAnimationFrame(measure);
 }
+/** 用户开始键盘操作或按 Escape 时结束提示，不继续遮挡实际操作。 */
 function keydown(event: KeyboardEvent) {
   if (["Escape", "Enter", " ", "Tab"].includes(event.key)) finish();
 }
+/** 移除尺寸、滚动和输入监听，取消计时器与动画帧，并隐藏光圈。 */
 function cleanup() {
   disposed = true;
   if (frame) cancelAnimationFrame(frame);
@@ -148,6 +166,7 @@ function cleanup() {
   document.removeEventListener("keydown", keydown, true);
   rect.value = undefined;
 }
+/** 目标或就绪状态变化时重新观察按钮，等待 DOM 完成后再测量。 */
 watch(
   () => [props.target, props.ready] as const,
   async ([target, ready]) => {
@@ -170,7 +189,9 @@ document.addEventListener("transitionend", schedule, true);
 document.addEventListener("pointerdown", finish, true);
 document.addEventListener("keydown", keydown, true);
 timeout = setTimeout(finish, 5000);
+/** 切走缓存标签时结束引导，避免光圈留在其他页面。 */
 onDeactivated(finish);
+/** 卸载时释放所有监听和计时器，不再显示旧目标。 */
 onBeforeUnmount(cleanup);
 </script>
 <style scoped>

@@ -31,12 +31,15 @@ const props = withDefaults(
   }>(),
   { size: "default" }
 );
+/** 按字典编码读取选项和请求状态，失败时允许局部重试。 */
 const { options, loading, error, reload } = useDictionary(() => props.code);
+/** 按原值匹配字典项，找到后显示中文标签，没有匹配时使用组件兜底。 */
 const item = computed(() =>
   props.modelValue === null || props.modelValue === undefined
     ? undefined
     : options.value.find((option) => String(option.value) === String(props.modelValue))
 );
+/** 将字典项的颜色配置转换为标签支持的类型，避免无效样式传给组件。 */
 const tagType = computed(() => {
   const value = item.value?.tagType;
   return value === "success" ||

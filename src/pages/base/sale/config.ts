@@ -15,7 +15,7 @@ export const saleModule = defineBusinessModule<SaleContract>()({
   meta: { key: "base.sale", title: "销售组织档案" },
   /** 直接采用公共组织与访问范围，不新增页面上下文字段。 */
   context: (base) => base,
-  /** 路径集中登记；保留本页新增 drawer 配置，页面宿主统一处理。 */
+  /** 路径集中登记；保留本页新增 drawer 配置，页面容器统一处理。 */
   page: salePage,
   /** 字符串 ID 保持原值。 */
   parseId: (value) => value,

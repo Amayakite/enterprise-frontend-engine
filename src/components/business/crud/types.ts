@@ -11,14 +11,14 @@ import type {
   QueryScope,
 } from "@/components/business/search/types";
 
-/** CRUD 装配公开合同，业务 DTO 及状态规则仍归模块配置。 */
+/** CRUD 组合公开接口说明，业务 DTO 及状态规则仍归模块配置。 */
 export interface CrudRequestContext<C> {
   /** 页面卸载或请求取消时中止等待；需透传 API，不代表服务端事务回滚。 */
   signal: AbortSignal;
   /** 只读页面上下文，例如组织和 scopeKey；不在请求回调中修改。 */
   context: DeepReadonly<C>;
 }
-/** 列表请求合同；固定 scope、用户 where、分页与排序分开传递，不直接拼接接口参数。 */
+/** 列表请求格式；固定 scope、用户 where、分页与排序分开传递，不直接拼接接口参数。 */
 export interface CrudListRequest<Row, S extends QuerySchema, Scope> extends QueryEnvelope<
   S,
   Scope
@@ -111,7 +111,7 @@ export type CrudValidation<M> =
 
 /** S2 已并入字段所有者；保留 S1 类型名称供配置兼容。 */
 export type CrudField<M, C> = FieldDefinition<M, C>;
-/** 从统一字段合同提取 select 分支；选项值仍受模型字段类型约束。 */
+/** 从统一字段配置提取 select 分支；选项值仍受模型字段类型约束。 */
 export type CrudOptionField<M, C = undefined> = Extract<
   FieldDefinition<M, C>,
   {
@@ -261,7 +261,7 @@ export type CrudAction<Row, Id extends string | number, C> =
       location: "row";
     } & ActionOptions<CrudRowActionContext<Row, Id, C>, Id>);
 
-/** CRUD 表格列合同；与 MyTable 列定义复用，保留行字段类型。 */
+/** CRUD 表格列接口约定；与 MyTable 列定义复用，保留行字段类型。 */
 export interface CrudColumn<Row> extends TableColumn<Row> {
   /** 必须同时提供对应 navigation，未绑定时退为普通文本。 */
   link?: "detail" | "edit";
@@ -293,11 +293,11 @@ export interface CrudListConfig<
   getKey: (row: Readonly<Row>) => Id;
   /** 列表列配置；字段列需要与 fields 中同名 key 对应。 */
   columns: readonly CrudColumn<Row>[];
-  /** 可选字段合同，用于列表单元格格式化或行内编辑。 */
+  /** 可选字段配置，用于列表单元格格式化或行内编辑。 */
   fields?: readonly CrudField<Row, C>[];
   /** 查询 schema 与已应用初始条件。 */
   query: {
-    /** 后端查询白名单与 UI 输入合同；不要传未经验证的任意字段。 */
+    /** 后端查询白名单与 UI 输入接口约定；不要传未经验证的任意字段。 */
     schema: S;
     /** 初始已应用条件；通常 emptyAppliedQuery<typeof schema>()。 */
     initial: AppliedQuery<S>;
@@ -656,7 +656,7 @@ export interface CrudListState<Row, Id extends string | number, S extends QueryS
 }
 /** 公共列表控制器；供 MyCrudList 和页面插槽使用，业务只调用公开命令。 */
 export interface CrudListController<Row, Id extends string | number, S extends QuerySchema> {
-  /** 本机查询方案端口；仅配置 queryPresets 且装配存储身份后提供。 */
+  /** 本机查询方案端口；仅配置 queryPresets 且组合存储身份后提供。 */
   readonly presets?: import("../search/query-presets").QueryPresetController;
   /**
    * 控制器只读响应式状态；模板可读取，业务更新必须通过公开方法，不能直接赋值。
@@ -785,7 +785,7 @@ export interface CrudFormController<Model, Entity, Id extends string | number> {
     /**
      * 整体回填版本，从 0 开始；初始化、读取、保存回填、草稿恢复或上下文重置时递增。
      * MyCrudForm 用它更新 MyForm 的 formKey，整体回填不执行字段联动或用户 change。
-     * 普通 patch 不递增；宿主只读，不自行修改。
+     * 普通 patch 不递增；调用方只读，不自行修改。
      * @example
      * controller.state.hydrationRevision
      */
@@ -853,7 +853,7 @@ export interface CrudFormController<Model, Entity, Id extends string | number> {
    * 注册子表生命周期端口；返回取消注册函数，应随子表卸载调用。
    */
   registerChild: <K extends FieldKey<Model>>(module: CrudChildModule<Model, K>) => () => void;
-  /** 装配组件登记主表校验与聚焦，页面无需维护 MyForm 实例。 */
+  /** 组合组件登记主表校验与聚焦，页面无需维护 MyForm 实例。 */
   registerForm: (port: CrudFormPort<Model>) => () => void;
 
   /**
@@ -1180,7 +1180,7 @@ export type CrudChildTableChange<Row, Key extends string | number> =
        */
       changes: Partial<Row>;
     };
-/** 列表公开插槽合同；工具栏接收控制器，列插槽接收只读行和值。 */
+/** 列表公开插槽接口约定；工具栏接收控制器，列插槽接收只读行和值。 */
 export type CrudListSlots<Row, Id extends string | number, S extends QuerySchema> = {
   /**
    * 更多操作面板中的扩展插槽，收到公开列表控制器；适合低频、基于选择的按钮。
@@ -1224,7 +1224,7 @@ export type CrudListSlots<Row, Id extends string | number, S extends QuerySchema
     setDraft: (draft: QueryDraft<S>) => void;
   }) => VNodeChild;
 };
-/** 表单公开插槽合同；通过 update/控制器修改模型，不能直接修改插槽快照。 */
+/** 表单公开插槽接口约定；通过 update/控制器修改模型，不能直接修改插槽快照。 */
 export type CrudFormSlots<Model, Entity, Id extends string | number> = {
   [K in FieldKey<Model> as `field-${K}`]?: (context: {
     /**
@@ -1266,7 +1266,7 @@ export type CrudFormSlots<Model, Entity, Id extends string | number> = {
    */
   footer?: (context: CrudFormController<Model, Entity, Id>) => VNodeChild;
 };
-/** 详情公开插槽合同；用于只读字段、子表页签和底部业务扩展。 */
+/** 详情公开插槽接口约定；用于只读字段、子表页签和底部业务扩展。 */
 export type CrudDetailSlots<Model, Entity, Id extends string | number> = {
   [K in `tab-${string}`]?: (context: CrudDetailController<Model, Entity, Id>) => VNodeChild;
 } & {

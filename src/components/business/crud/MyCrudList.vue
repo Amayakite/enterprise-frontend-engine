@@ -1,5 +1,6 @@
 <template>
   <section class="crud-list">
+    <!-- 显示筛选条件。用户点击查询后才应用条件并加载列表；页面无需再监听输入变化重复请求。 -->
     <QueryPanel
       class="crud-list__commandbar"
       compact
@@ -296,12 +297,12 @@ import type { CrudListConfig, CrudListController, CrudListSlots, CrudNavigation 
 import type { CrudViewEnvironment } from "./crud-page";
 const props = withDefaults(
   defineProps<{
-    /** 标准装配层的新增权限；默认 true 保持独立列表原行为，false 隐藏并禁用新增。 */
+    /** 标准CRUD 组件和 useCrud 方法的新增权限；默认 true 保持独立列表原行为，false 隐藏并禁用新增。 */
     createPermitted?: boolean;
     /** 导航意图视觉效果；默认 halo，false 仅文字说明。 */
     guideMode?: "halo" | "spotlight" | false;
     /**
-     * 当前列表自动消费的弹窗/抽屉宿主；标准 useCrudView 会提供，独立列表省略时不挂载。
+     * 当前列表自动消费的弹窗/抽屉容器；标准 useCrudView 会提供，独立列表省略时不挂载。
      * @example
      * `<MyCrudList v-bind="bindings.list" />`
      */
@@ -341,10 +342,12 @@ const props = withDefaults(
   }>(),
   { createPermitted: true }
 );
+/** 读取列表字段所需字典，供单元格显示名称，列表刷新时也能更新字典。 */
 const dictionaries = useFieldDictionaries(
   () => props.config.fields ?? [],
   () => props.context
 );
+/** 每轮列表加载开始时刷新字典，避免后台字典修改后列表一直显示旧名称。 */
 watch(
   () => props.controller.state.loading,
   (loading) => {
@@ -352,6 +355,7 @@ watch(
   }
 );
 const slots = defineSlots<CrudListSlots<Row, Id, S>>();
+/** 检查工具栏、查询和列插槽是否写错名称，帮助定位没有显示的自定义内容。 */
 onMounted(() =>
   diagnoseCrudSlots("MyCrudList", slots, [
     "toolbar-left",
@@ -360,24 +364,33 @@ onMounted(() =>
     ...Object.keys(props.config.query.schema).map((key) => `query-${key}`),
   ])
 );
+/** 管理当前用户的列宽、显隐、固定位置等偏好，并转换为表格需要的列配置。 */
 const preferences = useCrudColumns(props.config.columns, () => props.preference);
+/** 当前页数据的只读副本，供表格和业务插槽显示。 */
 const rows = computed(() => cloneReadonlyModel<readonly Row[]>(props.controller.state.rows));
+/** 已经应用的查询条件，和用户还没点查询的输入草稿区分开。 */
 const applied = computed(() => cloneReadonlyModel<AppliedQuery<S>>(props.controller.state.applied));
+/** 尚未应用的筛选输入，供查询面板编辑，输入时不直接发请求。 */
 const draft = computed(() => cloneReadonlyModel<QueryDraft<S>>(props.controller.state.draft));
+/** 当前已应用的排序信息，用于显示表头排序状态。 */
 const sort = computed(() => cloneReadonlyModel<TableSort<Row> | null>(props.controller.state.sort));
+/** 合并列表加载、单项操作和批量操作状态，避免用户同时发起冲突操作。 */
 const busy = computed(
   () =>
     props.controller.state.loading || !!props.controller.state.busyActionKey || !!props.batch?.busy
 );
+/** 挑出工具栏动作，计算权限及可用性，并去掉不可见按钮。 */
 const toolbarActions = computed(() =>
   (props.config.actions ?? [])
     .filter((action) => action.location === "toolbar")
     .map((action) => ({ ...action, availability: props.controller.actionAvailability(action.key) }))
     .filter((action) => action.availability.visible)
 );
+/** 只保留行操作配置，后续按每一行的数据分别判断是否可用。 */
 const rowActions = computed(() =>
   (props.config.actions ?? []).filter((action) => action.location === "row")
 );
+/** 按行 ID 缓存本轮各按钮的权限和禁用原因，模板无需重复计算同一行。 */
 const rowActionViews = computed(
   () =>
     new Map(
@@ -393,6 +406,7 @@ const rowActionViews = computed(
       })
     )
 );
+/** 把选择方式和选中 ID 交给表格；配置 none 时不显示选择功能。 */
 const selection = computed(() =>
   props.config.selection && props.config.selection !== "none"
     ? {
@@ -401,9 +415,13 @@ const selection = computed(() =>
       }
     : false
 );
+/** 新增、编辑或详情跳转失败时的局部提示，不混入列表查询错误。 */
 const navigationError = ref("");
+/** 读取其他页面带来的新增引导，提供提示文案和结束引导的方法。 */
 const pageIntent = usePageIntent();
+/** 新增按钮所在元素，供操作引导定位和高亮。 */
 const createTarget = ref<HTMLElement | null>(null);
+/** 根据新增权限、引导进度和跳转错误生成当前提示文案。 */
 const intentMessage = computed(() => {
   const intent = pageIntent.intent.value;
   if (!intent) return "";
@@ -415,21 +433,26 @@ const intentMessage = computed(() => {
         : "已收到操作引导。";
   return [message, pageIntent.error.value].filter(Boolean).join(" ");
 });
+/** 跳转错误用错误色，无新增权限用警告色，普通引导用信息色。 */
 const intentTone = computed(() => {
   if (pageIntent.error.value) return "error";
   if (props.createPermitted === false && pageIntent.intent.value?.action === "create")
     return "warning";
   return "info";
 });
+/** 只有仍需引导且具备新增权限时，才提示点击新增按钮。 */
 const intentNextStep = computed(() =>
   pageIntent.guiding.value && props.createPermitted !== false ? "点击新增按钮继续。" : undefined
 );
+/** 再次检查新增权限和忙碌状态，结束引导后打开新增入口。 */
 function onCreate() {
   if (props.createPermitted === false || busy.value || !props.navigation?.add) return;
   pageIntent.finish();
   void navigate(props.navigation.add);
 }
+/** 控制列设置窗口的打开状态，不改变已经应用的列偏好。 */
 const columnSettingsOpen = ref(false);
+/** 执行页面跳转并在列表内显示失败原因，操作忙碌时不重复跳转。 */
 async function navigate(action: () => Promise<void>) {
   if (busy.value) return;
   navigationError.value = "";
@@ -439,6 +462,7 @@ async function navigate(action: () => Promise<void>) {
     navigationError.value = cause instanceof Error ? cause.message : "导航失败";
   }
 }
+/** 将查询面板确认的条件交给列表重新查询；reset 则恢复模块默认条件。 */
 async function apply(value: AppliedQuery<S>, reason: string) {
   if (reason === "reset") await props.controller.resetQuery();
   else {
@@ -470,18 +494,23 @@ function onColumnResize(value: { key: Extract<keyof Row, string>; width: number 
 function onPagination(value: { page: number; limit: number }) {
   return props.controller.setPage(value.page, value.limit);
 }
+/** 用当前行的只读数据执行模块编辑限制，例如已审核记录不允许修改。 */
 function editDisabledReason(row: Readonly<Row>) {
   return props.config.editDisabledReason?.(cloneReadonlyModel<Row>(row), props.context);
 }
 
+/** 把字段名转为 column-* 插槽名，将自定义单元格传给表格。 */
 const columnSlot = (key: Extract<keyof Row, string>) =>
   `column-${key}` as Exclude<keyof typeof slots, "toolbar-left" | "toolbar-right">;
+/** 只透传页面实际提供的 query-* 插槽，未提供的查询字段继续使用默认输入。 */
 const querySlots = computed(() =>
   Object.keys(props.config.query.schema)
     .map((key) => `query-${key}` as Exclude<keyof typeof slots, "toolbar-left" | "toolbar-right">)
     .filter((key) => slots[key])
 );
+/** 为行操作插槽提供只读数据，业务按钮不能绕过保存流程直接修改列表记录。 */
 const readonlyRow = (row: Readonly<Row>) => readonly(row);
+/** 把操作结果、成功数量和逐项失败原因组合为一条可读反馈。 */
 const actionMessage = computed(() => {
   const result = props.controller.actionResult;
   return result

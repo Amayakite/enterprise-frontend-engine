@@ -1,10 +1,10 @@
 # 企业前端开发引擎
 
-Enterprise Frontend Engine 是面向企业业务系统的通用前端开发引擎，基于 Vue 3、TypeScript、Vite、Element Plus、Pinia 和 Vue Router。以配置驱动业务页面，复用字段、列表、主子表和操作流程，减少重复装配。
+Enterprise Frontend Engine 是面向企业业务系统的通用前端开发引擎，基于 Vue 3、TypeScript、Vite、Element Plus、Pinia 和 Vue Router。通过配置生成业务页面，共用字段、列表、主子表及加载保存逻辑，减少重复代码。
 
 ## 核心能力
 
-- **业务装配**：以 `config.ts` 为入口，复用 `MyCrud* + useCrud*`；支持列表、新增、编辑、详情，以及页面、弹窗和抽屉入口。
+- **业务页面**：以 `config.ts` 为入口，复用 `MyCrud* + useCrud*`；支持列表、新增、编辑、详情，以及页面、弹窗和抽屉入口。
 - **字段与参照**：统一业务字段、普通/高级搜索、参照选择、关联页面跳转与目标操作引导，允许页面局部覆盖回写逻辑。
 - **操作体验**：统一成功/失败反馈、权限轻提示、批量操作结果和下一步操作入口。
 - **页面基础设施**：动态菜单、按钮权限、标签页、页面缓存、草稿、列偏好，以及明暗主题。
@@ -32,8 +32,8 @@ pnpm dev
 ```bash
 pnpm type-check  # TypeScript / Vue 类型检查
 pnpm test:quick  # 日常反馈：行为、结构与文档断言，不启动完整 TS/Vue 编译
-pnpm test:contracts # 类型正反例、语言服务悬停及混合合同测试
-pnpm test        # 合同与行为测试（限制并发，降低内存占用）
+pnpm test:contracts # 检查类型使用、编辑器悬停和相关行为
+pnpm test        # 类型与行为测试（限制并发，降低内存占用）
 pnpm bench:crud  # 0/100/500 行子表模型回写基准（不代表浏览器帧率）
 pnpm build       # 类型检查后打包至 dist
 pnpm preview     # 预览构建产物，不启动 Mock
@@ -43,7 +43,7 @@ pnpm format      # 手动格式化全部文件
 日常验证按改动范围选择，避免每次修改都跑全量测试：
 
 - 交互改动直接使用内置浏览器或浏览器 MCP 检查实际页面、相关键盘操作和控制台；布局变更再补明暗主题、窄屏检查。不默认引入浏览器测试依赖或自动化脚本。
-- TS/Vue 改动运行 `pnpm type-check`；逻辑变更只运行相关的 `node --test tests/<文件>.test.mjs`，公共类型合同变更再补对应合同测试。
+- TS/Vue 改动运行 `pnpm type-check`；逻辑变更只运行相关的 `node --test tests/<文件>.test.mjs`，公共类型定义变更再补对应接口约定测试。
 - 需要扩大检查范围时使用 `pnpm test:quick` 或 `pnpm test:contracts`；全量 `pnpm test` 留给明确的整体验证或核心跨模块风险，不作为每次提交的固定步骤。
 - 构建配置、运行时依赖或影响打包的跨模块改动运行 `pnpm build`，它已包含类型检查，无需重复执行。纯文档、测试设施清理不默认构建；`pnpm bench:crud` 只在排查性能时使用。
 - 验证通过后，仅在新增修改、失败或仍有疑点时补测，不反复执行相同检查。
@@ -55,7 +55,7 @@ pnpm format      # 手动格式化全部文件
 
 开发者与 AI 从 [项目速查卡 AGENTS.md](./AGENTS.md) 开始，再按 [任务导航](./docs/README.md) 定位文档章节与源码，不必通读所有指南。
 
-最简模块从 [Sale 示例](./docs/sale-example.md) 开始；复杂主子表参考 [customer](./docs/customer-example.md) 的职责划分。默认 add/edit 各自装配，子表各有独立 config。费用仅作局部能力参考，服务申请和会议申请不作为结构范本；具体规则与示例统一由任务导航进入。
+最简模块从 [Sale 示例](./docs/sale-example.md) 开始；复杂主子表参考 [customer](./docs/customer-example.md) 的职责划分。默认 add/edit 各自组合，子表各有独立 config。费用仅作局部能力参考，服务申请和会议申请不作为结构范本；具体规则与示例统一由任务导航进入。
 
 ## 注释与配置可读性
 
@@ -84,7 +84,7 @@ src/
   types/        无业务归属的基础类型与声明
   utils/        纯工具
 mock/           开发 Mock
-tests/          必要的合同与行为验证
+tests/          必要的接口约定与行为验证
 ```
 
 ## 对接新后端
@@ -101,7 +101,7 @@ VITE_APP_VUE_DEVTOOLS=true # 需要组件树/更新时间线排查时才开启
 
 修改环境变量后重启开发服务。当前响应协议为 `{ code, data, msg }`、分页为 `{ list, total }`，尚未适配新的正式后端；应从 API 层、请求层、菜单转换和权限映射统一适配，不能让页面依赖完整后端路径。
 
-与后端确认接口时使用 [接口契约草案](./docs/backend-contract-draft.md)，其中区分当前 Mock 合同与待确认协议。
+与后端确认接口时使用 [接口契约草案](./docs/backend-contract-draft.md)，其中区分当前 Mock 接口约定与待确认协议。
 
 ## 构建与部署
 

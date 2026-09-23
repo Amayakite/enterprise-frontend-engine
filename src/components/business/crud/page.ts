@@ -50,6 +50,7 @@ export interface BusinessPageOptions<Organization extends string = string> {
  * @remarks 仅构造字符串，不导航、不读取全局 route。
  */
 export function createBusinessPaths(basePath: string) {
+  /** 去掉模块基础路径末尾的斜杠，拼接新增/编辑/详情路径时避免重复分隔符。 */
   const base = basePath.replace(/\/+$/, "");
   if (!base.startsWith("/") || base.includes("?") || base.includes("#"))
     throw new Error("模块 basePath 必须是无 query/hash 的绝对路由路径");
@@ -81,8 +82,11 @@ export function resolveBusinessPresentation(
   view: BusinessView,
   override: BusinessViewPresentation = {}
 ) {
+  /** 读取旧版新增/编辑显示设置，详情没有旧版对应项。 */
   const legacy = view === "detail" ? undefined : page[view];
+  /** 读取新增、编辑和详情共用的显示设置，作为各页面的默认值。 */
   const common = page.presentation;
+  /** 当前页面单独覆盖的显示方式，优先于共用默认设置。 */
   const specific = common?.[view];
   return {
     mode: override.mode ?? specific?.mode ?? common?.mode ?? legacy?.mode ?? "tab",

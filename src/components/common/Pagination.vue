@@ -54,12 +54,14 @@ const emit = defineEmits<{
   pagination: [value: { page: number; limit: number }];
 }>();
 
+/** 与父页面双向绑定的当前页码，从 1 开始；真正接受分页后才更新。 */
 const currentPage = defineModel("page", {
   type: Number,
   required: true,
   default: 1,
 });
 
+/** 与父页面双向绑定的每页条数，调整条数会回到第一页。 */
 const pageSize = defineModel("limit", {
   type: Number,
   required: true,
@@ -68,10 +70,13 @@ const pageSize = defineModel("limit", {
 
 // Element Plus 在改页大小时还会调整 currentPage；同一轮只发布一次逻辑分页。
 let queued: { page: number; limit: number; resized: boolean } | undefined;
+/** 标记分页组件是否仍存在，微任务执行前检查，避免卸载后继续通知。 */
 let alive = true;
+/** 标记已卸载，丢弃排队但尚未发布的分页事件。 */
 onBeforeUnmount(() => {
   alive = false;
 });
+/** 把同轮页码和条数变化合并成一次通知，条数变化优先回到第一页。 */
 function queue(page: number, limit: number, resized = false) {
   if (props.disabled) return;
   const scheduled = !!queued;
@@ -91,6 +96,7 @@ function queue(page: number, limit: number, resized = false) {
     emit("pagination", { page: next.page, limit: next.limit });
   });
 }
+/** 总条数减少导致当前页超出范围时，自动请求回到最后有效页。 */
 watch(
   () => props.total,
   (newVal: number) => {
@@ -101,10 +107,12 @@ watch(
   }
 );
 
+/** 改变每页条数时排队更新并回到第一页，避免短页下超出范围。 */
 function handleSizeChange(val: number) {
   queue(1, val, true);
 }
 
+/** 排队处理页码变化，如果同轮也改条数则使用最新条数。 */
 function handleCurrentChange(val: number) {
   queue(val, queued?.limit ?? pageSize.value);
 }

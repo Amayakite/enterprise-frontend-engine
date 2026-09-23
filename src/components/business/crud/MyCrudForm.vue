@@ -1,4 +1,5 @@
 <template>
+  <!-- 用于新增或编辑记录。传入 bindings.form，自动显示字段、保存按钮、草稿提示和错误；section-* 插槽用于添加子表。 -->
   <MyCrudLayout
     class="crud-form"
     role="form"
@@ -30,6 +31,7 @@
         </button>
       </nav>
     </template>
+    <!-- 显示可恢复的草稿和保存错误。自定义页面若替换这里，也需提供恢复、放弃草稿或重试按钮，否则用户可能无法继续保存。 -->
     <MyCrudFormFeedback v-bind="props" />
     <el-skeleton v-if="controller.state.phase === 'loading'" animated :rows="6" />
     <div ref="body" v-show="controller.state.phase !== 'loading'" class="crud-form__body">
@@ -43,6 +45,7 @@
           'crud-form__fields--simple': layout?.preset === 'simple',
         }"
       >
+        <!-- 显示并校验主表字段。一个编辑页面只放一份 MyCrudFormFields，避免同一字段出现两次。 -->
         <MyCrudFormFields v-bind="props" @groups-change="groups = $event">
           <template
             v-for="field in fields.filter((item) => slots[fieldSlot(item.key)])"
@@ -53,6 +56,7 @@
           </template>
         </MyCrudFormFields>
       </div>
+      <!-- 在 section-* 插槽中放联系人、地址等子表。点击保存时会检查并提交全部子表行，包括其他分页的数据。 -->
       <section
         v-for="section in sections"
         :key="section.key"
@@ -72,6 +76,7 @@
         <MyCrudFormToolbar v-if="layout" v-bind="props" :footer-mode="true" />
       </div>
     </template>
+    <!-- 这里负责打开其他模块的弹窗或抽屉。使用 MyCrudForm 的页面无需再添加 MyBusinessPageHost。 -->
     <MyBusinessPageHost v-if="host" v-bind="host" />
   </MyCrudLayout>
 </template>
@@ -89,8 +94,10 @@ import type { CrudFormSlots } from "./types";
 import type { FieldKey, FormVisibleGroup } from "../fields/types";
 import { diagnoseCrudSlots } from "./config";
 const props = defineProps<CrudFormProps<Model, Entity, Id, C>>();
+/** 判断是否位于弹窗或抽屉内；嵌入时不重复显示独立页面的大标题。 */
 const embedded = inject(embeddedEditorKey, undefined);
 const slots = defineSlots<CrudFormSlots<Model, Entity, Id>>();
+/** 处理当前表单内的 Ctrl/Command+S：先结束输入触发联动，再检查能否保存；忽略输入法和长按重复事件。 */
 async function onFormKeydown(event: KeyboardEvent) {
   if (
     event.defaultPrevented ||
@@ -121,8 +128,11 @@ async function onFormKeydown(event: KeyboardEvent) {
     return;
   await props.controller.save();
 }
+/** 表单正文元素，用于点击分区导航后滚动到对应子表并设置焦点。 */
 const body = ref<HTMLElement>();
+/** MyCrudFormFields 通知的可见字段分组，用于生成页头导航。 */
 const groups = shallowRef<readonly FormVisibleGroup<Model>[]>([]);
+/** 合并主字段分组和子表分区，并统计各区错误数量，供导航按钮显示。 */
 const navigation = computed(() => [
   ...groups.value.map((group) => ({
     key: `field:${group.key}`,
@@ -142,6 +152,7 @@ const navigation = computed(() => [
     errors: props.controller.state.issues.filter((issue) => issue.section === section.key).length,
   })),
 ]);
+/** 主字段交给表单定位；子表分区滚动到 section 并聚焦，不改变当前填写内容。 */
 function navigate(item: (typeof navigation.value)[number]) {
   if (item.field) {
     void props.controller.focusIssue({ field: item.field, message: "" });
@@ -153,10 +164,13 @@ function navigate(item: (typeof navigation.value)[number]) {
   section?.scrollIntoView({ block: "start", behavior: "instant" });
   section?.focus({ preventScroll: true });
 }
+/** 生成 field-* 插槽名，让页面替换单个字段的输入方式。 */
 const fieldSlot = (key: FieldKey<Model>) =>
   `field-${key}` as Exclude<keyof typeof slots, "footer" | "header">;
+/** 生成 section-* 插槽名，将子表等内容放入配置好的分区。 */
 const sectionSlot = (key: string) =>
   `section-${key}` as Exclude<keyof typeof slots, "footer" | "header">;
+/** 检查页面传入的字段和分区插槽名，开发时提示拼写错误或未声明的插槽。 */
 onMounted(() =>
   diagnoseCrudSlots("MyCrudForm", slots, [
     "header",

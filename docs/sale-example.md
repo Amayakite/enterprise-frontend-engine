@@ -4,6 +4,26 @@
 这是无子表的标准 CRUD 示例；复杂主子表继续参考 Customer。
 当前 API 是开发进程内存 Mock，重启恢复种子，不代表正式权限、持久化或事务已联调。
 
+## 结构设计
+
+销售组织是无子表的基础档案，也是客户选择所属销售组织的参照对象。
+当前模型可直接复用 API 实体，因此不另建页面数据结构或 adapters.ts。
+
+| 字段/结构                | 类型和含义                           | 读写边界                                   |
+| ------------------------ | ------------------------------------ | ------------------------------------------ |
+| id                       | 稳定字符串主键；新建模型暂为空字符串 | 保存由接口返回，不加入新增白名单           |
+| organizationId           | 当前数据所属组织；Mock 为 org-a      | 从公共上下文限定范围，保存白名单不接受修改 |
+| code / name              | 组织编码/名称；空字符串为未填写      | 必填，提交前 trim，分别最多 30/80 字       |
+| active                   | 是否允许客户新选择；新增默认 true    | 停用记录仍可历史回显，不允许新选入         |
+| remark                   | 业务说明，缺省空字符串               | 可编辑，最长 300 字                        |
+| version                  | 接口实体版本；新建模型初值 0         | 编辑从加载基线取值，不让用户修改           |
+| SalePayload / SaleUpdate | 创建白名单；编辑在其上增加 version   | 当前 Mock 保存返回 SaleRecord              |
+
+页面、列表、参照共用同一组字段及查询派生；新增/编辑默认抽屉、详情为页面，直接访问路由仍可打开完整页面。
+草稿只保存 code/name/active/remark，实体 id、组织和版本不从旧草稿覆盖。
+后端物理表、编码唯一约束及正式并发协议待接口确认；以上描述的是当前前端与 Mock 接口约定。
+源码见 [API 类型](../src/api/base/sale/types.ts)、[模块配置](../src/pages/base/sale/config.ts)。
+
 ## 从哪个文件开始
 
 首先打开 [config.ts](../src/pages/base/sale/config.ts)：编码、名称、启用、备注仅维护一套，
@@ -15,11 +35,11 @@
 | `src/pages/base/sale/config.ts`               | 模块身份、页面路径、上下文、API、模型白名单、fields、查询及权限 |
 | `src/pages/base/sale/types.ts`                | 显式继承 BusinessModuleContract，API 实体直接作模型，不复制 DTO |
 | `index.vue / add.vue / edit.vue / detail.vue` | 各自 useCrudView，只选择 view 并渲染 MyCrud 组件                |
-| `src/pages/base/sale/references.ts`           | 复用模块派生查询，装配参照 source；不决定使用页的跳转           |
+| `src/pages/base/sale/references.ts`           | 复用模块派生查询，组合参照 source；不决定使用页的跳转           |
 | `src/api/base/sale/index.ts / types.ts`       | 请求、DTO、取消信号、批量 resolve                               |
 | `mock/sale.mock.ts / sale-data.ts`            | 独立查询白名单、范围、必填、编码唯一及版本检查                  |
 
-新增/编辑各自装配，不增加共用 Editor。没有模型转换差异，因此不额外建立 adapters.ts；
+新增/编辑各自组合，不增加共用 Editor。没有模型转换差异，因此不额外建立 adapters.ts；
 config.model 直接写出保存白名单。必须保留 context 与 parseId 适配，不能只写 page.basePath。
 页面无需 CSS；当前新增/编辑为抽屉、详情为页面，列表已启用 KeepAlive。
 四页分别渲染标准 `MyCrudList` / `MyCrudForm` / `MyCrudDetail`；它们会自动挂载一次
@@ -78,4 +98,4 @@ reference: reference({
 复制 Sale 的职责结构，替换业务模型、API、config 字段与菜单登记即可；
 没有参照需求就不建立 references.ts，没有子表就保留空 children。
 不要复制客户的省市区、审核或联系人规则。
-具体默认合同及扩展边界见[模块规范](./business-module-standard.md)与[CRUD 指南](./crud-development-guide.md)。
+具体默认接口约定及扩展边界见[模块规范](./business-module-standard.md)与[CRUD 指南](./crud-development-guide.md)。

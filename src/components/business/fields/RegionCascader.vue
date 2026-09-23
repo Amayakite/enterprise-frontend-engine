@@ -42,28 +42,41 @@ const props = defineProps<{
 }>();
 const emit = defineEmits<{
   /**
-   * 用户选定或清空地区，携带末级 ID 和完整层级记录；宿主可在此回填省、市、区 ID 和名称。
+   * 用户选定或清空地区，携带末级 ID 和完整层级记录；调用方可在此回填省、市、区 ID 和名称。
    * @example `<RegionCascader @change="(id, items) => writeRegionFields(id, items)" />`
    */
   change: [value: RegionId | null, items: readonly RegionOption[]];
 }>();
 
+/** 级联选择器当前已加载的地区树，既包含逐级候选，也可能包含编辑回显补入的路径。 */
 const options = ref<CascaderNode[]>([]);
+/** 控件使用的完整省市区 ID 路径；对外只提交最后一级 ID。 */
 const selectedPath = ref<RegionId[]>([]);
+/** 按父级 ID 和层级记录已加载地区，选中完整路径时用来回填名称。 */
 const loadedChildren = new Map<string, readonly RegionOption[]>();
+/** 需要重新加载候选时改变组件 key，以清除级联控件内部的旧节点。 */
 const cascaderRevision = ref(0);
+/** 逐级展开候选失败的提示，允许重试而不删除已有字段值。 */
 const loadError = ref("");
+/** 按已有 ID 回显完整路径失败的提示，与候选加载错误分开处理。 */
 const hydrateError = ref("");
+/** 优先显示回显错误，否则显示候选加载错误，统一放在控件旁。 */
 const errorMessage = computed(() => hydrateError.value || loadError.value);
+/** 根级查询成功但没有地区时显示空数据提示，与请求失败区分。 */
 const noData = ref(false);
+/** 取消当前回显和同轮候选请求，数据源或范围变化时终止旧请求。 */
 let controller: AbortController | undefined;
+/** 地区加载轮次，迟到的旧响应不能写入新范围的树。 */
 let revision = 0;
+/** 组件是否尚未卸载，异步结束时检查以免写回失效界面。 */
 let alive = true;
 
+/** 将层级和父级 ID 组成缓存键，保留数字与字符串 ID 的区别。 */
 function childrenKey(parentId: RegionId | null, level: number) {
   return `${level}:${parentId === null ? "root" : serializeStableKey(parentId)}`;
 }
 
+/** 把业务地区记录转成级联节点，达到配置深度后标记为叶子。 */
 function toNodes(items: readonly RegionOption[], level: number): CascaderNode[] {
   return items.map((item) => ({
     value: item.id,
@@ -72,6 +85,7 @@ function toNodes(items: readonly RegionOption[], level: number): CascaderNode[] 
   }));
 }
 
+/** 按父级加载一级候选，确认请求未过期后保存名称信息并生成控件节点。 */
 async function load(parentId: RegionId | null, level: number): Promise<CascaderNode[]> {
   const current = revision;
   const result = await props.source.loadChildren(
@@ -87,6 +101,7 @@ async function load(parentId: RegionId | null, level: number): Promise<CascaderN
   return toNodes(result, level);
 }
 
+/** 配置懒加载和完整路径输出；请求失败时结束节点加载状态并显示可重试错误。 */
 const cascaderProps = computed<CascaderProps>(() => ({
   lazy: true,
   emitPath: true,
@@ -106,10 +121,12 @@ const cascaderProps = computed<CascaderProps>(() => ({
   },
 }));
 
+/** 在当前一级节点中按 ID 查找，编辑回显时避免重复插入同一地区。 */
 function findNode(nodes: CascaderNode[], id: RegionId): CascaderNode | undefined {
   return nodes.find((node) => node.value === id);
 }
 
+/** 把已有记录的完整地区路径补入候选树，使未展开过的地区也能显示名称。 */
 function insertPath(path: readonly RegionOption[]) {
   let current = options.value;
   path.forEach((item, index) => {
@@ -122,6 +139,7 @@ function insertPath(path: readonly RegionOption[]) {
   });
 }
 
+/** 从已加载记录还原选择路径的 ID 和名称，路径缺少任一级则拒绝回填。 */
 function optionsForPath(path: readonly RegionId[]): RegionOption[] {
   const result: RegionOption[] = [];
   let parentId: RegionId | null = null;
@@ -136,6 +154,7 @@ function optionsForPath(path: readonly RegionId[]): RegionOption[] {
   return result;
 }
 
+/** 只有完整地区路径才提交末级 ID 和路径记录；清空时提交 null 和空数组。 */
 function commit(value: unknown) {
   const path = Array.isArray(value) ? (value as RegionId[]) : [];
   if (!path.length) {
@@ -150,6 +169,7 @@ function commit(value: unknown) {
   emit("change", path.at(-1)!, items);
 }
 
+/** 根据已有末级 ID 读取完整路径并回显；失败时保留外部字段值，允许用户重试。 */
 async function hydrate() {
   controller?.abort();
   const activeController = new AbortController();
@@ -191,6 +211,7 @@ async function hydrate() {
   }
 }
 
+/** 按失败类型重试路径回显或重建候选树，不自动无限重复请求。 */
 function retry() {
   noData.value = false;
   if (hydrateError.value) {
@@ -203,10 +224,12 @@ function retry() {
   cascaderRevision.value++;
 }
 
+/** 父页面替换地区 ID 后重新回显路径，包括加载记录和恢复草稿。 */
 watch(
   () => props.modelValue,
   () => void hydrate()
 );
+/** 组织条件或数据源变化时清空旧候选，并在新范围内重新解析已有 ID。 */
 watch(
   () => [props.filters, props.source] as const,
   () => {
@@ -219,6 +242,7 @@ watch(
   },
   { immediate: true, deep: true }
 );
+/** 卸载后禁止旧响应写回，并取消尚未结束的地区请求。 */
 onBeforeUnmount(() => {
   alive = false;
   revision++;

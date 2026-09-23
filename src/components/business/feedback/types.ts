@@ -1,6 +1,6 @@
 import type { FeedbackTone } from "@/utils/feedback-policy";
 
-/** 页内与全局轻提示共用的呈现合同；不拥有保存或重试状态。 */
+/** 页内与全局轻提示共用的显示接口约定；不拥有保存或重试状态。 */
 export interface FeedbackProps {
   /** 完整纯文本；超出统一阈值显示摘要，通过详情阅读，不执行 HTML。 */
   message: string;
@@ -19,7 +19,7 @@ export interface FeedbackProps {
 
 /** 反馈只提供展示事件，不自动重新执行业务命令。 */
 export interface FeedbackEmits {
-  /** 点击关闭触发；宿主负责移除本次展示，不清除表单或错误事实。
+  /** 点击关闭触发；调用方负责移除本次展示，不清除表单或错误事实。
    * @example
    * `<MyFeedback closable message="保存成功" @close="dismiss" />`
    */

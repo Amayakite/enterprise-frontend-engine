@@ -1,4 +1,5 @@
 <template>
+  <!-- 传入 rows、fields 和 rowKey 显示列表。可配置选择、排序和行编辑，通过事件更新页面数据；保存 API 由页面调用。 -->
   <section
     ref="root"
     class="my-table"
@@ -38,6 +39,7 @@
         </button>
       </div>
     </section>
+    <!-- TableView 负责画出表格，MyTable 负责处理字段格式和行编辑；页面使用上方公开插槽即可自定义单元格。 -->
     <TableView
       v-if="!engineError"
       ref="table"
@@ -324,13 +326,13 @@ import type {
 
 const props = withDefaults(
   defineProps<{
-    /** 受控表格数据；行增删与编辑结果由宿主合并回此数组。 */
+    /** 受控表格数据；行增删与编辑结果由调用方合并回此数组。 */
     rows: readonly Row[];
     /** 从行数据取得稳定主键，供选择、编辑和定位使用。 */
     getRowKey: (row: Readonly<Row>) => Key;
     /** 展示列配置；不传时可由 fields 推导。 */
     columns?: readonly TableColumn<Row>[];
-    /** 字段合同，用于行编辑、展示格式和校验。 */
+    /** 字段配置，用于行编辑、展示格式和校验。 */
     fields?: readonly FieldDefinition<Row, C>[];
     /** 字段渲染和联动所需的页面上下文。 */
     context: C;
@@ -338,7 +340,7 @@ const props = withDefaults(
     height?: number | string;
     /** 表格允许收缩到的最小高度。 */
     minHeight?: number | string;
-    /** 宿主正在加载数据时显示读取状态。 */
+    /** 调用方正在加载数据时显示读取状态。 */
     loading?: boolean;
     /** 冻结编辑/选择等命令，不显示读取中的遮罩。 */
     readonly?: boolean;
@@ -356,13 +358,13 @@ const props = withDefaults(
     engineOptions?: TableEngineOptions;
     /** 表格密度，默认 compact。 */
     density?: FieldDensity;
-    /** 展示装配可明确要求单行；省略保持既有编辑/参照换行规则。 */
+    /** 展示组合可明确要求单行；省略保持既有编辑/参照换行规则。 */
     wrapCells?: boolean | null;
     /** 用于编辑草稿等局部状态隔离的稳定模块标识。 */
     moduleKey?: string;
     /** 为跨页错误摘要提供全量行序号或业务名称。 */
     getRowLabel?: (key: Key) => string | undefined;
-    /** 定位跨页/页签数据前由宿主完成装载；组件随后滚动并聚焦。 */
+    /** 定位跨页/页签数据前由调用方完成装载；组件随后滚动并聚焦。 */
     beforeLocate?: (key: Key, field: FieldKey<Row>) => Promise<void>;
   }>(),
   {
@@ -396,33 +398,46 @@ const slots = defineSlots<
     summary?: (props: { scope: "page" | "all" }) => unknown;
   }
 >();
+/** 将字段名转换为 field-* 插槽名，让行编辑使用页面提供的输入控件。 */
 function fieldSlotName(key: FieldKey<Row>) {
   return `field-${key}` as keyof typeof slots & `field-${string}`;
 }
+/** 只允许已支持的底层表格选项；收到未知配置时显示原因，避免无效选项悄悄被忽略。 */
 const engineError = computed(() => {
   const unsupported = Object.keys(props.engineOptions ?? {}).filter((key) => key !== "stripe");
   return unsupported.length
     ? `不支持的 engineOptions：${unsupported.join("、")}。首期不支持虚拟滚动、合并和展开组合。`
     : "";
 });
+/** 表格最外层元素，用于找到并聚焦带行 ID 和字段标记的单元格。 */
 const root = ref<HTMLElement>();
+/** 让当前表格的参照显示共用批量请求；分页或组织变化时清空旧范围。 */
 const displayContext = createReferenceDisplayContext();
 provide(referenceDisplayKey, displayContext);
+/** 组织等上下文变化时作废参照名称缓存，避免显示另一范围的记录。 */
 watch(
   () => props.context,
   () => displayContext.reset(),
   { deep: true, flush: "sync" }
 );
+/** 卸载表格时取消参照回显请求并释放共享记录。 */
 onBeforeUnmount(() => displayContext.dispose());
+/** 内部 TableView 的公开重算和定位方法，用于编辑展开后的滚动与焦点处理。 */
 const table = ref<{
   recalculate: () => Promise<void>;
   scrollToCell: (key: Key, field: FieldKey<Row>) => Promise<void>;
 }>();
+/** 弹窗或抽屉中的行表单实例，确认时校验并聚焦错误字段。 */
 const rowForm = ref<MyFormExpose<Row>>();
+/** 控制行编辑弹窗或抽屉的开关，和整页编辑窗口无关。 */
 const dialogOpen = ref(false);
+/** 记录尚未确认的新行，取消其编辑时应同时删除占位行。 */
 const newRowKeys = shallowRef(new Set<Key>());
+/** 记录本次表格已确认修改过的行，用于行状态显示。 */
 const modifiedRowKeys = shallowRef(new Set<Key>());
+/** 新增等表格操作失败时的提示，不混入字段校验错误。 */
 const operationError = ref("");
+/** 管理当前行的输入、校验和取消；确认后通过 row-patch 通知页面，取消新行时通知删除。 */
 const draft = useRowDraft(
   props,
   (rowKey, changes) => {
@@ -435,56 +450,75 @@ const draft = useRowDraft(
     if (!committed) emit("row-remove", key);
   }
 );
+/** 判断是否用弹窗或抽屉编辑行；否则在原单元格内输入。 */
 const overlayEdit = computed(
   () => !!props.edit && ["dialog", "drawer"].includes(props.edit.presentation ?? "inline")
 );
+/** 区分抽屉和弹窗编辑，用于选择组件及读取对应布局设置。 */
 const drawerEdit = computed(() => !!props.edit && props.edit.presentation === "drawer");
+/** 按编辑方式选择 MyDrawer 或 MyDialog，共用同一个行表单。 */
 const editorShell = computed(() => (drawerEdit.value ? MyDrawer : MyDialog));
+/** 读取当前编辑方式的标题、宽度和列数，避免两种弹层配置混用。 */
 const editorConfig = computed(() => {
   if (!props.edit) return;
   return drawerEdit.value ? props.edit.drawer : props.edit.dialog;
 });
+/** 优先采用显式换行设置；未配置时，编辑表格、长文本或参照字段默认允许换行。 */
 const effectiveWrapCells = computed(
   () =>
     props.wrapCells ??
     (!!props.edit ||
       !!props.fields?.some((field) => field.type === "textarea" || field.type === "reference"))
 );
+/** 按当前编辑行生成弹层标题，未配置时显示“编辑明细”。 */
 const dialogTitle = computed(() => {
   if (!props.edit || !draft.session.value) return "编辑明细";
   const title = editorConfig.value?.title;
   return typeof title === "function" ? title(draft.session.value.draft) : (title ?? "编辑明细");
 });
+/** 输入、错误或显示密度变化时递增，通知表格重新测量行高。 */
 const layoutRevision = ref(0);
+/** 行输入、错误和换行布局改变后请求一次表格重算，避免输入框或提示被旧行高裁切。 */
 watch(
   [draft.session, draft.errors, () => props.density, effectiveWrapCells],
   () => layoutRevision.value++,
   { deep: true, flush: "post" }
 );
+/** 从错误列表去重得到需要高亮的行 ID。 */
 const errorRowKeys = computed(() => [...new Set(draft.errors.value.map((error) => error.rowKey))]);
+/** 当前是否有行草稿变化时通知主表，用于未保存确认和草稿保护。 */
 watch(
   () => !!draft.session.value,
   (active) => emit("draft-change", active)
 );
+/** 正在切页、排序或定位编辑时暂时锁住其他操作，避免切换过程叠加。 */
 const navigating = ref(false);
+/** 合并加载、只读、行确认和导航状态，统一限制编辑、选择和翻页。 */
 const busy = computed(
   () => props.loading || props.readonly || draft.pending.value || navigating.value
 );
+/** 操作结束后若当前行仍有错误，自动聚焦第一项错误，方便用户继续修改。 */
 watch(busy, (value, previous) => {
   const first = draft.errors.value[0];
   if (previous && !value && first && draft.session.value?.key === first.rowKey)
     void focusCell(first.rowKey, first.field);
 });
+/** 优先使用显式 columns，否则由 fields 生成列表列配置。 */
 const resolvedColumns = computed(() => props.columns ?? toTableColumns(props.fields ?? []));
+/** 正在编辑的行显示临时输入，其余行显示页面传入的原数据。 */
 const displayRow = (row: Readonly<Row>, key: Key) =>
   draft.session.value?.key === key ? draft.session.value.draft : row;
+/** 为当前行的字段规则准备数据、组织等信息和编辑模式。 */
 const environment = (model: Readonly<Row>): FieldEnvironment<Row, C> => ({
   model,
   context: props.context,
   mode: "edit",
 });
+/** 按字段名索引配置，渲染多行单元格时避免重复扫描字段数组。 */
 const fieldsByKey = computed(() => new Map(props.fields?.map((field) => [field.key, field])));
+/** 按列字段名取得输入及格式化配置；纯 columns 模式下可能没有对应字段。 */
 const fieldFor = (key: FieldKey<Row>) => fieldsByKey.value.get(key);
+/** 结合当前行数据计算真正可见且允许编辑的字段，支持条件只读和显隐。 */
 const editableFields = computed(() => {
   const row = draft.session.value?.draft;
   return new Map(
@@ -495,6 +529,7 @@ const editableFields = computed(() => {
       : []
   );
 });
+/** 仅在可编辑表格中判断静态必填列；普通只读列表不显示必填红点。 */
 function fixedRequired(key: FieldKey<Row>) {
   if (!props.edit) return false;
   const form = fieldFor(key)?.form;
@@ -505,10 +540,12 @@ function fixedRequired(key: FieldKey<Row>) {
     form.required === true
   );
 }
+/** 读取字段填写帮助，作为表头提示；没有字段配置时不额外显示。 */
 function headerHelp(key: FieldKey<Row>) {
   const field = fieldFor(key);
   return field ? fieldHelpText(field) : "";
 }
+/** 按当前行计算条件必填，仅在单元格提示，避免把所有行都标为必填。 */
 function dynamicRequired(key: FieldKey<Row>, row: Readonly<Row>) {
   if (!props.edit) return false;
   const field = fieldFor(key);
@@ -516,10 +553,12 @@ function dynamicRequired(key: FieldKey<Row>, row: Readonly<Row>) {
   const form = normalizeFields([field], environment(row))[0]?.form;
   return form?.visible && form.required;
 }
+/** 取当前行允许编辑的字段，未返回时使用只读显示。 */
 function editableField(key: FieldKey<Row>) {
   return editableFields.value.get(key);
 }
 
+/** 校验可编辑性和参照回填冲突，再将主值及关联字段合并到行草稿。 */
 function changeValue(
   key: FieldKey<Row>,
   value: Row[FieldKey<Row>],
@@ -531,8 +570,10 @@ function changeValue(
     throw new Error(`参照回填冲突：${key}`);
   draft.patch({ ...mapped, [key]: value } as Partial<Row>, reason);
 }
+/** 按行 ID 和字段名查找单元格错误，避免相同字段串到其他行。 */
 const cellError = (key: Key, field: FieldKey<Row>) =>
   draft.errors.value.find((error) => error.rowKey === key && error.field === field)?.message;
+/** 组合行号、字段标签和错误内容，便于用户在错误清单中识别位置。 */
 function errorLabel(error: TableValidation<Row, Key>["errors"][number]) {
   const rowIndex = props.rows.findIndex((row) => props.getRowKey(row) === error.rowKey);
   const field = fieldFor(error.field);
@@ -540,6 +581,7 @@ function errorLabel(error: TableValidation<Row, Key>["errors"][number]) {
     props.getRowLabel?.(error.rowKey) ?? (rowIndex >= 0 ? `第 ${rowIndex + 1} 行` : "");
   return `${rowLabel ? `${rowLabel} · ` : ""}${field?.label ?? error.field}：${error.message}`;
 }
+/** 等待表格重算和滚动后找到目标单元格，再把焦点放到输入控件。 */
 async function locateTableCell(key: Key, field: FieldKey<Row>) {
   await table.value?.recalculate();
   await nextTick();
@@ -551,6 +593,7 @@ async function locateTableCell(key: Key, field: FieldKey<Row>) {
   cell?.scrollIntoView({ block: "nearest", inline: "nearest" });
   focusFieldControl(cell);
 }
+/** 先让父页面切到目标行所在分页/分区，再进入编辑或直接滚动定位。 */
 async function focusCell(key: Key, field: FieldKey<Row>) {
   await props.beforeLocate?.(key, field);
   await nextTick();
@@ -560,12 +603,14 @@ async function focusCell(key: Key, field: FieldKey<Row>) {
   }
   await locateTableCell(key, field);
 }
+/** 确认当前行输入；失败则保留草稿并定位第一项错误。 */
 async function commitEdit() {
   const success = await draft.commitEdit();
   const first = draft.errors.value[0];
   if (!success && first) await focusCell(first.rowKey, first.field);
   return success;
 }
+/** 先确认上一行，再编辑目标行；根据配置打开弹层或聚焦行内字段。 */
 async function startEdit(key: Key, field?: FieldKey<Row>, located = false) {
   if (busy.value) return false;
   if (!located) {
@@ -573,6 +618,7 @@ async function startEdit(key: Key, field?: FieldKey<Row>, located = false) {
     if (locateField) await props.beforeLocate?.(key, locateField);
     await nextTick();
   }
+  // 切到另一行前先确认当前草稿，校验失败则保留原行，避免输入被切换操作丢弃。
   if (draft.session.value?.key !== key) {
     if (!(await commitEdit())) return false;
     const previousErrors = [...draft.errors.value];
@@ -580,6 +626,7 @@ async function startEdit(key: Key, field?: FieldKey<Row>, located = false) {
     draft.errors.value = previousErrors;
   }
   const target = field ?? resolvedColumns.value.find((column) => editableField(column.key))?.key;
+  // 按行编辑展示方式打开弹层或定位单元格，弹层要等表单挂载后再校验和聚焦。
   if (overlayEdit.value) {
     dialogOpen.value = true;
     await nextTick();
@@ -588,6 +635,7 @@ async function startEdit(key: Key, field?: FieldKey<Row>, located = false) {
   } else if (target) await locateTableCell(key, target);
   return true;
 }
+/** 比较行表单的新旧值，只把变化字段交给行草稿，继续执行行联动。 */
 function updateDialogModel(model: Row) {
   const current = draft.session.value;
   if (!current) return;
@@ -596,14 +644,17 @@ function updateDialogModel(model: Row) {
     if (!sameModelValue(current.draft[key], model[key])) changes[key] = model[key];
   if (Object.keys(changes).length) draft.patch(changes);
 }
+/** 关闭行编辑弹层并丢弃临时修改；新建行由草稿关闭回调删除。 */
 function cancelDialog() {
   dialogOpen.value = false;
   draft.cancelEdit();
 }
+/** 同步弹层开关，关闭时一并取消仍在编辑的行，避免隐藏的草稿继续存在。 */
 function updateDialogVisible(value: boolean) {
   dialogOpen.value = value;
   if (!value && draft.session.value) draft.cancelEdit();
 }
+/** 先校验弹层表单，再确认行草稿；只有两者通过才关闭编辑窗口。 */
 async function commitDialog() {
   const formResult = await rowForm.value?.validate();
   if (formResult && !formResult.valid) {
@@ -616,6 +667,7 @@ async function commitDialog() {
   if (success) dialogOpen.value = false;
   return success;
 }
+/** 确认已有草稿后创建新行，检查 ID 唯一再进入编辑；无法编辑时移除刚插入的行。 */
 async function addRow() {
   if (busy.value || !props.edit || !props.edit.allowAdd || !(await commitEdit())) return false;
   operationError.value = "";
@@ -627,6 +679,7 @@ async function addRow() {
     return false;
   }
   newRowKeys.value.add(key);
+  // 先通知父组件插入行，再等 rows 回传后开始编辑；父组件未接收时撤回新行。
   emit("row-add", row);
   await nextTick();
   if (await startEdit(key)) return true;
@@ -635,6 +688,7 @@ async function addRow() {
   operationError.value = "新增行未能进入编辑，请检查 row-add 是否同步更新 rows";
   return false;
 }
+/** 根据稳定 ID 删除行；先处理正在编辑的草稿和对应错误，再通知页面。 */
 async function removeRow(key: Key) {
   if (
     busy.value ||
@@ -653,6 +707,7 @@ async function removeRow(key: Key) {
   emit("row-remove", key);
   return true;
 }
+/** 普通行内输入用 Enter/Tab 确认并移动字段；保留文本域、富文本和参照自己的键盘行为。 */
 async function cellKeydown(event: KeyboardEvent, key: Key, field: FieldKey<Row>) {
   if (
     event.defaultPrevented ||
@@ -674,17 +729,22 @@ async function cellKeydown(event: KeyboardEvent, key: Key, field: FieldKey<Row>)
   event.preventDefault();
   if ((await commitEdit()) && next) await startEdit(key, next.key);
 }
+/** 从页面传入的选中 ID 判断当前行是否勾选。 */
 const selected = (key: Key) => !!props.selection && props.selection.keys.includes(key);
+/** 当前页有数据且全部选中时，勾选页头全选框。 */
 const allSelected = computed(
   () => !!props.rows.length && props.rows.every((row) => selected(props.getRowKey(row)))
 );
+/** 判断当前页是否有选中项，与 allSelected 一起决定半选状态。 */
 const someSelected = computed(() => props.rows.some((row) => selected(props.getRowKey(row))));
+/** 通知新的选中 ID，并附带本页对应行；跨页 ID 不会冒充本页记录。 */
 function publishSelection(keys: Key[]) {
   emit("selection-change", {
     keys,
     currentPageRows: props.rows.filter((row) => keys.includes(props.getRowKey(row))),
   });
 }
+/** 切换一行的勾选，单选替换旧选择，多选保留其他已选 ID。 */
 function toggleSelection(key: Key) {
   if (!props.selection || busy.value) return;
   publishSelection(
@@ -695,6 +755,7 @@ function toggleSelection(key: Key) {
         : [...props.selection.keys, key]
   );
 }
+/** 全选或取消当前页，同时保留其他页已选择的记录。 */
 function selectPage() {
   if (!props.selection || busy.value) return;
   const pageKeys = props.rows.map(props.getRowKey);
@@ -704,10 +765,12 @@ function selectPage() {
       : [...new Set([...props.selection.keys, ...pageKeys])]
   );
 }
+/** 未开启跨页保留时，切页或排序前清空选择。 */
 function clearPageSelection() {
   if (props.selection && !props.selection.preserveOnPageChange && props.selection.keys.length)
     publishSelection([]);
 }
+/** 确认当前行后按升序、降序、取消排序依次切换，并通知页面重新查询。 */
 async function changeSort(key: FieldKey<Row>) {
   if (busy.value) return;
   navigating.value = true;
@@ -725,10 +788,12 @@ async function changeSort(key: FieldKey<Row>) {
     navigating.value = false;
   }
 }
+/** 按当前列的排序状态选图标，让用户区分未排序、升序和降序。 */
 function sortIcon(key: FieldKey<Row>) {
   if (props.sort?.key !== key) return Sort;
   return props.sort.order === "asc" ? SortUp : SortDown;
 }
+/** 生成包含列名、当前顺序和下次操作的按钮说明，供键盘和读屏使用。 */
 function sortLabel(key: FieldKey<Row>) {
   const column = resolvedColumns.value.find((item) => item.key === key);
   const label = column?.label ?? String(key);
@@ -737,9 +802,13 @@ function sortLabel(key: FieldKey<Row>) {
     ? `排序${label}，当前升序，点击降序`
     : `排序${label}，当前降序，点击取消排序`;
 }
+/** 切页成功或被校验拦截后刷新分页控件，使其显示页面实际接受的页码。 */
 const paginationRevision = ref(0);
+/** 同一轮交互中最后一次分页目标，用于合并条数变化连带触发的页码事件。 */
 let queuedPage: { page: number; limit: number } | undefined;
+/** 合并分页事件，先确认行草稿，改变每页条数时回第一页；校验失败则恢复原分页显示。 */
 function queuePage(value: { page: number; limit: number }) {
+  // 每页条数变化可能连带触发页码事件，在同一微任务里只处理最后一个目标。
   const scheduled = !!queuedPage;
   queuedPage = value;
   if (!scheduled)
@@ -753,6 +822,7 @@ function queuePage(value: { page: number; limit: number }) {
       navigating.value = true;
       try {
         if (!(await commitEdit())) return;
+        // 当前行确认通过后才发布分页；更改每页条数回第一页，并清掉旧页选择。
         const pageNum = next.limit !== props.pagination.pageSize ? 1 : next.page;
         if (pageNum !== props.pagination.pageNum || next.limit !== props.pagination.pageSize) {
           clearPageSelection();
@@ -764,6 +834,7 @@ function queuePage(value: { page: number; limit: number }) {
       }
     });
 }
+/** 父页面真正改变分页或排序后取消旧行编辑、清理参照显示及按配置重置选择。 */
 watch(
   [
     () => props.pagination && props.pagination.pageNum,

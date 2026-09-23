@@ -1,7 +1,7 @@
-/** 请求失败的归属方；local 由发起业务的控制器呈现，global 由请求层的兼容兜底呈现。 */
+/** 请求失败的归属方；local 由发起业务的控制器显示，global 由请求层的兼容兜底显示。 */
 export type RequestErrorOwner = "local" | "global";
 
-/** 可供页面决定呈现和保存后续动作的请求失败类别。 */
+/** 可供页面决定显示和保存后续动作的请求失败类别。 */
 export type RequestErrorKind =
   | "business"
   | "permission"
@@ -36,7 +36,7 @@ export interface RequestErrorInput {
 export class RequestError extends Error {
   /** 可供调用方决定是否可安全重提的失败类别。 */
   readonly kind: RequestErrorKind;
-  /** 此错误应由请求层兜底还是调用方局部反馈呈现。 */
+  /** 此错误应由请求层兜底还是调用方局部反馈显示。 */
   readonly owner: RequestErrorOwner;
   /** 后端业务码；非协议响应时为 undefined。 */
   readonly code: string | number | undefined;

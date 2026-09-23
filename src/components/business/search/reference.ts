@@ -14,14 +14,14 @@ export function createQueryReference<
   F extends ReferenceFilters,
 >(options: {
   /**
-   * 参照数据源合同；提供稳定 key、行主键/名称、搜索和 ID 回显方法。创建对象本身不发请求。
+   * 参照数据源配置；提供稳定 key、行主键/名称、搜索和 ID 回显方法。创建对象本身不发请求。
    * @example
    * `source: provinceReference`
    */
   source: ReferenceSource<Row, Id, F>;
 
   /**
-   * 返回查询参照的固定范围，不接收表单 model；确保与 source 的过滤合同一致。
+   * 返回查询参照的固定范围，不接收表单 model；确保与 source 的过滤接口约定一致。
    * @example
    * `filters: () => ({ organizationId: "org-a", level: "province", parentId: null })`
    */
@@ -33,6 +33,7 @@ export function createQueryReference<
    */
   scopeKey?: () => string;
 }): QueryValueEditor {
+  /** 为单选或多选生成参照字段配置，查询编辑器复用同一数据源及范围规则。 */
   const make = (multiple: boolean) =>
     createReferenceField<
       {
@@ -48,6 +49,7 @@ export function createQueryReference<
       filters: options.filters,
       scopeKey: ({ context }) => context,
     });
+  /** 预先准备单选和多选两份配置，运算符决定本次使用哪一份。 */
   const single = make(false),
     multiple = make(true);
   return {

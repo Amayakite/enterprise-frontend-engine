@@ -26,7 +26,7 @@ export type AggregatePayloadBindings<M, DTO> = {
 
 /** 模块组合器所需的最小绑定；具体子配置与精确 key 在工厂返回值中保留。 */
 export interface AggregateBinding<M> {
-  /** 按需登记聚合编辑端口；页面负责呈现，省略时由页面自行登记。 */
+  /** 按需登记聚合编辑端口；页面负责显示，省略时由页面自行登记。 */
   createBinding?: <Entity, Id extends string | number>(
     form: CrudFormController<M, Entity, Id>
   ) => unknown;

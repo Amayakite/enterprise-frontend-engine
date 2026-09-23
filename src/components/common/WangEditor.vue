@@ -65,12 +65,15 @@ const modelValue = defineModel<string>({
 // 编辑器实例，必须用 shallowRef
 const editorRef = shallowRef<IDomEditor | null>(null);
 
+/** 外部整体替换内容时递增，用于重建编辑器而不是保留旧内部文档。 */
 const editorKey = ref(0);
+/** 标记当前变化来自编辑器输入，避免 v-model 回传触发自我销毁重建。 */
 const innerUpdating = ref(false);
 
 // 工具栏配置
 const toolbarConfig: Partial<IToolbarConfig> = {};
 
+/** 记录编辑器正在进行的图片上传，卸载时统一取消。 */
 const uploads = new Set<AbortController>();
 
 // 编辑器配置
@@ -105,6 +108,7 @@ const handleCreated = (editor: IDomEditor) => {
   editorRef.value = editor;
 };
 
+/** 把当前微任务内的内容变化标记为用户输入，父级回传相同内容时保留编辑器实例。 */
 const handleChange = () => {
   innerUpdating.value = true;
   Promise.resolve().then(() => {
@@ -112,6 +116,7 @@ const handleChange = () => {
   });
 };
 
+/** 外部替换富文本内容时销毁旧实例并重建；编辑器自己的输入回传不重建。 */
 watch(
   () => modelValue.value,
   () => {

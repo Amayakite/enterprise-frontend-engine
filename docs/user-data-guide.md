@@ -4,7 +4,7 @@
 
 ## 1. 公共入口与 Key
 
-- `src/utils/user-data/index.ts`：异步 read/write/remove、用户清理、容量和 TTL、可读 Key、远端 adapter 合同。
+- `src/utils/user-data/index.ts`：异步 read/write/remove、用户清理、容量和 TTL、可读 Key、远端 adapter 接口约定。
 - `src/utils/user-data/preferences.ts`：列设置远端检查会话，只保存有界时间戳，不保存表格行或页面实例。
 - `useCrudColumns`：沿用列白名单归一化，连接本地优先和远端同步。
 - `useCrudDraft/useCrudDraftRestorePrompt/useCrudForm/MyCrudForm`：草稿防抖、恢复、首次漫游式聚焦引导、状态提示及提交保护。
@@ -12,7 +12,7 @@
 
 模块沿用唯一 `config.key`。新模块可用 `base/trm` 等可读逻辑路径，不用磁盘路径或当前路由 URL。已有 customer、task-fee 的 key 保持不变，以免偏好失联。公共 `createUserDataKey` 对身份与用途进行编码，保留 string/number ID 差异；主模块逻辑路径允许分段可读，不允许业务手拼缓存键。
 
-列 identity 由 `user/module/version/scope?` 组成。customer 和任务费用已传 scopeKey，隔离组织与权限范围；旧 localStorage 列设置会兼容读取。当前列配置版本体现在 `columns:<version>` 用途键中，存储记录另有 schemaVersion。将来修改 Key 或身份合同须明确迁移，不直接删除旧配置。
+列 identity 由 `user/module/version/scope?` 组成。customer 和任务费用已传 scopeKey，隔离组织与权限范围；旧 localStorage 列设置会兼容读取。当前列配置版本体现在 `columns:<version>` 用途键中，存储记录另有 schemaVersion。将来修改 Key 或身份接口约定须明确迁移，不直接删除旧配置。
 
 ## 2. 存储降级与内存边界
 
@@ -48,7 +48,7 @@ draft: {
 },
 ```
 
-独立 add/edit 页面或可选共用宿主创建 controller 时，只补一次身份和现有模块 key；以下为装配片段，`user/context/config` 沿用页面上下文，`draftInstanceKey` 在 setup 时捕获该实例的 route.fullPath：
+独立 add/edit 页面或可选共用编辑组件创建 controller 时，只补一次身份和现有模块 key；以下为组合片段，`user/context/config` 沿用页面上下文，`draftInstanceKey` 在 setup 时捕获该实例的 route.fullPath：
 
 ```ts
 const controller = useCrudForm(config.form!, {
@@ -69,7 +69,7 @@ const contacts = useCrudTableChild(controller, "contacts", {
 
 未登录或缺少合法身份时不得以公用账号键开启正式业务草稿。新增用 instanceKey 区分路由实例，编辑按实体 ID；同一路径同时打开的浏览器窗口竞争同一草稿会报告冲突，不互相覆盖。业务需要多个独立新增单据时，在新增路由携带唯一草稿实例参数。子表白名单必须包含稳定键字段，不能从行下标猜键。未配置 draft 的模块不启用落盘。
 
-子表配置版本、已确认行、活动行和新增行身份一起存储；恢复不调用提交或业务校验，半填数据保持为未提交草稿。行内、dialog、drawer 沿用原编辑呈现，取消恢复的新行仍会删除该未确认行。主字段、子行恢复时跳过当前只读字段。正式保存仍走现有权限、参照、字段和整单校验。
+子表配置版本、已确认行、活动行和新增行身份一起存储；恢复不调用提交或业务校验，半填数据保持为未提交草稿。行内、dialog、drawer 沿用原编辑显示，取消恢复的新行仍会删除该未确认行。主字段、子行恢复时跳过当前只读字段。正式保存仍走现有权限、参照、字段和整单校验。
 
 ## 4. 用户流程与异常
 
@@ -90,7 +90,7 @@ const contacts = useCrudTableChild(controller, "contacts", {
 
 列设置先应用本地缓存，再于当前会话首次使用或 5 分钟检查期到达后的激活时读取后端；不是每次列表查询都请求配置，也不后台轮询。用户保存后本地立即生效并尝试远端提交；失败保留待同步标记和重试入口。迟到响应不能覆盖用户刚编辑的配置，退出会话后旧响应不能回写。无 adapter 时只使用本机存储，不产生虚构请求。
 
-后端仍须补齐 preference 的 read/write/remove、服务端修订号和版本冲突协议。当前测试适配器验证的是前端同步行为，不代表真实多端联调已完成。Excel 解析、校验和导入执行归后端，前端只呈现上传进度和处理结果，不在此存储层实现 Excel 导入。
+后端仍须补齐 preference 的 read/write/remove、服务端修订号和版本冲突协议。当前测试适配器验证的是前端同步行为，不代表真实多端联调已完成。Excel 解析、校验和导入执行归后端，前端只显示上传进度和处理结果，不在此存储层实现 Excel 导入。
 
 ## 快捷搜索历史
 

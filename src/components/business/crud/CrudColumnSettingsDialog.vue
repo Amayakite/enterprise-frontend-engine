@@ -570,12 +570,13 @@ const emit = defineEmits<{
    */
   "update:modelValue": [value: boolean];
   /**
-   * 用户确认列设置，返回完整列偏好和表格密度；宿主负责持久化。
+   * 用户确认列设置，返回完整列偏好和表格密度；调用方负责持久化。
    * @example `<CrudColumnSettingsDialog @apply="(items, density) => preferences.apply(items, density)" />`
    */
   apply: [items: CrudColumnPreference[], density: CrudColumnDensity];
 }>();
 
+/** 列设置的左固定、随表滚动、右固定三个区域及标题样式，拖动和预览共用。 */
 const groupDefinitions: readonly {
   fixed: CrudColumnFixed;
   label: string;
@@ -586,55 +587,81 @@ const groupDefinitions: readonly {
   { fixed: "none", label: "跟随表格滚动", symbol: "↔", className: "center" },
   { fixed: "right", label: "固定在右侧", symbol: "→", className: "right" },
 ];
+/** 对齐方式代码及中文名称，列和表头组设置共用。 */
 const alignOptions: readonly { value: CrudColumnAlign; label: string }[] = [
   { value: "left", label: "左对齐" },
   { value: "center", label: "居中" },
   { value: "right", label: "右对齐" },
 ];
+/** 三块区域中的临时列顺序；有分组的列作为一个整体移动，点击应用前不修改真实表格。 */
 const zoneUnits = reactive<Record<CrudColumnFixed, ColumnUnit[]>>({
   left: [],
   none: [],
   right: [],
 });
+/** 本次窗口里选择的表格密度，应用时才通知外层保存。 */
 const draftDensity = ref<CrudColumnDensity>("compact");
+/** 按列名或表头组名搜索的输入，不影响实际表格查询。 */
 const keyword = ref("");
+/** 当前只查看全部、已显示还是已隐藏列，便于批量检查列设置。 */
 const filter = ref<VisibilityFilter>("all");
+/** 右侧属性面板当前编辑的单列 key，与选中表头组互斥。 */
 const selectedKey = ref("");
+/** 右侧属性面板当前编辑的表头组 key，与选中单列互斥。 */
 const selectedGroupKey = ref("");
+/** 是否正在拖列，用于拖动过程中的交互和样式反馈。 */
 const dragging = ref(false);
+/** 结构列表与属性预览之间的分栏尺寸，默认分给左侧 52%。 */
 const structurePaneSize = ref<string | number>("52%");
+/** 窄窗口下调整设置面板布局，避免两栏内容挤在一起。 */
 const isNarrow = useMediaQuery("(max-width: 900px)");
 
+/** 将窗口开关与父页面 v-model 对接，关闭只发通知，不直接修改 prop。 */
 const visible = computed({
   get: () => props.modelValue,
   set: (value: boolean) => emit("update:modelValue", value),
 });
+/** 按列 key 索引原始配置，用来读取名称和分组，避免反复遍历。 */
 const columnsByKey = computed(
   () => new Map(props.columns.map((column) => [column.key as string, column]))
 );
+/** 记录业务配置中的原始列顺序，同组列加载草稿时按此顺序排列。 */
 const sourceOrder = computed(
   () => new Map(props.columns.map((column, index) => [column.key as string, index]))
 );
+/** 按左、中、右顺序合并所有列组，用于统一搜索和预览。 */
 const allUnits = computed(() => [zoneUnits.left, zoneUnits.none, zoneUnits.right].flat());
+/** 展开所有组得到临时列设置列表，统计数量和应用配置时使用。 */
 const allItems = computed(() => allUnits.value.flatMap((unit) => unit.items));
+/** 目前设置为显示的列数，禁止隐藏最后一列时使用。 */
 const visibleCount = computed(() => allItems.value.filter((item) => item.visible).length);
+/** 目前隐藏的列数，用于筛选入口的数量提示。 */
 const hiddenCount = computed(() => allItems.value.length - visibleCount.value);
+/** 全部业务列数量，不受当前搜索和显隐筛选影响。 */
 const totalCount = computed(() => allItems.value.length);
+/** 当前搜索和显隐条件命中的列数，用于空结果和计数显示。 */
 const filteredTotal = computed(() => allItems.value.filter(matchesFilter).length);
+/** 只有展示完整列列表时允许拖动，避免过滤后的顺序被误当作实际列顺序。 */
 const dragEnabled = computed(() => filter.value === "all" && !keyword.value.trim());
+/** 当前选中列的临时设置，属性面板直接修改这份草稿。 */
 const selected = computed(() => allItems.value.find((item) => item.key === selectedKey.value));
+/** 当前选中的表头组及成员列，用于整组移动或调整对齐。 */
 const selectedGroup = computed(() =>
   allUnits.value.find((unit) => unit.group?.key === selectedGroupKey.value)
 );
+/** 当前单列所属的表头组；组内列不能脱离该组单独固定。 */
 const selectedHeaderGroup = computed(() =>
   selected.value ? headerGroupOf(selected.value) : undefined
 );
+/** 读取组标题的对齐设置，未指定时默认居中。 */
 const selectedGroupAlign = computed(
   () => selectedGroup.value?.items[0]?.groupAlign ?? selectedGroup.value?.group?.align ?? "center"
 );
+/** 从组内列读取统一固定位置，空组默认跟随表格滚动。 */
 const selectedGroupFixed = computed(
   () => selectedGroup.value?.items[0]?.fixed ?? ("none" as CrudColumnFixed)
 );
+/** 连接列宽输入与选中列草稿，未取到列宽时显示 160。 */
 const selectedWidth = computed({
   get: () => selected.value?.width ?? 160,
   set: (value: number) => {
@@ -642,9 +669,11 @@ const selectedWidth = computed({
   },
 });
 
+/** 存在可见分组列时使用分组表头预览，纯普通列不多画一层标题。 */
 const hasGroupedPreview = computed(() =>
   allUnits.value.some((unit) => !!unit.group && unit.items.some((item) => item.visible))
 );
+/** 每次打开窗口都从已应用列设置创建新草稿，取消后的修改不会带到下次。 */
 watch(
   () => props.modelValue,
   (open) => {
@@ -653,9 +682,11 @@ watch(
   { immediate: true }
 );
 
+/** 逐项复制列偏好，避免设置窗口直接修改父页面已应用对象。 */
 function cloneItems(items: readonly CrudColumnPreference[]) {
   return items.map((item) => ({ ...item }));
 }
+/** 把列偏好按表头组和固定位置整理为可拖动草稿，并重置搜索、选择和拖动状态。 */
 function loadDraft(items: readonly CrudColumnPreference[], density: CrudColumnDensity) {
   const next = cloneItems(items);
   const units: ColumnUnit[] = [];
@@ -694,27 +725,34 @@ function loadDraft(items: readonly CrudColumnPreference[], density: CrudColumnDe
   else selectItem(initial?.items[0]?.key ?? "");
   dragging.value = false;
 }
+/** 按 key 取得原始业务列，获取名称和分组等不由用户改写的配置。 */
 function columnOf(key: string) {
   return columnsByKey.value.get(key);
 }
+/** 取得列的显示名称，未知列以 key 兜底，便于识别失效配置。 */
 function labelOf(key: string) {
   return columnOf(key)?.label ?? key;
 }
+/** 读取列所属表头组，没有分组时作为独立列处理。 */
 function headerGroupOf(item: CrudColumnPreference) {
   return columnOf(item.key)?.headerGroup;
 }
+/** 为独立列或整组生成不同前缀的拖动 ID，避免同名 key 冲突。 */
 function unitKey(item: CrudColumnPreference) {
   const headerGroup = headerGroupOf(item);
   return headerGroup ? `group:${headerGroup.key}` : `column:${item.key}`;
 }
+/** 选中单列并退出组选择，右侧显示该列的属性。 */
 function selectItem(key: string) {
   selectedKey.value = key;
   selectedGroupKey.value = "";
 }
+/** 选中整组并清除单列选择，右侧显示组属性。 */
 function selectHeaderGroup(key: string) {
   selectedGroupKey.value = key;
   selectedKey.value = "";
 }
+/** 同时匹配关键词和显隐筛选，关键词可命中列名或组名。 */
 function matchesFilter(item: CrudColumnPreference) {
   const query = keyword.value.trim().toLocaleLowerCase();
   const groupLabel = headerGroupOf(item)?.label ?? "";
@@ -725,19 +763,24 @@ function matchesFilter(item: CrudColumnPreference) {
       (filter.value === "hidden" && !item.visible))
   );
 }
+/** 组内至少一列命中条件时保留该组，避免搜索时把匹配列一起隐藏。 */
 function unitMatchesFilter(unit: ColumnUnit) {
   return unit.items.some(matchesFilter);
 }
+/** 统计指定固定区域内命中筛选的列数。 */
 function filteredItemCount(fixed: CrudColumnFixed) {
   return zoneUnits[fixed].flatMap((unit) => unit.items).filter(matchesFilter).length;
 }
+/** 切换一列显隐，但阻止隐藏整个表格剩下的最后一列。 */
 function setItemVisibility(item: CrudColumnPreference, value: boolean) {
   if (!value && item.visible && visibleCount.value === 1) return;
   item.visible = value;
 }
+/** 查找某列所在的拖动单元，组内列共享同一个单元。 */
 function unitOf(item: CrudColumnPreference) {
   return allUnits.value.find((unit) => unit.items.some((entry) => entry.key === item.key));
 }
+/** 从原区域移出整列或整组，统一更新固定位置后插入目标区域。 */
 function moveUnit(unit: ColumnUnit, target: CrudColumnFixed, index?: number) {
   for (const fixed of ["left", "none", "right"] as const) {
     const currentIndex = zoneUnits[fixed].findIndex((entry) => entry.key === unit.key);
@@ -746,6 +789,7 @@ function moveUnit(unit: ColumnUnit, target: CrudColumnFixed, index?: number) {
   for (const item of unit.items) item.fixed = target;
   zoneUnits[target].splice(index ?? zoneUnits[target].length, 0, unit);
 }
+/** 修改独立列的固定位置；属于表头组的列必须通过整组操作移动。 */
 function setSelectedFixed(value: string | number | boolean | undefined) {
   if (
     !selected.value ||
@@ -756,15 +800,18 @@ function setSelectedFixed(value: string | number | boolean | undefined) {
   const unit = unitOf(selected.value);
   if (unit) moveUnit(unit, String(value) as CrudColumnFixed);
 }
+/** 把所选表头组全部移动到左固定、滚动或右固定区域。 */
 function setSelectedGroupFixed(value: string | number | boolean | undefined) {
   if (!selectedGroup.value || !["left", "none", "right"].includes(String(value))) return;
   moveUnit(selectedGroup.value, String(value) as CrudColumnFixed);
 }
+/** 同时更新组内成员保存的组标题对齐设置，使恢复后仍一致。 */
 function setSelectedGroupAlign(value: string | number | boolean | undefined) {
   if (value !== "left" && value !== "center" && value !== "right") return;
   if (!selectedGroup.value) return;
   for (const item of selectedGroup.value.items) item.groupAlign = value;
 }
+/** 等待拖动库更新数组后，按各区域重新写入固定位置并结束拖动态。 */
 async function finishDrag() {
   await nextTick();
   for (const zone of groupDefinitions)
@@ -772,29 +819,36 @@ async function finishDrag() {
       for (const item of unit.items) item.fixed = zone.fixed;
   dragging.value = false;
 }
+/** 收集一个表头组的所有列，整组显隐和恢复默认共同使用。 */
 function headerGroupItems(key: string) {
   return allItems.value.filter((item) => headerGroupOf(item)?.key === key);
 }
+/** 统计指定组中当前可见列数量。 */
 function headerGroupVisibleCount(key: string) {
   return headerGroupItems(key).filter((item) => item.visible).length;
 }
+/** 判断组内列是否全部可见，控制组级勾选框。 */
 function headerGroupAllVisible(key: string) {
   const items = headerGroupItems(key);
   return !!items.length && items.every((item) => item.visible);
 }
+/** 组内只有部分列可见时显示半选状态。 */
 function headerGroupIndeterminate(key: string) {
   const visibleItems = headerGroupVisibleCount(key);
   return visibleItems > 0 && visibleItems < headerGroupItems(key).length;
 }
+/** 如果隐藏该组会让整个表格没有任何列，就禁止整组隐藏。 */
 function headerGroupHideDisabled(key: string) {
   const visibleItems = headerGroupVisibleCount(key);
   return headerGroupAllVisible(key) && visibleItems > 0 && visibleCount.value === visibleItems;
 }
+/** 一次切换整组显隐，同时保留至少一个可见业务列。 */
 function setHeaderGroupVisibility(key: string, value: string | number | boolean) {
   const show = value === true;
   if (!show && headerGroupHideDisabled(key)) return;
   for (const item of headerGroupItems(key)) item.visible = show;
 }
+/** 按默认列顺序计算恢复后的插入位置，只比较同一个固定区域。 */
 function defaultUnitIndex(item: CrudColumnPreference) {
   const preceding = new Set<string>();
   for (const entry of props.defaults) {
@@ -804,6 +858,7 @@ function defaultUnitIndex(item: CrudColumnPreference) {
   }
   return zoneUnits[item.fixed].filter((unit) => preceding.has(unit.key)).length;
 }
+/** 恢复单列默认显隐、宽度和对齐；组内列不单独移动整个表头组。 */
 function restoreItem(item: CrudColumnPreference) {
   const original = props.defaults.find((entry) => entry.key === item.key);
   if (!original) return;
@@ -818,12 +873,15 @@ function restoreItem(item: CrudColumnPreference) {
   Object.assign(item, original);
   moveUnit(unit, original.fixed, defaultUnitIndex(original));
 }
+/** 只恢复当前选中列，不改其他列的临时设置。 */
 function restoreSelected() {
   if (selected.value) restoreItem(selected.value);
 }
+/** 恢复当前选中的整个表头组。 */
 function restoreSelectedGroup() {
   if (selectedGroup.value?.group) restoreHeaderGroup(selectedGroup.value.group.key);
 }
+/** 恢复组内所有列的默认属性和顺序，并把整组移回默认固定位置。 */
 function restoreHeaderGroup(key: string) {
   const orderedDefaults = props.defaults.filter((item) => {
     const column = columnOf(item.key);
@@ -840,6 +898,7 @@ function restoreHeaderGroup(key: string) {
   unit.items.sort((left, right) => (order.get(left.key) ?? 0) - (order.get(right.key) ?? 0));
   moveUnit(unit, first.fixed, defaultUnitIndex(first));
 }
+/** 把临时偏好合并到原始列生成预览配置，隐藏列不进入预览。 */
 function draftColumn(item: CrudColumnPreference): TableColumn<Row> | undefined {
   const column = columnOf(item.key);
   if (!column || !item.visible) return undefined;
@@ -857,6 +916,7 @@ function draftColumn(item: CrudColumnPreference): TableColumn<Row> | undefined {
       : undefined,
   };
 }
+/** 按拖动单元预先生成可见预览列，结构和属性面板共用。 */
 const previewColumns = computed(
   () =>
     new Map(
@@ -866,35 +926,45 @@ const previewColumns = computed(
       ])
     )
 );
+/** 读取当前列或组对应的预览列，未找到时显示空列表。 */
 function previewUnitColumns(unit: ColumnUnit): TableViewColumn<Row>[] {
   return previewColumns.value.get(unit.key) ?? [];
 }
+/** 把真实列宽缩小到预览合适的范围，避免超宽列撑破设置窗口。 */
 function previewSize(column: TableViewColumn<Row>) {
   return Math.max(68, Math.min(142, (column.width ?? column.minWidth ?? 160) * 0.52));
 }
+/** 将列宽和对齐方式转换为预览单元格样式。 */
 function previewCellStyle(column: TableViewColumn<Row>): CSSProperties {
   const justifyContent =
     column.align === "right" ? "flex-end" : column.align === "center" ? "center" : "flex-start";
   return { flexBasis: `${previewSize(column)}px`, justifyContent };
 }
+/** 汇总组内预览列宽，让组标题与下面列对齐。 */
 function previewBandWidth(columns: readonly TableViewColumn<Row>[]): CSSProperties {
   return { flexBasis: `${columns.reduce((total, column) => total + previewSize(column), 0)}px` };
 }
+/** 应用组标题对齐方式，未指定时居中。 */
 function previewGroupStyle(group: TableHeaderGroup): CSSProperties {
   return { textAlign: group.align ?? "center" };
 }
+/** 在预览中高亮属性面板当前选中的列。 */
 function isSelectedColumn(column: TableViewColumn<Row>) {
   return selectedKey.value === column.key;
 }
+/** 把对齐代码显示成中文，未知值以左对齐文案兜底。 */
 function alignLabel(value: CrudColumnAlign) {
   return alignOptions.find((option) => option.value === value)?.label ?? "左对齐";
 }
+/** 在草稿中显示全部列，仍需点击应用才影响列表。 */
 function showAll() {
   for (const item of allItems.value) item.visible = true;
 }
+/** 把整个设置草稿恢复为模块默认列配置和紧凑密度，尚不写入用户偏好。 */
 function restoreDraft() {
   loadDraft(props.defaults, "compact");
 }
+/** 至少保留一列后发布列设置副本和密度，再关闭窗口；外层负责持久化。 */
 function confirm() {
   if (!visibleCount.value) return;
   emit("apply", cloneItems(allItems.value), draftDensity.value);

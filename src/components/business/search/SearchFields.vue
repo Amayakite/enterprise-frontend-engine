@@ -53,7 +53,7 @@ const props = defineProps<{
   createInitialQuery: () => Q;
   /** 搜索字段渲染和联动所需的页面上下文。 */
   context: C;
-  /** 宿主正在查询时禁用修改与重复提交。 */
+  /** 调用方正在查询时禁用修改与重复提交。 */
   loading?: boolean;
 }>();
 const emit = defineEmits<{
@@ -76,38 +76,48 @@ const slots = defineSlots<{
     readonly: boolean;
   }) => unknown;
 }>();
+/** 保存尚未提交的查询值，从初始查询函数复制，输入时不直接修改页面已应用条件。 */
 const draft = shallowRef<Q>(cloneModel(props.createInitialQuery()));
+/** 是否展开标记为高级的筛选字段，收起时保留输入。 */
 const expanded = ref(false);
+/** 把查询草稿作为模型传给字段输入，附带当前组织等信息。 */
 const environment = computed<FieldEnvironment<Q, C>>(() => ({
   model: draft.value,
   context: props.context,
   mode: "add",
 }));
+/** 配置中存在高级字段时才显示展开/收起入口。 */
 const hasAdvanced = computed(() => props.fields.some((field) => field.search.advanced));
+/** 根据展开状态选择当前显示的快捷和高级字段。 */
 const displayedFields = computed(() =>
   props.fields.filter((field) => expanded.value || !field.search.advanced)
 );
+/** 统计高级条件中已填写的数量，用于收起时提示还有多少条件。 */
 const advancedCount = computed(
   () =>
     props.fields.filter((field) => field.search.advanced && !isEmptyValue(draft.value[field.key]))
       .length
 );
-// TS 不能将泛型判别联合的交集自动回退到其左侧，公开字段合同不变。
+// TS 不能将泛型判别联合的交集自动回退到其左侧，公开字段配置不变。
 function asField(field: SearchField<Q, C>) {
   return field as FieldDefinition<Q, C>;
 }
+/** 同时写入查询字段值和参照附带回填，不直接请求列表。 */
 function setValue(key: FieldKey<Q>, value: Q[FieldKey<Q>], mapped: Partial<Q> = {}) {
   if (!props.loading)
     draft.value = { ...draft.value, ...cloneModel(mapped), [key]: cloneModel(value) };
 }
+/** 把当前查询草稿交给页面应用，实际列表请求由页面处理。 */
 function submit() {
   if (!props.loading) emit("submit", cloneModel(draft.value));
 }
+/** 重新创建默认查询值并通知页面重置，不复用之前被修改的初始对象。 */
 function reset() {
   if (props.loading) return;
   draft.value = cloneModel(props.createInitialQuery());
   emit("reset", cloneModel(draft.value));
 }
+/** 在可直接提交的输入中响应回车，同时避开输入法等不应提交的情况。 */
 function onEnter(event: KeyboardEvent) {
   const target = event.target;
   if (
@@ -123,6 +133,7 @@ function onEnter(event: KeyboardEvent) {
   submit();
 }
 defineExpose({ reset, submit, getQuery: () => cloneModel(draft.value) });
+/** 生成 field-* 查询插槽名，供页面替换输入组件。 */
 function fieldSlotName(key: string) {
   return `field-${key}` as Exclude<keyof typeof slots, "footer">;
 }

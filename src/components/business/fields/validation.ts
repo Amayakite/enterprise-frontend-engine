@@ -30,7 +30,9 @@ export function createFieldRules<M, C>(
     rules: FormItemRule[];
   }
 ): FormItemRule[] {
+  /** 读取用于错误文案的字段名称和格式要求，例如手机号或金额。 */
   const { label, formatHint } = field;
+  /** 按字段类型与格式要求收集通用校验规则，再与业务规则合并。 */
   const semantic: FormItemRule[] = [];
   if (field.type === "rich" && (form.required || field.props?.maxlength !== undefined)) {
     semantic.push({
@@ -89,8 +91,10 @@ export function createFieldRules<M, C>(
   ];
 }
 
+/** 从不同形状的校验异常中提取第一条可显示消息，无法识别时交给上层使用默认提示。 */
 function firstValidationMessage(cause: unknown): string | undefined {
   if (!cause || typeof cause !== "object") return;
+  /** 并行校验后汇总字段错误，供表单和表格显示及定位。 */
   const errors: unknown = Reflect.get(cause, "errors");
   if (!Array.isArray(errors)) return;
   const first: unknown = errors[0];
@@ -105,7 +109,9 @@ export async function validateFieldModel<M, C>(
   env: FieldEnvironment<M, C>,
   batch = createReferenceValidationBatch()
 ): Promise<FieldValidationResult<M>> {
+  /** 只校验当前可见表单字段，隐藏字段保留值但不因此阻止提交。 */
   const checks = normalizeFields(fields, env).filter((entry) => entry.form?.visible);
+  /** 并行校验后汇总字段错误，供表单和表格显示及定位。 */
   const errors = (
     await Promise.all(
       checks.map(async ({ field, form }) => {
@@ -141,6 +147,7 @@ export async function validateFieldModel<M, C>(
 
 /** 一次 validate 调用独享；微任务合并同 source/条件，结束即释放，无跨表单缓存。 */
 export function createReferenceValidationBatch(signal?: AbortSignal): ReferenceValidationBatch {
+  /** 按参照数据源保存当前校验批次，合并多行相同范围的 ID 解析请求。 */
   const owners = new WeakMap<
     object,
     Map<

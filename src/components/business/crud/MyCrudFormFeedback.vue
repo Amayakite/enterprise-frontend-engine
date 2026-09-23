@@ -1,4 +1,5 @@
 <template>
+  <!-- 显示草稿恢复、字段错误和失败重试入口。自定义布局时传入 bindings.feedback；保存成功后的本地更新重试不会重复提交服务器。 -->
   <div class="crud-feedback">
     <MyFeedback
       v-if="
@@ -127,18 +128,26 @@ const props = defineProps<
   > &
     Partial<Pick<CrudFormProps<Model, Entity, Id, C>, "fields" | "sections">>
 >();
+/** 给错误信息加上字段或子表分区名称；找不到配置时仅显示原错误。 */
 function issueLabel(issue: DeepReadonly<CrudIssue<Model>>) {
   const label = issue.section
     ? props.sections?.find((section) => section.key === issue.section)?.label
     : props.fields?.find((field) => field.key === issue.field)?.label;
   return label ? `${label}：` : "";
 }
+/** 用于提示当前新增或编辑目标的只读信息，避免提示区域意外改动表单目标。 */
 const target = computed(() => cloneReadonlyModel<CrudTarget<Id>>(props.controller.state.target));
+/** 控制草稿内容预览窗口，只查看内容，不代表已经恢复。 */
 const previewOpen = ref(false);
+/** 准备给预览窗口显示的草稿文本，和真正用于恢复的草稿数据分开保存。 */
 const draftPreview = ref("");
+/** 加载或保存期间禁用恢复、重试等操作，避免同时修改表单。 */
 const busy = computed(() => props.controller.busy);
+/** 优先显示页面指定的只读原因，没有时使用表单自身的原因。 */
 const readonlyReason = computed(() => props.readonlyReason ?? props.controller.readonlyReason);
+/** 显示当前草稿的检查或恢复提示；没有额外消息时显示已开启草稿保护。 */
 const draftMessage = computed(() => props.controller.draft?.state.message || "已启用本机草稿保护");
+/** 按草稿状态选择提示颜色：读取错误用红色，需要用户处理的草稿用警告色。 */
 const draftTone = computed(() => {
   const phase = props.controller.draft?.state.phase;
   return phase === "error"
@@ -147,6 +156,7 @@ const draftTone = computed(() => {
       ? "warning"
       : "info";
 });
+/** 根据草稿是否可恢复、冲突或提交结果不明，告诉用户下一步应该怎么做。 */
 const draftNextStep = computed(() => {
   const phase = props.controller.draft?.state.phase;
   if (phase === "available") return "可恢复旧草稿，也可先查看内容。";
@@ -154,6 +164,7 @@ const draftNextStep = computed(() => {
   if (phase === "unsafe") return "请先核实提交结果，再继续处理。";
   return undefined;
 });
+/** 区分未加载成功、保存结果不明和已保存但本地更新失败，防止提示用户重复提交。 */
 const nextStep = computed(() => {
   const state = props.controller.state;
   if (state.mutationOutcome === "unknown") return feedbackConfig.messages.unknown;

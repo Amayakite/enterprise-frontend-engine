@@ -2,6 +2,19 @@
 
 入口分工：根 [README](../README.md) 讲启动；[AGENTS](../AGENTS.md) 是 AI/开发者速查卡；本页只负责找文档。详细文档不要求每次全部阅读。
 
+## 设计与独立组件入口
+
+- 只需要一个输入或显示值：[单独使用一个字段](./business-components-guide.md#单独使用一个字段)。
+- 在特殊页面选择或显示业务记录：[独立参照](./business-components-guide.md#单独选择销售组织)。
+- 注释如何写得让人看懂：[先回答使用问题](./typescript-and-structure.md#注释先回答使用问题)。
+
+- 新模块先写什么：[设计说明先于字段和实现](./business-module-standard.md#设计说明先于字段和实现)。
+- 配置每一项怎么填：[配置成员职责](./business-module-standard.md#配置成员怎么写)。
+- 每个文件怎么写：[从设计到文件的编写顺序](./module-development-example.md#从设计到文件的编写顺序)。
+- 对照实际结构：[销售组织](./sale-example.md#结构设计)、[客户主子表](./customer-example.md#结构设计)。
+- 单独使用表单/表格或拆开 CRUD：[独立使用与组合](./business-components-guide.md#独立使用与组合)。
+- 模板应该说明什么：[模板区块注释](./business-components-guide.md#模板区块注释怎么写)。
+
 ## 30 秒定位
 
 | 当前任务                          | 阅读范围                                                                                              | 首查源码                                                                              |
@@ -19,7 +32,7 @@
 | 查看现有业务参考                  | [客户示例](./customer-example.md)；仅需要局部能力时看[费用示例](./task-fee-example.md)                | 对应模块及其调用点                                                                    |
 | 删除/替换服务申请或会议申请       | [试点边界](./production-pilots/README.md)                                                             | 目标页面、API、Mock、菜单引用                                                         |
 
-“§”指文档中的编号章节。新模块先完整阅读模块规范；局部任务按表选择相关章节，涉及的合同与限制一起读，不能只复制示例片段。
+“§”指文档中的编号章节。新模块先完整阅读模块规范；局部任务按表选择相关章节，涉及的接口约定与限制一起读，不能只复制示例片段。
 
 ## 参照导航与最简模块
 
@@ -28,7 +41,7 @@
 
 - [Sale 最简标准模块](./sale-example.md)：无子表四页 CRUD、客户参照跳转配置及开发权限预览入口。
 
-- 参照导航、局部回写见[组件指南](./business-components-guide.md#参照查看与前往新增)；页面意图、CSS 光圈与 SVG 遮罩见 [CRUD 指南](./crud-development-guide.md#页面意图与新增引导)。以当前源码合同为准。
+- 参照导航、局部回写见[组件指南](./business-components-guide.md#参照查看与前往新增)；页面意图、CSS 光圈与 SVG 遮罩见 [CRUD 指南](./crud-development-guide.md#页面意图与新增引导)。以当前源码接口约定为准。
 
 ## 最小检索方式
 
@@ -60,4 +73,4 @@ rg -n 'useCrudForm|useCrudTableChild' src/pages/base/customer src/composables
 - 用户当前任务决定做什么；规范决定怎么做。未联调能力、示例和限制清单不等于授权待办。
 - 规则描述应如何开发，源码/相邻类型确认已实现能力。发现冲突先核对调用点并同步修正，不盲从历史示例。
 - Mock 不等于真实后端；现行文档不保存执行流水、阶段数字和已完成待办。
-- 更新合同或文件路径时同步对应主文档，检查格式与相对链接。不要默认在每个模块复制 AGENTS.md；仅有真实局部约束时才新增。
+- 更新接口约定或文件路径时同步对应主文档，检查格式与相对链接。不要默认在每个模块复制 AGENTS.md；仅有真实局部约束时才新增。

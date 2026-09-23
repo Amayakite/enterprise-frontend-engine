@@ -7,7 +7,7 @@ import type {
   SaleSearchRequest,
   SaleScope,
 } from "@/api/base/sale/types";
-/** Sale 页面无需另一份实体模型；只具体化标准合同。 */
+/** Sale 页面无需另一份实体模型；只具体化标准接口约定。 */
 export interface SaleContract extends BusinessModuleContract {
   /** 一套字段供四个场景使用。 */
   Model: SaleRecord;
@@ -27,7 +27,7 @@ export interface SaleContract extends BusinessModuleContract {
   Update: SaleUpdate;
   /** Mock 写入返回实体。 */
   Result: SaleRecord;
-  /** 页面上下文由公共装配生成。 */
+  /** 页面上下文由公共组合生成。 */
   Context: {
     /** 登录组织。 */ organizationId: string;
     /** 用户与权限隔离 key。 */ scopeKey: string;

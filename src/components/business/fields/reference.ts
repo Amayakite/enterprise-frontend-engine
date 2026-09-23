@@ -18,7 +18,7 @@ import { cloneModel } from "./model";
 import { referenceIds } from "@/components/business/MyReference/selection";
 import ReferenceDisplay from "./ReferenceDisplay.vue";
 
-/** 可复用参照定义；withMap 创建独立闭包，不修改共享 map。 */
+/** 一份可重复使用的参照配置。某个页面需要不同的回填字段时，用 withMap 创建新配置，不影响其他页面。 */
 export interface ConfiguredReference<
   Row,
   Id extends ReferenceId,
@@ -35,7 +35,7 @@ export interface ConfiguredReference<
     map: NonNullable<ReferenceFieldOptions<Row, Id, F, Multiple, M, C>["map"]>
   ) => ConfiguredReference<Row, Id, F, Multiple, M, C>;
 }
-/** 参照工厂配置，数据源类型在 withMap 回调中保持推导。 */
+/** 将参照用于表单字段时需要的配置：查询来源、当前范围和选择后的额外回填。 */
 export interface ReferenceFieldOptions<
   Row,
   Id extends ReferenceId,
@@ -45,7 +45,7 @@ export interface ReferenceFieldOptions<
   C,
 > {
   /**
-   * 参照数据源合同；提供稳定 key、行主键/名称、搜索和 ID 回显方法。创建对象本身不发请求。
+   * 参照数据源配置；提供稳定 key、行主键/名称、搜索和 ID 回显方法。创建对象本身不发请求。
    * @example
    * `source: provinceReference`
    */
@@ -106,10 +106,11 @@ export interface ReferenceFieldOptions<
 }
 
 /**
- * 将 API 参照源装配为字段编辑器，统一选择、回显、额外字段回填和提交校验。
+ * 把已有参照用于统一字段配置。传入 source、filters、scopeKey，返回值放到字段的 reference 中。
+ * 需要选择后填写名称等其他字段时加 map；只需要独立选择器时直接使用 MyReference 即可。
  * @typeParam M 页面表单模型，决定 map 允许写回哪些字段。
  * @typeParam C 页面上下文，通常含 organizationId 和 scopeKey。
- * @returns 接收参照配置的函数；仅装配合同，不在创建时请求接口。
+ * @returns 接收参照配置的函数；调用后得到字段的 reference 配置，创建配置时不请求接口。
  * @remarks 选择提交后通过 commit 回写；回显/校验只读取数据，不直接修改模型。
  * @example
  * ```ts
@@ -120,6 +121,7 @@ export interface ReferenceFieldOptions<
  * ```
  */
 export function createReferenceField<M, C = undefined>() {
+  /** 根据同一份参照配置生成显示、输入和校验方法；withMap 会重新创建一份以更换回填逻辑。 */
   function build<
     Row,
     Id extends ReferenceId,
@@ -162,7 +164,7 @@ export function createReferenceField<M, C = undefined>() {
         });
       },
       render(value, env, readonly, commit, presentation) {
-        // Vue 的 h 重载不能保留泛型 SFC 的参数；类型擦除仅限这个已由上面合同约束的边界。
+        // Vue 的 h 重载不能保留泛型 SFC 的参数；类型擦除仅限这个已由上面接口约定约束的边界。
         return h(MyReference as Component, {
           source: options.source,
           navigation: options.navigation,

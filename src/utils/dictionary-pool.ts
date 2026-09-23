@@ -64,7 +64,7 @@ export function createDictionaryPool(
     };
   }
   return {
-    /** 同范围/编码只发一次在途请求；返回 release，宿主卸载/停用时必须调用。 */
+    /** 同范围/编码只发一次在途请求；返回 release，调用方卸载/停用时必须调用。 */
     acquire(code: string, scope: string) {
       const key = JSON.stringify([scope, code]);
       let entry = entries.get(key);

@@ -20,7 +20,7 @@ import type {
 import type { BatchRequest, BatchResult } from "@/api/common/batch";
 
 /**
- * index 级批量装配：复用 CRUD 确认、权限、单飞、快照复查与刷新，不逐行请求。
+ * 为列表提供批量操作：复用 CRUD 按钮的权限、确认、重复点击保护和刷新，一次提交整批请求。
  * @remarks 无选择时仅 allowQuery 命令允许操作整个已应用查询，草稿/当前页不能冒充全部结果。
  * 统一响应未知时禁止本实例再次写入；应先核实后端，不做自动重试。
  * @example
@@ -35,8 +35,18 @@ export function useBatchActions<
   C,
 >(options: {
   /** 模块稳定 key 和后端组件码；componentKey 缺失时禁用，不猜测后端名称。 */
-  module: { meta: { key: string; componentKey?: string }; batch?: BatchIdentity<Row> };
-  /** 当前列表合同，复用范围和查询 DTO 适配。 */
+  module: {
+    /** 模块的稳定身份与后端组件码，批量请求据此标识业务对象。 */
+    meta: {
+      /** 稳定模块 key，操作完成后用它通知列表或详情刷新。 */
+      key: string;
+      /** 后端约定的模块组件码；缺失时禁用批量操作，不从前端名称推断。 */
+      componentKey?: string;
+    };
+    /** 模块默认的批量标识映射；省略时使用行主键作为 batchID。 */
+    batch?: BatchIdentity<Row>;
+  };
+  /** 当前列表接口约定，复用范围和查询 DTO 适配。 */
   config: CrudListConfig<Row, Id, S, Scope, Query, C>;
   /** 当前页面列表控制器。 */
   list: CrudListController<Row, Id, S>;
@@ -51,22 +61,29 @@ export function useBatchActions<
   /** 覆写 config 的 ID/编码映射；普通模块不需要。 */
   identity?: BatchIdentity<Row>;
 }): BatchController {
+  /** 最近一次校验通过的批量回执，只为当前范围展示，失败明细最多保留 50 条。 */
   const receipt = shallowRef<BatchResult | null>(null);
+  /** 上次写入结果无法核实；本实例禁止再次批量写入，避免重试造成重复操作。 */
   const uncertain = shallowRef(false);
+  /** 批量记录标识映射，页面显式覆盖优先，否则沿用模块配置。 */
   const identity = options.identity ?? options.module.batch;
   if (new Set(options.commands.map((x) => x.key)).size !== options.commands.length)
     throw new Error("批量动作 key 重复");
+  /** 当前勾选 ID 的只读视图，供执行前确认数据版本使用。 */
   const selectedKeys = computed(() => cloneReadonlyModel<Id[]>(options.list.state.selectedKeys));
+  /** 按已勾选 ID 找到当前页记录，用来生成后端批量标识。 */
   const selected = computed(() =>
     options.list.state.rows.filter((row) =>
       selectedKeys.value.includes(options.config.getKey(cloneReadonlyModel<Row>(row)))
     )
   );
+  /** 确认框中的操作范围说明，区分已勾选记录和当前查询的全部分页结果。 */
   const scopeLabel = computed(() =>
     options.list.state.selectedKeys.length
       ? `已勾选 ${options.list.state.selectedKeys.length} 条`
       : `未勾选：当前查询全部 ${options.list.state.total} 条（包含其他分页）`
   );
+  /** 把页面批量命令转换为统一按钮动作，复用权限、确认与一次执行保护。 */
   const actions: CrudAction<Row, Id, C>[] = options.commands.map((command) => ({
     key: command.key,
     label: command.label,
@@ -95,6 +112,7 @@ export function useBatchActions<
     execute: async ({ selectedRows, selectedKeys, signal, context }) => {
       const componentKey = options.module.meta.componentKey;
       if (!componentKey) throw new Error("缺少后端模块组件码");
+      // 有勾选时只发送已选标识；无勾选时发送已应用查询，交由后端处理全部匹配记录。
       const target: BatchRequest<Query>["target"] = selectedKeys.length
         ? {
             mode: "selected",
@@ -144,6 +162,7 @@ export function useBatchActions<
           `提交结果待核实（${requestId}），禁止自动重试：${cause instanceof Error ? cause.message : "请求失败"}`
         );
       }
+      // 核对回执对应本次 requestId，并检查成功/失败数量；无效回执按结果未知处理。
       if (
         !result ||
         result.requestId !== requestId ||
@@ -171,6 +190,7 @@ export function useBatchActions<
       return { affectedKeys: [], message: `成功 ${result.succeeded} 条，失败 ${result.failed} 条` };
     },
   }));
+  /** 共用 CRUD 动作执行器，确认期间条件或勾选变化则不再提交原操作。 */
   const executor = useCrudActions({
     actions,
     context: (signal) => ({
@@ -195,6 +215,7 @@ export function useBatchActions<
       if (options.list.state.error) throw new Error(options.list.state.error);
     },
   });
+  /** 将批量忙碌状态同步给列表，防止同时发起普通行操作。 */
   watch(
     executor.busyKey,
     (value) => {
@@ -202,6 +223,7 @@ export function useBatchActions<
     },
     { flush: "sync" }
   );
+  /** 组织范围切换后清除旧回执；结果未知的写入保护仍保留。 */
   watch(
     () => options.config.scope(options.context()).key,
     () => {

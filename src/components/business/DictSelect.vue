@@ -65,6 +65,7 @@ const emit = defineEmits<{
    */
   "update:modelValue": [value: string | number | (string | number)[] | undefined];
 }>();
+/** 读取字典选项及加载错误，多个相同字典组件可复用公共请求。 */
 const { options, loading, error, reload } = useDictionary(() => props.code);
 // 字典协议沿用数字/字符串编码兼容，不将这条规则用于业务 ID。
 const scalarValue = computed(() =>
@@ -72,7 +73,9 @@ const scalarValue = computed(() =>
     ? undefined
     : options.value.find((option) => String(option.value) === String(props.modelValue))?.value
 );
+/** 多选控件只接收数组，未选或单值时按空集合显示。 */
 const arrayValue = computed(() => (Array.isArray(props.modelValue) ? props.modelValue : []));
+/** 整理选择控件的结果后通知父页面，单选和多选保持各自约定的值形状。 */
 function change(value: unknown) {
   if (Array.isArray(value))
     emit(

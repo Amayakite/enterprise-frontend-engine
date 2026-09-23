@@ -28,15 +28,16 @@ import { shallowRef } from "vue";
 import { createReferenceChannel } from "@/components/business/MyReference/request-channel";
 import { useBusinessNavigation } from "@/composables/useBusinessNavigation";
 import type { BusinessNavigationRequest } from "@/router/business-targets";
-/** 单条已授权解析的参照呈现；导航不触发选择或写入。 */
+/** 单条已授权解析的参照显示；导航不触发选择或写入。 */
 interface DisplayItem {
   /** 保持原类型的稳定主键。 */
   id: string | number;
   /** 合法解析所得名称，不猜测失效记录信息。 */
   label: string;
-  /** 可选查看目标；没有时呈现纯文本。 */
+  /** 可选查看目标；没有时显示纯文本。 */
   target?: BusinessNavigationRequest;
 }
+/** 打开参照名称对应的详情目标，沿用项目统一跳转方式。 */
 const navigation = useBusinessNavigation();
 import {
   referenceDisplayKey,
@@ -60,12 +61,19 @@ const props = defineProps<{
    */
   load: (context: ReferenceDisplayContext) => Promise<string | readonly DisplayItem[]>;
 }>();
+/** 优先使用表格提供的参照批量查询环境，减少每个单元格各自请求。 */
 const inherited = inject(referenceDisplayKey, undefined);
+/** 没有父级环境时创建本组件自己的环境；卸载时只释放自己创建的那份。 */
 const context = inherited ?? createReferenceDisplayContext();
+/** 给每次回显编号，只有最近一次请求能更新当前名称。 */
 const channel = createReferenceChannel();
+/** 名称正在解析时显示加载状态，避免把尚未返回误当作空值。 */
 const loading = ref(false);
+/** 保存解析后的纯文本或可点击名称列表，两种内容共用相同加载流程。 */
 const label = shallowRef<string | readonly DisplayItem[]>("");
+/** 回显失败的原因，显示重试入口，不把接口异常伪装成没有记录。 */
 const error = ref("");
+/** 清除旧名称并重新解析，只有仍有效的请求能写入名称、错误和加载状态。 */
 async function refresh() {
   const request = channel.start();
   loading.value = true;
@@ -80,7 +88,9 @@ async function refresh() {
     if (request.isCurrent()) loading.value = false;
   }
 }
+/** 数据源、ID/范围标识或共享刷新版本改变后重新读取名称，首次挂载也会执行。 */
 watch([() => props.owner, () => props.requestKey, context.revision], refresh, { immediate: true });
+/** 作废本组件的回显；独立使用时同时释放自己创建的请求环境，保留父级共享环境。 */
 onBeforeUnmount(() => {
   channel.cancel();
   if (!inherited) context.dispose();

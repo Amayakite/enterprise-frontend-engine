@@ -105,7 +105,7 @@ import ActionButton from "@/components/business/ActionButton.vue";
 
 const props = withDefaults(
   defineProps<{
-    /** 可见状态；由宿主通过 v-model 控制，强制关闭不经过 beforeClose。 */
+    /** 可见状态；由调用方通过 v-model 控制，强制关闭不经过 beforeClose。 */
     modelValue: boolean;
     /** 关闭前检查；返回 false 保持可见，支持异步未保存确认。外部强制 v-model=false 不经过此守卫。 */
     beforeClose?: () => boolean | Promise<boolean>;
@@ -193,7 +193,7 @@ const emit = defineEmits<{
    */
   "update:fullscreen": [value: boolean];
   /**
-   * 用户点击确认；组件不自行提交数据，宿主负责保存。
+   * 用户点击确认；组件不自行提交数据，调用方负责保存。
    * @example
    * `<MyDialog @confirm="save" />`
    */
@@ -227,7 +227,7 @@ defineSlots<{
     /** 切换全屏并发出 update:fullscreen。 */
     toggleFullscreen: () => void;
   }) => unknown;
-  /** 替换默认操作区，宿主负责提交和禁用状态。 */
+  /** 替换默认操作区，调用方负责提交和禁用状态。 */
   footer?: (props: {
     /** 请求关闭，仍经过 beforeClose。 */
     close: () => void;
@@ -238,9 +238,13 @@ defineSlots<{
   }) => unknown;
 }>();
 
+/** Element Plus 弹窗公开实例，关闭后用于恢复拖动前的位置。 */
 const dialog = ref<DialogInstance>();
+/** 父页面未控制 fullscreen 时保存本组件自己的全屏状态。 */
 const internalFullscreen = ref(false);
+/** 仅宽度至少 768px 时允许拖拽，避免窄屏手势与弹窗滚动冲突。 */
 const desktop = useMediaQuery("(min-width: 768px)");
+/** 统一使用外部全屏状态或内部状态，并通过事件通知全屏切换。 */
 const resolvedFullscreen = computed({
   get: () => props.fullscreen ?? internalFullscreen.value,
   set: (value: boolean) => {
@@ -248,7 +252,9 @@ const resolvedFullscreen = computed({
     emit("update:fullscreen", value);
   },
 });
+/** 同时满足允许拖动、桌面宽度和非全屏才启用拖拽。 */
 const canDrag = computed(() => props.draggable && desktop.value && !resolvedFullscreen.value);
+/** 把最大尺寸及铺满高度传给弹窗样式，全屏时使用动态视口高度。 */
 const dialogStyle = computed(
   () =>
     ({
@@ -262,10 +268,13 @@ const dialogStyle = computed(
     }) as CSSProperties
 );
 
+/** 通知父页面修改弹窗开关，保持 modelValue 单向传入。 */
 function updateVisible(value: boolean) {
   emit("update:modelValue", value);
 }
+/** 防止点击遮罩、关闭按钮等同时启动多次异步关闭确认。 */
 let checkingClose = false;
+/** 等待 beforeClose 同意后才执行关闭，检查失败或拒绝时保留弹窗内容。 */
 async function guardClose(done: () => void) {
   if (checkingClose) return;
   checkingClose = true;
@@ -275,15 +284,18 @@ async function guardClose(done: () => void) {
     checkingClose = false;
   }
 }
+/** 取消按钮也经过关闭检查，通过后通知取消并收起弹窗。 */
 function cancel() {
   return guardClose(() => {
     emit("cancel");
     updateVisible(false);
   });
 }
+/** 切换全屏状态，兼容父页面受控和组件内部管理两种用法。 */
 function toggleFullscreen() {
   resolvedFullscreen.value = !resolvedFullscreen.value;
 }
+/** 关闭动画完成后退出全屏并重置拖动位置，下一次从默认位置打开。 */
 async function closed() {
   resolvedFullscreen.value = false;
   await nextTick();

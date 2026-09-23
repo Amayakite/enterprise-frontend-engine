@@ -17,6 +17,7 @@
 </template>
 <script setup lang="ts">
 import { useReferencePermissionPreview } from "./reference-permission-preview";
+/** 读取当前开发权限模拟模式，用户切换选项后更新前端预览。 */
 const { mode, change } = useReferencePermissionPreview();
 </script>
 <style scoped>

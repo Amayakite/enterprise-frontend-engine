@@ -1,38 +1,337 @@
 # 业务组件使用说明
 
-本说明记录当前可用的参照、字段、表单、查询、详情和表格组件。新业务目录和 CRUD 装配方式分别见 [业务模块开发规范](./business-module-standard.md) 与 [CRUD 开发指南](./crud-development-guide.md)。公共组件不发送业务保存请求、不生成后端协议；Mock 回执不代表持久化。
+本说明帮助你选择组件、准备参数并接入页面。只需要一个输入框、一项详情或一个参照选择器时，可以直接使用下面的独立组件；需要完整的列表、新增、编辑和详情页时，参考 [CRUD 开发指南](./crud-development-guide.md)。新模块的文件放置和配置写法见 [业务模块开发规范](./business-module-standard.md)。
+
+独立输入和展示组件不会替你保存业务数据。标准 CRUD 会调用你配置的 API；目前 API 使用开发 Mock，重启开发服务后数据会重置。
 
 ## 先选择所需能力
 
 基础交互先复用已有组件。标签右键菜单采用 [Reka UI Context Menu](https://reka-ui.com/docs/components/context-menu)
-的组合原语，管理键盘选择、焦点返回与边界定位；标签关闭、草稿确认和缓存仍归原 store。
+的基础组件，管理键盘选择、焦点返回与边界定位；标签关闭、草稿确认和缓存仍归原 store。
 这是借鉴 shadcn-vue 组合方式的局部用法，不建立第二套表单、表格或样式工具链。
 单选等已有能力继续使用 Element Plus。项目自有控件共用 `theme.scss` 的
 `--ui-control-radius`、`--ui-popover-radius` 和 `--ui-focus-ring`，颜色跟随现有明暗主题。
 
-| 场景                     | 入口                                                     | 状态归属与选择原则                                                                  |
-| ------------------------ | -------------------------------------------------------- | ----------------------------------------------------------------------------------- |
-| 普通业务弹窗             | `src/components/common/MyDialog.vue`                     | 容器管理尺寸、桌面拖拽、全屏、复位、loading、默认动作和无障碍；业务管理内容与状态   |
-| 标准列表/CRUD/主子表页面 | `MyCrudList`、`MyCrudForm`、`MyCrudDetail` 与 `useCrud*` | 装配层管理查询、分页、动作、保存、脏状态和详情加载；业务模块提供 config、DTO 和导航 |
-| 独立客户/商品选择        | `src/components/business/MyReference/index.vue`          | 页面持有 ID；组件管理候选、回显与弹窗草稿                                           |
-| 独立配置式编辑表单       | `src/components/business/MyForm/index.vue`               | 页面持有模型；组件管理快照、校验和联动                                              |
-| 独立查询 / 详情          | `src/components/business/MySearch.vue` / `MyDesc.vue`    | 查询草稿独立；详情仅展示                                                            |
-| 独立列表与行编辑         | `src/components/table/MyTable.vue`                       | 页面持有 rows、分页、排序、选择；组件管理活动行草稿                                 |
-| 仅展示表格内核           | `src/components/table/TableView.vue`                     | 无分页/编辑业务状态；不反向引入字段体系                                             |
+| 场景                     | 入口                                                     | 状态归属与选择原则                                                                                    |
+| ------------------------ | -------------------------------------------------------- | ----------------------------------------------------------------------------------------------------- |
+| 普通业务弹窗             | `src/components/common/MyDialog.vue`                     | 容器管理尺寸、桌面拖拽、全屏、复位、loading、默认动作和无障碍；业务管理内容与状态                     |
+| 标准列表/CRUD/主子表页面 | `MyCrudList`、`MyCrudForm`、`MyCrudDetail` 与 `useCrud*` | CRUD 组件和 useCrud 方法管理查询、分页、动作、保存、脏状态和详情加载；业务模块提供 config、DTO 和导航 |
+| 独立客户/商品选择        | `src/components/business/MyReference/index.vue`          | 页面持有 ID；组件管理候选、回显与弹窗草稿                                                             |
+| 独立配置式编辑表单       | `src/components/business/MyForm/index.vue`               | 页面持有模型；组件管理快照、校验和联动                                                                |
+| 独立查询 / 详情          | `src/components/business/MySearch.vue` / `MyDesc.vue`    | 查询草稿独立；详情仅展示                                                                              |
+| 独立列表与行编辑         | `src/components/table/MyTable.vue`                       | 页面持有 rows、分页、排序、选择；组件管理活动行草稿                                                   |
+| 仅展示表格内核           | `src/components/table/TableView.vue`                     | 无分页/编辑业务状态；不反向引入字段体系                                                               |
 
-普通业务列表需要查询、分页、权限动作或列偏好时，优先使用装配层；单个字段、嵌入式局部表格或特殊页面仍可独立组合基础组件。MyCrud 内部复用 MyReference、MyForm、MyDesc、MyTable 和查询核心，没有替换其公开合同，现有独立调用可以继续使用。列表命令栏会按组装配新增/业务动作、快捷字段、查询命令、`toolbar-right` 和列设置，空间不足时换行，不在业务页复制第二条工具栏。
+普通业务列表需要查询、分页、权限按钮或列设置时，优先使用 `MyCrudList` 和 `useCrudView`。只需要页面中的一小块内容时，可单独使用 MyReference、MyForm、MyDesc 或 MyTable。完整 CRUD 页面内部也使用这些组件。列表顶部已经提供新增、查询、列设置和 `toolbar-right` 扩展位置，业务页通常只需补充自己的按钮。
 
-`MyDialog` 默认桌面可拖拽、窄屏禁用拖拽，支持全屏/还原并在关闭后复位；默认 footer 提供确认/取消和确认禁用原因，也可用 `footer` 完整替换，`actions` 用于标题栏扩展。参照、查询、系统维护、个人资料、通知、服务申请和子表行编辑等普通生产弹窗均已接入。快捷搜索也复用 `MyDialog`，禁用拖拽和全屏，使用独立输入管理焦点/键盘导航；组件实验页的直接用法仅用于嵌套焦点探针。`MyCrudForm` 默认只在顶部显示保存/关闭，`footer` 仅在业务显式提供时作为额外底部区域渲染。
+`MyDialog` 默认桌面可拖拽、窄屏禁用拖拽，支持全屏/还原并在关闭后复位；默认 footer 提供确认/取消和确认禁用原因，也可用 `footer` 完整替换，`actions` 用于标题栏扩展。参照、查询、系统维护、个人资料、通知、服务申请和子表行编辑等普通生产弹窗均已接入。快捷搜索也复用 `MyDialog`，禁用拖拽和全屏，使用独立输入管理焦点/键盘导航；组件实验页的直接用法仅用于嵌套焦点探针。`MyCrudForm` 未配置 layout 时在顶部显示保存/关闭；使用布局预设时操作移到底部，业务 `footer` 插槽用于追加核对或说明。
 
 把独立表单升级为标准 CRUD 时，保留原字段、source、links、稳定行键和 adapter，再将通用加载/保存/动作交给 `useCrud*`。子表只有参与整单事务时才注册到 `childKeys`；独立保存子表、复杂树表和虚拟滚动组合仍由业务页面单独设计。扩展先用公开插槽，不读取组件私有 refs 或 VXE 内部实例。
 
 长文本 `textarea` 编辑默认显示 2 行，可通过字段 `props.rows` 调整初始行数；内容溢出可滚动，用户可纵向拖动调整高度。公共输入不启用异步自动高度测量，避免草稿恢复、只读切换或关闭浮层期间测量已卸载的文本框。
 
+## 独立使用与组合
+
+“独立”表示可在项目内脱离整页 CRUD 组合使用，并不表示已经发布为无依赖的组件库。
+这些组件仍依赖 Vue、Element Plus、项目主题/布局样式、路径别名及现有构建配置；MyTable 还依赖
+表格引擎，字典、上传与业务参照还可能依赖公共请求和登录环境。迁到其他项目之前应核对这些依赖，
+不能只复制一个 Vue 文件就认为功能完整。
+
+### 按需要选择层级
+
+先看“需要传什么”，再决定是否使用完整 CRUD。表中的 controller 是 `useCrud*` 返回的对象，包含加载状态、数据和保存等方法；bindings 是 `useCrudView` 整理好的组件参数，可直接用 `v-bind` 传入，通常不需要自己逐个构造。
+
+| 能力/入口                                                                | 是否需要 CRUD 控制器                          | 主要输入与输出                                                               | 调用方负责什么                               |
+| ------------------------------------------------------------------------ | --------------------------------------------- | ---------------------------------------------------------------------------- | -------------------------------------------- |
+| [MyForm](../src/components/business/MyForm/index.vue)                    | 否                                            | modelValue、fields、context、初值工厂；更新事件、validate/hydrate 等公开方法 | 加载、保存 API、错误提示、离开保护           |
+| [MyFormField](../src/components/business/MyForm/MyFormField.vue)         | 不需要 CRUD，但需要 MyForm 的 field(key) 绑定 | 字段绑定；插槽 value/update/commit/readonly                                  | 同一字段只挂载一次，不自行伪造内部绑定       |
+| [MyDesc](../src/components/business/MyDesc.vue)                          | 否                                            | 只读模型、fields、context；按 detail 场景展示                                | 读取实体、加载/失败状态、详情动作            |
+| [MyTable](../src/components/table/MyTable.vue)                           | 否                                            | rows、fields、context、稳定行键；分页/排序/选择、行编辑事件                  | 行数据、分页请求、应用行补丁和持久化         |
+| [MyReference](../src/components/business/MyReference/index.vue)          | 否                                            | v-model、source、filters、scopeKey；commit/resolve 等事件                    | 合法数据源、范围隔离、需要的业务回写         |
+| [MyDialog](../src/components/common/MyDialog.vue)                        | 否                                            | 可见性和公开 props/slots/events                                              | 异步提交锁、保存结果、是否关闭               |
+| [MyCrudLayout](../src/components/business/crud/MyCrudLayout.vue)         | 否                                            | toolbar/default/aside/footer 插槽                                            | 内容和业务状态；该组件只管理布局             |
+| MyCrudFormFields / Toolbar / Feedback                                    | 是，三者共享一个                              | bindings.fields/toolbar/feedback                                             | 自定义布局；不重复创建控制器或保存流程       |
+| MyCrudDetailToolbar / Feedback                                           | 是，共享原详情控制器                          | bindings.toolbar/feedback；description 可给 MyDesc                           | 自定义只读内容与动作位置                     |
+| [MyCrudChildTable](../src/components/business/crud/MyCrudChildTable.vue) | 需要聚合编辑 binding                          | 原子表操作接口及子 config；行变化回到主模型                                  | 必需子表挂载、子行规则，整单保存交给父控制器 |
+| MyCrudList / Form / Detail                                               | 是                                            | bindings.list/form/detail                                                    | 标准完整页面组合、业务插槽与页面 hooks       |
+
+表格仅展示时不要为它建立 CRUD 模块；子表参与整单保存时优先用 MyCrudChildTable，
+不要用普通 MyTable 再手写一套子草稿提交。组件可单独组合，但数据所有者保持唯一。
+
+### 独立表单与详情：完整最小例子
+
+下例是可以放入项目内 Vue 文件的局部资料编辑器，不依赖模块配置或路由。
+确认只向父组件发出校验后的值，**没有调用保存 API**；真实接口、提交锁和错误反馈由调用方接入。
+字段同时声明 form/detail；原始字段的 table 与模块 fields.scenes.list 是两个层级，不混写。
+
+```vue
+<script setup lang="ts">
+import { ref } from "vue";
+import MyForm from "@/components/business/MyForm/index.vue";
+import MyDesc from "@/components/business/MyDesc.vue";
+import { defineFields } from "@/components/business/fields/normalize";
+import type { MyFormExpose } from "@/components/business/fields/types";
+
+/** 局部编辑模型；此例只编辑标题和数量，没有服务端 ID，也不会保存到服务器。 */
+interface Model {
+  /** 标题，空字符串为未填写。 */ title: string;
+  /** 非负数量，0 是有效值。 */ quantity: number;
+}
+const initial = (): Model => ({ title: "", quantity: 0 });
+const model = ref<Model>(initial());
+const form = ref<MyFormExpose<Model>>();
+const fields = defineFields<Model, undefined>()([
+  { key: "title", label: "标题", type: "text", form: { required: true }, detail: true },
+  { key: "quantity", label: "数量", type: "number", props: { min: 0 }, form: {}, detail: true },
+]);
+const emit = defineEmits<{
+  /** 校验通过后交给调用方处理；不代表已持久化。 */ confirm: [value: Model];
+}>();
+async function confirm() {
+  const result = await form.value?.validate();
+  if (!result?.valid) return;
+  emit("confirm", { title: model.value.title.trim(), quantity: model.value.quantity });
+}
+</script>
+
+<template>
+  <!-- 模型由本组件持有；MyForm 通过 v-model 更新，不负责保存。 -->
+  <MyForm
+    ref="form"
+    v-model="model"
+    :fields="fields"
+    :context="undefined"
+    :create-initial-model="initial"
+    mode="add"
+  />
+  <el-button @click="confirm">确认资料</el-button>
+  <!-- 同一模型的只读预览；不要为预览再创建一个编辑控制器。 -->
+  <MyDesc :model-value="model" :fields="fields" :context="undefined" />
+</template>
+```
+
+读取另一条记录时使用 MyForm 的公开 hydrate 或明确的 formKey，不用普通字段 patch 模拟换实体。
+需要草稿、权限、主子表和保存后导航时，回到标准 useCrudView，避免逐个补写相同流程。
+
+### 独立表格：最小只读用法
+
+下面同样是完整局部组件示例；rows 是本地演示数据，不会自动请求接口或保存。
+
+```vue
+<script setup lang="ts">
+import MyTable from "@/components/table/MyTable.vue";
+import { defineFields } from "@/components/business/fields/normalize";
+interface Row {
+  /** 稳定数字行键；0 有效，不使用数组下标。 */ id: number;
+  /** 表格显示名称。 */ name: string;
+}
+const rows: Row[] = [{ id: 0, name: "示例资料" }];
+const fields = defineFields<Row, undefined>()([
+  { key: "name", label: "名称", type: "text", table: { minWidth: 180 } },
+]);
+const getRowKey = (row: Readonly<Row>) => row.id;
+</script>
+
+<template>
+  <!-- rows 由调用方提供；未配置 edit，不建立可编辑行草稿。 -->
+  <MyTable
+    :rows="rows"
+    :fields="fields"
+    :context="undefined"
+    :get-row-key="getRowKey"
+    height="auto"
+  />
+</template>
+```
+
+增加分页、选择或编辑时，按 [MyTable 与整单保存](#mytable-与整单保存) 的事件参数说明接入。
+不要监听同一个动作后再调用两次请求；不通过私有表格 ref 操作行数据。
+
+### 标准 CRUD 的拆分用法
+
+页面只调用一次 useCrudView。完整外壳和拆分组件二选一：
+
+```vue
+<!-- 以下仅为模板片段；setup 已取得同一个 useCrudView 的 state/actions/bindings。 -->
+<MyCrudLayout>
+  <template #toolbar><MyCrudFormToolbar v-bind="bindings.toolbar" /></template>
+  <!-- 草稿提示和失败重试仍使用原控制器；省略此组件时由页面自行提供提示。 -->
+  <MyCrudFormFeedback v-bind="bindings.feedback" />
+  <!-- 加载只隐藏，不反复卸载已登记的字段与子表操作接口。 -->
+  <div v-show="state.phase !== 'loading'">
+    <MyCrudFormFields v-bind="bindings.fields" />
+    <!-- 主子表模块在这里显式放入所有必需子组件，并传 bindings.child(key)。 -->
+  </div>
+</MyCrudLayout>
+```
+
+这段省略了页面初始化错误、加载提示和子表，不作为完整生产页面复制。
+完整可运行接法、详情拆分与字段插槽见 [CRUD 定制布局](./crud-development-guide.md#定制布局按需组合相同的表单能力)。
+跨模块页面容器也必须有明确所有者：完整 MyCrud 容器自动挂载；纯定制页面如需打开弹窗/抽屉，
+应从原绑定取得 host 并挂载一次 MyBusinessPageHost，不在父子组件重复挂载。
+Ctrl/Command+S 的键盘监听属于完整 MyCrudForm 外壳；单独摆放 Toolbar 不会自动建立快捷键作用域。
+
+### 模板区块注释怎么写
+
+让第一次打开文件的开发者先知道“这一块做什么、传什么、会显示什么”。只有替换它会影响保存、校验等行为时，再补充注意事项。props/事件的详细参数仍写在声明处，不把整张 API 表复制到模板中。
+
+```vue
+<!-- 显示并编辑联系人。contacts 来自 bindings.child('contacts')，修改后会随客户一起保存。 -->
+<CustomerContacts :binding="contacts" />
+```
+
+不为每个 div 写“容器”之类的注释，不把长篇 Markdown 塞进 HTML 注释，也不在运行界面显示开发说明。
+组件新增/修改时同步所属用法章节与关键区块说明；检查示例是否是完整代码，片段必须标明前置上下文。
+统一写法和正反例见 [注释先回答使用问题](./typescript-and-structure.md#注释先回答使用问题)。
+
+## 单独使用一个字段
+
+`FieldInput` 根据字段的 `type` 显示输入控件，`FieldDisplay` 根据同一份配置显示文本、金额、日期、图片等内容。它们不要求创建 CRUD 模块，也不要求传完整页面的数据。
+
+| 组件           | 必传参数                          | 使用后得到什么                                                       |
+| -------------- | --------------------------------- | -------------------------------------------------------------------- |
+| `FieldInput`   | `field`、`env`、`readonly`        | 一个输入控件；通过 `change` 通知新值，通过 `commit` 通知本次交互完成 |
+| `FieldDisplay` | `field`、`env`                    | 一个只读值；空值显示 `—`，按字段类型格式化，可选 `scene="table"`     |
+| `MyFormField`  | `MyForm` 提供的 `field(key)` 结果 | 带标签、必填提示和校验错误的表单项；不适合自己拼参数独立使用         |
+
+普通文本的 field 只需 `key/label/type`。`form`、`detail`、`table` 都不是直接调用这两个渲染组件的必填项；选择框仍需 `options`，字典需 `dict`，参照需 `reference`。`MyForm/MyDesc` 会按 `form/detail` 决定是否显示字段，与直接调用渲染组件不同。
+
+### 输入并同时显示结果
+
+下面是完整例子：输入姓名后，下方立即显示新值。`env.model` 只含这个字段；没有组织等额外信息时，`context` 传 `undefined`。
+
+```vue
+<script setup lang="ts">
+import { computed, ref } from "vue";
+import FieldInput from "@/components/business/fields/FieldInput.vue";
+import FieldDisplay from "@/components/business/fields/FieldDisplay.vue";
+import type { FieldDefinition, FieldEnvironment } from "@/components/business/fields/types";
+
+interface Model {
+  name: string;
+}
+const model = ref<Model>({ name: "" });
+const nameField: FieldDefinition<Model> = {
+  key: "name",
+  label: "姓名",
+  type: "text",
+  props: { maxlength: 40 },
+};
+const env = computed<FieldEnvironment<Model, undefined>>(() => ({
+  model: model.value,
+  context: undefined,
+  mode: "add",
+}));
+function onNameChange(value: string, mapped: Partial<Model>) {
+  model.value = { ...model.value, ...mapped, name: value };
+}
+</script>
+
+<template>
+  <FieldInput :field="nameField" :env="env" :readonly="false" @change="onNameChange" />
+  <p>
+    当前姓名：
+    <FieldDisplay :field="nameField" :env="env" />
+  </p>
+</template>
+```
+
+`FieldInput` 当前没有 `v-model`，页面通过 `change(value, mapped, reason)` 回写：value 是当前字段的新值，mapped 是参照或地区选择额外回填的字段，reason 说明是用户输入还是关联条件变化。上例只有一个字符串字段，不能直接当作任意多字段表单的回写函数。
+
+直接使用时，组件只负责输入或显示，不会自动执行 `form.required/rules/visible/readonly`、整张表单的 `links` 或保存逻辑。需要这些能力时使用 [MyForm](#独立表单与详情完整最小例子)。`readonly` 要显式传入；`type: "custom"` 的自定义输入需在表单插槽中实现。
+
+`FieldDisplay` 默认按详情格式显示；`scene="table"` 改用 `table.format`，详情使用 `detail.format`。目前 env 的 mode 只允许 `add/edit`，纯详情可传 `edit`，它本身不会让组件变成输入框。这里记录的是现有接口，尚无只传 `value + field` 的统一简化入口。
+
 ## 业务 source 与独立参照
+
+`MyReference` 用于选择客户、销售组织、商品等业务记录：传入 ID 和数据源，即可搜索候选、打开选择弹窗，并在编辑时按 ID 显示名称。它可直接使用 `v-model`，不需要 `FieldInput`、`MyForm` 或 CRUD 页面。
+
+### 单独选择销售组织
+
+下面是完整组件。复用已有的销售组织数据源，父页面传入当前组织和范围标识；用户选择后，saleId 保存 ID，saleName 保存名称。清空时名称也会清除。
+
+```vue
+<script setup lang="ts">
+import { ref } from "vue";
+import MyReference from "@/components/business/MyReference/index.vue";
+import { saleReference } from "@/pages/base/sale/references";
+import type { SaleRecord } from "@/api/base/sale/types";
+import type { ReferenceCommit } from "@/components/business/MyReference/types";
+
+defineProps<{
+  /** 当前组织 ID，与业务接口使用同一个值。 */
+  organizationId: string;
+  /** 由登录用户、组织及权限版本组成的稳定标识，不传 Token。 */
+  scopeKey: string;
+}>();
+const saleId = ref<string | null>(null);
+const saleName = ref("");
+function onSaleCommit(event: ReferenceCommit<SaleRecord, string, false>) {
+  saleName.value = event.items[0]?.name ?? "";
+}
+</script>
+
+<template>
+  <MyReference
+    v-model="saleId"
+    :source="saleReference"
+    :filters="{ organizationId }"
+    :scope-key="scopeKey"
+    placeholder="请选择销售组织"
+    @commit="onSaleCommit"
+  />
+  <p>已选名称：{{ saleName || "未选择" }}</p>
+</template>
+```
+
+| 参数/事件  | 应该传什么                                      | 可以省略吗                            |
+| ---------- | ----------------------------------------------- | ------------------------------------- |
+| `v-model`  | 单选为原类型 ID 或 `null`；多选为 ID 数组       | 必传当前值；只读时可用 `:model-value` |
+| `source`   | 现有业务数据源，例如 saleReference              | 必传，但可在不同页面复用              |
+| `filters`  | 数据源要求的查询范围，例如 `{ organizationId }` | 必传，内容由数据源类型决定            |
+| `scopeKey` | 当前用户、组织和权限版本对应的稳定标识          | 必传；身份或权限改变时更新            |
+| `commit`   | 需要额外回填名称等字段时监听                    | 只需要 ID 时可省略                    |
+| `multiple` | `true` 开启多选，同时将值改为数组               | 默认单选，不在运行时切换              |
+| `readonly` | `true` 只显示已选内容                           | 默认允许选择                          |
+
+### 单独显示已选参照
+
+沿用上例的导入、saleId 和父页面参数，替换为以下模板即可按 ID 显示只读内容：
+
+```vue
+<MyReference
+  :model-value="saleId"
+  :source="saleReference"
+  :filters="{ organizationId }"
+  :scope-key="scopeKey"
+  readonly
+/>
+```
+
+无需为了回显名称再写一个查询。初始 ID 的解析通过 `resolve` 事件通知，**不会触发上例的 commit 名称回填**；上例 saleName 只代表本次选择后回填的名称。组件自己仍会显示已有 ID 的名称。不要在 resolve 中修改其他业务字段，避免加载详情时覆盖表单数据。
+
+如果详情需要纯文本或名称链接，可复用 `createReferenceField` 创建的字段，再交给 `FieldDisplay` 显示；仍需提供 field 和 env。只读参照会根据 ID 查询当前记录，不等同于直接展示接口返回的历史名称。
+
+### 新参照的数据源写在哪里
+
+已有参照直接导入即可；只有新增一种业务参照时才定义数据源。参考 [销售组织数据源](../src/pages/base/sale/references.ts)，在业务模块的 references.ts 中集中写一次：
+
+| 配置              | 用途                                                     |
+| ----------------- | -------------------------------------------------------- |
+| `key/title`       | 稳定的参照名称和选择弹窗标题                             |
+| `getKey/getLabel` | 从记录读取 ID 和显示名称                                 |
+| `columns`         | 弹窗中要显示的列                                         |
+| `search`          | 根据关键词、固定条件和页码搜索，返回 `{ list, total }`   |
+| `resolve`         | 按 ID 批量读取已选记录，返回 `{ items, unavailableIds }` |
+| `selectable`      | 可选；例如停用的组织可以显示但不允许选择                 |
+
+同一个 source 可用于 MyReference 和 createReferenceField。后者把参照接入统一字段配置，在 `filters/scopeKey` 中读取页面数据，在 `map` 中返回名称等回填字段；主 ID 仍由字段处理。只使用选择器时无需绕一层字段工厂。
+
+### 回填、校验与请求处理
 
 新业务先在 API 模块声明 DTO 和请求，再在业务模块创建不可变 `ReferenceSource<Row, Id, Filters>`。复用项目 request 实例，其普通响应已经解包。source 的 search 接收 keyword、filters、conditions、pageNum/pageSize、purpose；返回 `{ list, total }`。resolve 批量接收 ID，返回 `{ items, unavailableIds }`，每个请求 ID 必须且仅能归入一处。系统错误 reject，不能当成记录缺失。把 context.signal 传给请求，采用 `errorPresentation: "local"` 避免重复消息。
 
-可运行的三个 source 在 `src/pages/component-lab/reference/references.ts`；接口适配位于 `src/api/reference-lab/`。这些是开发数据示例，正式页面必须使用自己的 API，不引入实验模块。接口协议未知时先完成后端合同，不能扫描第一页猜测 ID 是否存在。
+可运行的三个 source 在 `src/pages/component-lab/reference/references.ts`；接口适配位于 `src/api/reference-lab/`。这些是开发数据示例，正式页面必须使用自己的 API，不引入实验模块。接口协议未知时先完成后端接口约定，不能扫描第一页猜测 ID 是否存在。
 
 以下片段在开发实验页中复用现有 source，客户 ID 为 number，商品 ID 为 string：
 
@@ -104,7 +403,7 @@ const navigation: ReferenceNavigation<CustomerRecord, string> = {
 声明 source.query 的参照使用与列表相同的紧凑查询栏：输入框内搜索，“筛选”展开普通/高级查询和重置；
 配置过的前往新增入口使用右侧带跳转图标的描边按钮。Sale 和实验页客户参照复用所属模块的派生 schema。
 旧 source 仅提供 keyword/conditions 时继续兼容旧搜索，不凭空宣称后端支持高级 AST。
-多选参照按实际弹窗内容宽度布局：宽容器固定左右区域同高，已选项只在右栏内部滚动；窄容器（包括桌面上的窄抽屉/弹窗）纵向排列并限制已选区高度。表单字段、紧凑查询栏和普通查询弹窗也按各自宿主容器宽度收为单列；组件不注册全局 resize 监听，表格仍复用 `TableView` 既有的 `ResizeObserver` 测量。
+多选参照按实际弹窗内容宽度布局：宽容器固定左右区域同高，已选项只在右栏内部滚动；窄容器（包括桌面上的窄抽屉/弹窗）纵向排列并限制已选区高度。表单字段、紧凑查询栏和普通查询弹窗也按各自所在容器宽度收为单列；组件不注册全局 resize 监听，表格仍复用 `TableView` 既有的 `ResizeObserver` 测量。
 
 ### 页面局部回写覆盖
 
@@ -132,7 +431,7 @@ form: {
 
 字段归组件旁 `fields/types.ts`，通过 `defineFields<Model, Context>()([...])` 定义。需要哪个场景就显式声明 form、detail、table；不声明的场景不自动出现。字典 valueType 与模型类型相符，数字清空若需 null 须声明 emptyValue。公共字段不直接拼保存 DTO。
 
-文本使用 `text`，长文本使用 `textarea`。紧凑表格默认单行省略；内容被裁切时悬浮单元格显示完整值，长文本或需要换行的子表显式使用现有舒适/换行呈现，不在页面重复实现省略和 tooltip。金额使用 `amount`：模型、DTO 和计算均为十进制字符串，字段层校验非负值、精度（默认两位）、上下界，不接受千分位或科学计数法；展示才调用 `decimal.ts` 的 `formatMoney`。日期支持 `date`、`month`、`year`、`datetime` 和 `dateRange`，分别按 `YYYY-MM-DD`、`YYYY-MM`、`YYYY`、`YYYY-MM-DD HH:mm:ss` 与两端日期字符串提交；区间要求完整且不允许逆序。`dateRange` 默认清空为 `[]`，页面模型用 `null` 表示空值时显式声明 `emptyValue: null`。
+文本使用 `text`，长文本使用 `textarea`。紧凑表格默认单行省略；内容被裁切时悬浮单元格显示完整值，长文本或需要换行的子表显式使用现有舒适/换行显示，不在页面重复实现省略和 tooltip。金额使用 `amount`：模型、DTO 和计算均为十进制字符串，字段层校验非负值、精度（默认两位）、上下界，不接受千分位或科学计数法；展示才调用 `decimal.ts` 的 `formatMoney`。日期支持 `date`、`month`、`year`、`datetime` 和 `dateRange`，分别按 `YYYY-MM-DD`、`YYYY-MM`、`YYYY`、`YYYY-MM-DD HH:mm:ss` 与两端日期字符串提交；区间要求完整且不允许逆序。`dateRange` 默认清空为 `[]`，页面模型用 `null` 表示空值时显式声明 `emptyValue: null`。
 
 省市区使用 `region` 字段，不把三个独立选择框拼在业务页。字段值是最后一级 ID，`region.map(items)` 显式原子回写省、市、区的 ID 和名称等业务字段；`RegionCascaderSource.loadChildren(parentId, level, filters)` 支持逐级接口，`resolvePath` 用于编辑回显的路径接口。服务申请是当前可运行例子。固定组织/租户等条件放 `filters`，不要把用户选择的 parentId 混入固定范围；真实后端可以改为整树或路径接口，只替换所属 API source。
 
@@ -182,7 +481,7 @@ MySearch 的 Query 独立于编辑 Model，用 `buildSearchFields<Query, Context
 ### 富文本字段
 
 富文本单独使用 `type: "rich"`，模型为 HTML 字符串（string 或 string | null），
-不混用 textarea 的 rows。合同见 [RichTextProps](../src/components/business/fields/rich-text.ts)。
+不混用 textarea 的 rows。接口约定见 [RichTextProps](../src/components/business/fields/rich-text.ts)。
 
 ```ts
 {
@@ -195,7 +494,7 @@ MySearch 的 Query 独立于编辑 Model，用 `buildSearchFields<Query, Context
 }
 ```
 
-| 配置            | 类型            | 默认及语义                                           |
+| 配置            | 类型            | 默认值与效果                                         |
 | --------------- | --------------- | ---------------------------------------------------- |
 | height          | string          | 240px，编辑内容区 CSS 高度，不含工具栏               |
 | placeholder     | string          | “请输入内容”，字段顶层 placeholder 优先              |
@@ -238,7 +537,7 @@ MySearch 的 Query 独立于编辑 Model，用 `buildSearchFields<Query, Context
 
 业务列的 `width` 是首选宽度，也是用户拖拽后保存的宽度；普通列会以它（或显式 `minWidth`）作为最小宽度参与剩余空间分配，因此列总宽不足容器时会自动铺满，容器不足时保持最小宽度并横向滚动。选择列、操作列和显式固定业务列保持精确宽度。不要在参照弹窗或业务页面传 `fit=false` 来绕过该兜底；需要窄列时直接把 `width/minWidth` 配得更小。
 
-启用 edit 时传 createInitialRow 和可选 links。`presentation` 默认为 `inline`：适合少量短字段的高频录入；中等表单可用 `dialog`；字段较多或纵向内容较长时可用 `drawer`。后两者分别通过 `dialog.title/width/columns`、`drawer.title/width/columns` 调整统一 `MyForm` 编辑器。三种呈现共用同一份 fields、links、行草稿、normalize、validate 和 commit/cancel 合同，不在浮层内复制业务规则。聚合子表不提供新页面模式；主表的新页面新增/编辑使用 `CrudNavigation.add/edit`。
+启用 edit 时传 createInitialRow 和可选 links。`presentation` 默认为 `inline`：适合少量短字段的高频录入；中等表单可用 `dialog`；字段较多或纵向内容较长时可用 `drawer`。后两者分别通过 `dialog.title/width/columns`、`drawer.title/width/columns` 调整统一 `MyForm` 编辑器。三种显示共用同一份 fields、links、行草稿、normalize、validate 和 commit/cancel 接口约定，不在浮层内复制业务规则。聚合子表不提供新页面模式；主表的新页面新增/编辑使用 `CrudNavigation.add/edit`。
 
 startEdit(rowKey, field?) 打开独立行草稿；commitEdit() 校验后通过 row-patch 发出原子 patch，页面按 rowKey 合并。cancelEdit() 丢弃草稿。普通 blur 不提交，参照弹窗关闭不会误提交行。外部改行、删除、换页、条件变化会作废旧会话。校验失败时表格顶部显示可点击摘要、错误行带状态，行内单元格或弹窗表单显示完整字段错误；点击摘要和整单首错都复用 focusCell，在公共分页切换后先重算、横向/纵向滚动，再聚焦实际控件。
 
@@ -255,7 +554,10 @@ startEdit(rowKey, field?) 打开独立行草稿；commitEdit() 校验后通过 r
 
 ## 验证与扩展边界
 
-运行 `node --test tests/*.test.mjs` 与 `pnpm build`。类型正反样例位于 component-lab 各模块，Vite 生成声明后由 vue-tsc 校验；实验路由只在开发模式注册，生产包不提供实验 API/Mock 后端。
+验证按改动范围执行：纯说明与模板注释检查链接、示例和注释位置；TS/Vue 改动运行类型检查，
+行为改动补对应 Node 用例，交互改动使用浏览器检查实际路由；构建相关变动再运行 build。
+不因补文档执行全量测试或新增测试依赖。具体命令见[根 README](../README.md)。
+类型正反样例位于 tests/type-cases，开发实验路由用于观察公开能力，生产包不提供实验 API/Mock 后端。
 
 纯工具按职责复用：搜索 normalizeSearchText、身份 serializeStableKey、空字段/筛选 isEmptyValue、金额 decimal、日期 date。isEmptyValue 只认为 null/undefined/空字符串/空数组为空，不 trim，不验证 ID。参照选择、请求会话、字段联动各留在所属模块，不混成宽松比较工具。
 

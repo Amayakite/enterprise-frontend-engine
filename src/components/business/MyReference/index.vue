@@ -1,4 +1,5 @@
 <template>
+  <!-- 选择客户、商品等业务记录。v-model 保存 ID；source 提供搜索和回显；filters/scopeKey 指定范围。加 readonly 只显示已选内容。 -->
   <div ref="root" class="my-reference">
     <div class="my-reference__control">
       <el-popover
@@ -447,27 +448,37 @@ defineSlots<
     selected?: (props: { row: Readonly<Row> }) => unknown;
   } & { [name: `column-${string}`]: (props: { row: Readonly<Row> }) => unknown }
 >();
+/** 参照输入所在元素，用于按实际宽度安排候选浮层。 */
 const root = ref<HTMLElement>();
+/** 当前组件所在标签是否可见，防止后台页面抢焦点或处理关闭事件。 */
 const active = ref(true);
+/** 缓存页面重新显示时恢复交互和焦点处理。 */
 onActivated(() => {
   active.value = true;
 });
+/** 切换标签时停止输入候选，避免候选浮层留在其他页面上。 */
 onDeactivated(() => {
   active.value = false;
   state.stopTyping();
 });
+/** 处理查看和前往新增的跳转，返回来源页面时尝试把焦点放回参照输入。 */
 const navigator = useBusinessNavigation(focus);
+/** 旧式弹窗关键词输入实例，调整查询时可直接聚焦。 */
 const dialogInput = ref<InputInstance>();
+/** 新查询面板的公开 focus 方法，用于把焦点放到筛选输入。 */
 const queryPanel = ref<{ focus: () => void }>();
+/** 生成“前往新增”按钮文案，优先使用页面自定义标题。 */
 const createLabel = computed(
   () =>
     props.navigation?.createLabel ??
     `前往新增${getBusinessTarget(props.navigation?.create ?? "")?.title ?? props.source.title}`
 );
+/** 按当前记录 ID 计算查看目标，并交给统一导航打开详情。 */
 function viewRelated(row: Readonly<Row>) {
   const target = props.navigation?.view?.(props.source.getKey(row), row);
   if (target) void navigator.open(target);
 }
+/** 打开目标模块新增；保存返回后仅在来源范围和选择未变化时尝试选入新 ID。 */
 function createRelated() {
   if (props.readonly || !props.navigation?.create) return;
   const scope = props.scopeKey;
@@ -491,13 +502,18 @@ function createRelated() {
       throw new Error("记录已保存，但未能选入来源字段，请返回后重新选择");
   });
 }
+/** 按数据源使用的新旧查询界面，把焦点放到对应搜索框。 */
 function adjustSearch() {
   if (props.source.query) queryPanel.value?.focus();
   else dialogInput.value?.focus();
 }
+/** 测量输入区域宽度，让候选浮层与输入框大小匹配。 */
 const { width } = useElementSize(root);
+/** 选择弹窗的内容元素，用于根据容器宽度安排列表和已选区域。 */
 const dialogContent = ref<HTMLElement>();
+/** 测量弹窗正文的实际宽度，而不是只按浏览器宽度判断是否应紧凑显示。 */
 const { width: dialogWidth } = useElementSize(dialogContent);
+/** 记录选择弹窗是否全屏，使布局随全屏切换更新。 */
 const dialogFullscreen = ref(false);
 // 多选首列同时承载复选框与编码，保留最小宽度并允许表格横向滚动。
 const columns = computed(() =>
@@ -511,20 +527,25 @@ const columns = computed(() =>
       : { ...column, minWidth: column.minWidth ?? 100 }
   )
 );
+/** 窄弹窗采用较矮的候选列表，宽弹窗固定高度，避免结果数量变化时界面跳动。 */
 const tableHeight = computed(() => {
   if (dialogWidth.value < 768) return 200;
   // 候选区不随结果条数伸缩；极矮窗口由 MyDialog 的公共滚动容器兜底。
   // 不监听全局窗口 resize，TableView 继续通过自身 ResizeObserver 测量可用区域。
   return 360;
 });
+/** 说明为什么暂时不能确认，例如单选未选择、正在回显或查询失败。 */
 const confirmDisabledReason = computed(() => {
   if (!props.multiple && !state.draftIds.value.length) return "请先选择一条记录";
   if (state.resolving.value) return "正在校验已选记录";
   if (state.searchError.value) return "请先处理查询错误";
   return undefined;
 });
+/** 主参照输入框实例，对外 focus 和跳转返回后用它恢复焦点。 */
 const inputRef = ref<InputInstance>();
+/** 为本组件生成唯一候选列表 ID，关联输入框和键盘高亮项。 */
 const listId = `reference-${useId()}`;
+/** 复用参照的搜索、回显和暂选逻辑，并把值变化等事件通知页面。 */
 const state = useReference(props, {
   update: (value) => emit("update:modelValue", value),
   commit: (value) => emit("commit", value),
@@ -532,31 +553,39 @@ const state = useReference(props, {
   error: (value) => emit("error", value),
   open: (value) => emit("open-change", value),
 });
+/** 键盘高亮项变化后，等待候选 DOM 更新，再把它滚动到可见位置。 */
 watch(state.activeIndex, async (index) => {
   await nextTick();
   if (index >= 0)
     document.getElementById(`${listId}-${index}`)?.scrollIntoView({ block: "nearest" });
 });
+/** 输入框失焦时结束候选模式；弹窗正在接管焦点时保留当前操作。 */
 function cancelInput() {
   // 弹窗接管焦点时不终止刚建立的查询会话。
   if (!state.visible.value) state.stopTyping();
 }
+/** 仅在组件可见且弹窗关闭时聚焦主输入，避免后台标签抢焦点。 */
 function focus() {
   if (active.value && !state.visible.value) inputRef.value?.focus();
 }
+/** 收到关闭请求时结束弹窗暂选；忽略来自后台缓存页面的关闭变化。 */
 function closeDialog(value: boolean) {
   if (!value && active.value) state.close();
 }
+/** 输入法组合期间不搜索，其余输入交给候选搜索逻辑。 */
 function onInput(text: string) {
   if (!state.composing.value) state.input(text);
 }
+/** 输入法确认后读取最终文字，再开始候选查询。 */
 function onCompositionEnd(event: CompositionEvent) {
   state.input((event.target as HTMLInputElement).value);
 }
+/** 用户重新查询时回到第一页，避免新条件继续停留在旧页码。 */
 function query() {
   state.page.value = 1;
   void state.search();
 }
+/** 支持上下键选择候选、Enter 确认和 Escape 退出，并避免干扰输入法。 */
 function onKeydown(event: Event | KeyboardEvent) {
   if (!(event instanceof KeyboardEvent)) return;
   if (event.isComposing || state.composing.value) return;

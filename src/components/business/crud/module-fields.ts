@@ -18,7 +18,7 @@ interface OrderedScene {
 /**
  * 单一字段来源：控件与通用表单规则写一次，scenes 仅声明使用位置和差异。
  * @typeParam M 页面模型，不是保存 DTO；提交必须经过白名单适配。
- * @typeParam S API 查询合同；查询 key 可以与模型字段不同。
+ * @typeParam S API 查询接口约定；查询 key 可以与模型字段不同。
  * @example
  * ```ts
  * { key: "name", label: "名称", type: "text", form: { required: true },
@@ -138,7 +138,7 @@ type TypedQueryField<F> = F extends {
     }
   : never;
 
-/** 唯一字段合同；字段名、控件、值与查询操作符关联，所有场景从这里派生。 */
+/** 唯一字段配置；字段名、控件、值与查询操作符关联，所有场景从这里派生。 */
 export type ModuleField<M, C, S extends QuerySchema> = TypedQueryField<BaseModuleField<M, C, S>>;
 
 /**
@@ -165,6 +165,7 @@ export function compileModuleFields<M, C, S extends QuerySchema>(
   queryOnly: readonly string[] = []
 ) {
   defineFields<M, C>()(fields);
+  /** 按各页面场景的 order 排字段，未指定顺序时保留业务声明顺序。 */
   const ordered = (scene: "list" | "add" | "edit" | "detail") =>
     fields
       .map((field, index) => ({ field, index }))
@@ -177,6 +178,7 @@ export function compileModuleFields<M, C, S extends QuerySchema>(
         );
       })
       .map(({ field }) => field);
+  /** 根据新增/编辑场景生成表单字段，合并共享输入规则与当前模式设置。 */
   const form = (mode: "add" | "edit"): readonly FieldDefinition<M, C>[] =>
     ordered(mode).flatMap((field) => {
       const scene = field.scenes[mode];
@@ -188,12 +190,15 @@ export function compileModuleFields<M, C, S extends QuerySchema>(
       result.form = { ...options, modes: [mode] };
       return [result];
     });
+  /** 筛出开启列表显示的字段，按列表顺序生成列配置。 */
   const list = ordered("list").filter((field) => !!field.scenes.list);
+  /** 将列表字段转换成表格列，保留显示格式、宽度和排序等设置。 */
   const columns: readonly CrudColumn<M>[] = list.map((field) => ({
     key: field.key,
     label: field.label,
     ...(typeof field.scenes.list === "object" ? field.scenes.list : {}),
   }));
+  /** 生成开启详情显示的字段及其分组/跨度，不混入仅编辑时使用的字段。 */
   const detail: readonly FieldDefinition<M, C>[] = ordered("detail")
     .filter((field) => !!field.scenes.detail)
     .map((field) => {
@@ -207,11 +212,15 @@ export function compileModuleFields<M, C, S extends QuerySchema>(
             };
       return result;
     });
+  /** 按查询字段名收集自定义输入组件，用于补到最终查询 schema。 */
   const inputs: Partial<Record<Extract<keyof S, string>, QueryValueEditor>> = {};
+  /** 检查字段映射到查询参数后是否重名，防止一个输入覆盖另一个。 */
   const queryKeys = new Set<string>();
   for (const field of fields) {
+    /** 当前字段声明的查询入口、参数名和自定义输入，没有配置就跳过。 */
     const query = field.scenes.query;
     if (!query) continue;
+    /** 当前字段对应的查询参数名，允许通过 query.key 与表单字段名区分。 */
     const key = query.key ?? field.key;
     if (!Object.hasOwn(schema, key)) throw new Error(`未声明的查询字段：${key}`);
     if (queryKeys.has(key)) throw new Error(`重复查询映射：${key}`);
@@ -223,9 +232,11 @@ export function compileModuleFields<M, C, S extends QuerySchema>(
     if (queryKeys.has(key)) throw new Error(`重复查询映射：${key}`);
     queryKeys.add(key);
   }
+  /** 给查询白名单补上各字段的自定义输入，后续再继承静态字典并限制显示入口。 */
   const query = withQueryInputs(schema, inputs);
-  // 静态字典只在字段声明一次，查询呈现自动继承；不改变 API 运算符或值类型。
+  // 静态字典只在字段声明一次，查询显示自动继承；不改变 API 运算符或值类型。
   for (const field of fields) {
+    /** 当前字段对应的查询参数名，允许通过 query.key 与表单字段名区分。 */
     const key = field.scenes.query ? (field.scenes.query.key ?? field.key) : undefined;
     if (
       key &&

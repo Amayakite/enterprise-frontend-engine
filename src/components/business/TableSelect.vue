@@ -226,15 +226,18 @@ const queryParams = reactive<TableSelectQuery>({
   pageSize,
 });
 
+/** 仅把文本或数字值传给普通输入，未填写或不匹配时显示空字符串。 */
 function textValue(key: string): string | number {
   const value = queryParams[key];
   return typeof value === "string" || typeof value === "number" ? value : "";
 }
+/** 写回文本搜索条件，数字配置只在可安全解析为有限数值时转换类型。 */
 function setTextValue(key: string, value: string | number, numeric = false) {
   const parsed = typeof value === "string" && value.trim() !== "" ? Number(value) : value;
   queryParams[key] =
     numeric && typeof parsed === "number" && Number.isFinite(parsed) ? parsed : value;
 }
+/** 检查选择框的标量或数组类型，不把对象等未知条件传给选择组件。 */
 function selectValue(
   key: string
 ): string | number | boolean | (string | number | boolean)[] | undefined {
@@ -245,6 +248,7 @@ function selectValue(
   if (Array.isArray(value) && value.every(scalar)) return value;
   return undefined;
 }
+/** 整理日期输入支持的值或同类型数组，错误形状按空值处理。 */
 function dateValue(key: string): string | number | Date | string[] | number[] | Date[] | undefined {
   const value = queryParams[key];
   const scalar = (item: unknown): item is string | number | Date =>
@@ -260,7 +264,9 @@ function dateValue(key: string): string | number | Date | string[] | number[] | 
 
 // 计算popover的宽度
 const tableSelectRef = ref<HTMLElement>();
+/** 选择面板的实际宽度，随触发区域测量结果更新。 */
 const popoverWidth = ref(width);
+/** 触发区域宽度变化时同步面板宽度，避免嵌入窄表单后浮层过宽。 */
 useResizeObserver(tableSelectRef, (entries) => {
   popoverWidth.value = `${entries[0].contentRect.width}px`;
 });
@@ -312,9 +318,11 @@ const tableColumns = computed(() =>
 );
 // 选择
 const selectedItems = shallowRef<Row[]>([]);
+/** 确认按钮显示临时选中数量，尚未选择时提示用户先选择。 */
 const confirmText = computed(() => {
   return selectedItems.value.length > 0 ? `已选${selectedItems.value.length}条` : "请选择";
 });
+/** 多选保留所有勾选项；单选仅保留最后选中行，并同步表格的勾选与高亮。 */
 function handleSelect(selection: Row[]) {
   if (isMultiple || selection.length === 0) {
     // 多选
@@ -327,6 +335,7 @@ function handleSelect(selection: Row[]) {
     tableRef.value?.setCurrentRow(selectedItems.value[0]);
   }
 }
+/** 只在多选模式接收页头全选结果，单选模式不批量选入。 */
 function handleSelectAll(selection: Row[]) {
   if (isMultiple) {
     selectedItems.value = selection;
@@ -364,6 +373,7 @@ function handleClear() {
 function handleClose() {
   popoverVisible.value = false;
 }
+/** 保留浮层正文元素引用，用于与触发器区分内部点击区域。 */
 const popoverContentRef = ref<HTMLElement>();
 /* onClickOutside(tableSelectRef, () => (popoverVisible.value = false), {
   ignore: [popoverContentRef],

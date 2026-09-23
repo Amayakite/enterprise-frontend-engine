@@ -17,10 +17,15 @@ export interface CrudFormStatus {
  * const activity = crudFormActivity(controller.state);
  */
 export function crudFormActivity(status: CrudFormStatus) {
+  /** 分别读取前端流程阶段和接口写入结果；请求结束不一定表示可以安全再次保存。 */
   const { phase, mutationOutcome } = status;
+  /** 正在向服务器写入或读取保存结果，此时不能继续改数据或离开。 */
   const critical = phase === "saving" || phase === "resolving";
+  /** 正在确认子表或执行校验，允许内部回写但不能开始另一轮保存。 */
   const preparing = phase === "committing" || phase === "validating";
+  /** 加载、准备和提交阶段统一视为忙碌，供按钮与实际操作共同判断。 */
   const busy = critical || preparing || phase === "loading";
+  /** 已写入但尚未回填，或提交结果不明时，要求先核实结果，不能直接重发。 */
   const reconciliationReason =
     phase === "committed-needs-sync"
       ? "保存已提交，请先回填"

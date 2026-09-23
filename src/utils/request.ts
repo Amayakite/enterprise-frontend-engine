@@ -202,7 +202,7 @@ function createResponseError(
   });
 }
 
-/** 仅为未迁移 API 保留全局兜底；local 错误由调用方的控制器负责呈现。 */
+/** 仅为未迁移 API 保留全局兜底；local 错误由调用方的控制器负责显示。 */
 function presentRequestError(error: RequestError): void {
   if (error.owner === "global") feedback.error(error.message);
 }
@@ -211,7 +211,7 @@ function presentRequestError(error: RequestError): void {
  * 发起当前 API 协议请求；普通响应解包 data，二进制响应保留响应头。
  * @param config Axios 请求配置；沿用现有认证、错误提示与取消行为。
  * @returns blob/arraybuffer 返回 AxiosResponse，普通请求返回业务数据。
- * @remarks 泛型是 API 层声明的 DTO 合同，不表示对服务器数据做了运行时校验。
+ * @remarks 泛型是 API 层声明的 DTO 接口约定，不表示对服务器数据做了运行时校验。
  * @example
  * `request<unknown, CustomerRecord>({ url: "/api/v1/pilot/customers/C001" })`
  */

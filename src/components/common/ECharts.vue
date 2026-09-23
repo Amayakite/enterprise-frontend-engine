@@ -42,7 +42,9 @@ const props = defineProps<{
   height?: string;
 }>();
 
+/** 图表挂载的 DOM 元素，ECharts 初始化时需要真实容器。 */
 const chartRef = ref<HTMLDivElement | null>(null);
+/** 当前图表实例，更新配置及卸载释放使用同一份。 */
 let chartInstance: echarts.ECharts | null = null;
 
 // 初始化图表
@@ -71,10 +73,12 @@ watch(
   { deep: true }
 );
 
+/** 容器存在后初始化图表并设置配置，避免在 setup 阶段访问尚未生成的 DOM。 */
 onMounted(() => {
   nextTick(() => initChart());
 });
 
+/** 卸载时释放 ECharts 实例；useResizeObserver 的尺寸订阅随组件生命周期自动清理。 */
 onBeforeUnmount(() => {
   chartInstance?.dispose();
 });
