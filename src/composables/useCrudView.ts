@@ -1,9 +1,29 @@
-import { computed } from "vue";
+import { computed, onActivated, onMounted, reactive, ref } from "vue";
+import { viewInvalidationRevision } from "./useViewInvalidation";
+import type { DeepReadonly, UnwrapNestedRefs } from "vue";
+import { useBusinessPage } from "./useBusinessPage";
+import { useCrudList } from "./useCrudList";
+import { useCrudForm } from "./useCrudForm";
+import { useCrudDetail } from "./useCrudDetail";
+import { useBatchActions } from "./useBatchActions";
+import { crudPermission } from "./useCrudActions";
+import { applyReferenceOverrides } from "@/components/business/fields/reference-overrides";
+import { cloneReadonlyModel, readonlyModel } from "@/components/business/fields/model";
+import type { BusinessModuleContract, Form, List, Detail } from "@/components/business/crud/module";
+import type {
+  CrudTableBinding,
+  CrudNavigation,
+  CrudTarget,
+  CrudValidation,
+} from "@/components/business/crud/types";
+import type {
+  CrudViewEnvironment,
+  CrudPageModule,
+  CrudChildBinding,
+} from "@/components/business/crud/crud-page";
+
 import { crudFormDisabledReason } from "@/components/business/crud/form-presentation";
-import { cloneReadonlyModel } from "@/components/business/fields/model";
 import { useCrudChange } from "./useCrudChange";
-import type { BusinessModuleContract } from "@/components/business/crud/module";
-import type { CrudPageFormHooks, CrudPageModule } from "@/components/business/crud/crud-page";
 import type {
   CrudListViewOptions,
   CrudFormViewOptions,
@@ -12,8 +32,6 @@ import type {
   CrudFormView,
   CrudDetailView,
 } from "@/components/business/crud/crud-view";
-import { useCrudRuntime } from "./useCrudRuntime";
-
 /** 将同一控制器状态投射为 getter，不复制模型；解构返回的 state 对象仍能追踪更新。 */
 function projectState<A extends object, B extends object>(read: () => A, extra: B): A & B {
   const target = {};
@@ -24,16 +42,6 @@ function projectState<A extends object, B extends object>(read: () => A, extra: 
   // 所有 A/B 自有成员均以上述 getter/原描述符定义，恢复动态属性定义的静态形状。
   return target as A & B;
 }
-/** 钩子读取只读快照；这里只调整命名空间，原模型/context/signal 不变。 */
-function hookInput<I extends { state: object }>(
-  input: I
-): Omit<I, "state"> & {
-  state: { readonly custom: I["state"] };
-} {
-  const { state, ...rest } = input;
-  return { ...rest, state: { custom: state } };
-}
-
 /**
  * 按场景装配唯一控制器，返回 state/actions/bindings，模板直接引用真实业务组件。
  * @param module 模块配置；context/parseId 与稳定身份沿用原配置。
@@ -70,112 +78,264 @@ export function useCrudView<
     | CrudFormViewOptions<T, S, "edit">
     | CrudDetailViewOptions<T, S>
 ): CrudListView<T, S> | CrudFormView<T, S> | CrudDetailView<T, S> {
+  const base = useBusinessPage(module);
+  const resolveContext = module.context;
+  const parseId = module.parseId;
+  if (!resolveContext || !parseId)
+    throw new Error(`${module.meta.key}：统一页面需要 context 和 parseId 适配`);
+  const context = computed(() => readonlyModel(resolveContext(base.context.value)));
+  // S 由工厂推导；省略工厂时默认空状态。此处仅恢复 Vue 对泛型工厂的解包类型。
+  const state = reactive(options.state?.() ?? {}) as UnwrapNestedRefs<S>;
+  const stateSnapshot = () => ({ custom: readonlyModel(state) });
+  const navigation: CrudNavigation<T["Id"]> = {
+    add: base.navigation.add,
+    edit: (id) => base.navigation.edit(String(id)),
+    detail: (id) => base.navigation.detail(String(id)),
+    saved: (id) => base.navigation.saved(String(id)),
+    close: base.navigation.close,
+    ...options.navigation,
+  };
+  const config = module.createViewConfig(navigation, options.view === "edit" ? "edit" : "add");
+  const createPermitted = () => crudPermission(config.form.permissions?.create);
+  const createDenied = "当前账号没有新增该单据的权限，请联系管理员授权，或联系相关人员新增。";
+  const originalAdd = navigation.add;
+  navigation.add = async () => {
+    if (!createPermitted()) throw new Error(createDenied);
+    await originalAdd?.();
+  };
+  if (options.view === "add" || options.view === "edit") {
+    config.form = {
+      ...config.form,
+      fields: applyReferenceOverrides(config.form.fields, options.form?.references),
+    };
+  }
+  function hostBinding(refresh: () => Promise<void>): CrudViewEnvironment["host"] {
+    return { presentation: base.presentation, afterSave: refresh };
+  }
   if (options.view === "list") {
-    const { beforeQuery, afterQuery } = options.hooks ?? {};
-    const source = useCrudRuntime(module, {
-      ...options,
-      hooks: {
-        beforeQuery: beforeQuery ? (input) => beforeQuery(hookInput(input)) : undefined,
-        afterQuery: afterQuery ? (input) => afterQuery(hookInput(input)) : undefined,
+    const hooks = options.hooks;
+    const listConfig: List<T> = {
+      ...config.list,
+      beforeQuery: async (
+        query: Parameters<NonNullable<typeof config.list.beforeQuery>>[0],
+        input: Parameters<NonNullable<typeof config.list.beforeQuery>>[1]
+      ) => {
+        const guard = await config.list.beforeQuery?.(query, input);
+        input.signal.throwIfAborted();
+        if (guard && !guard.proceed) return guard;
+        return (
+          (await hooks?.beforeQuery?.({ ...input, query, state: stateSnapshot() })) ?? {
+            proceed: true,
+          }
+        );
       },
+      afterQuery: async (
+        result: Parameters<NonNullable<typeof config.list.afterQuery>>[0],
+        input: Parameters<NonNullable<typeof config.list.afterQuery>>[1]
+      ) => {
+        await config.list.afterQuery?.(result, input);
+        input.signal.throwIfAborted();
+        await hooks?.afterQuery?.({
+          ...input,
+          rows: result.list,
+          total: result.total,
+          state: stateSnapshot(),
+        });
+      },
+    };
+    if (!config.list.beforeQuery && !hooks?.beforeQuery) delete listConfig.beforeQuery;
+    if (!config.list.afterQuery && !hooks?.afterQuery) delete listConfig.afterQuery;
+    const lock = ref(false);
+    const list = useCrudList(listConfig, () => context.value, {
+      invalidationKey: config.key,
+      disabled: () => lock.value,
+      preference: () => base.preference.value,
     });
-    const state = projectState(() => source.list.state, {
-      custom: source.state,
+    const batch = options.batch
+      ? useBatchActions({
+          module,
+          config: listConfig,
+          list,
+          context: () => context.value,
+          lock,
+          ...options.batch,
+        })
+      : undefined;
+    const listHost = hostBinding(list.refresh);
+    const listBinding = () => ({
+      config: listConfig,
+      controller: list,
+      context: context.value,
+      navigation,
+      scopeKey: base.context.value.scopeKey,
+      preference: base.preference.value,
+      batch,
+      createPermitted: createPermitted(),
+      guideMode: module.page?.guideMode,
+      host: listHost,
+    });
+    const viewState = projectState(() => list.state, {
+      custom: state,
       get busy() {
-        return source.busy;
+        return list.state.loading || !!list.state.busyActionKey || !!batch?.busy;
       },
-      notice: source.notice,
+      notice: base.notice,
       get invalidReason() {
-        return source.invalidReason;
+        return undefined;
       },
       pagination: {
         get pageNum() {
-          return source.list.state.pageNum;
+          return list.state.pageNum;
         },
         get pageSize() {
-          return source.list.state.pageSize;
+          return list.state.pageSize;
         },
         get total() {
-          return source.list.state.total;
+          return list.state.total;
         },
       },
     });
-    const { state: _state, actionResult: _result, ...commands } = source.list;
+    const { state: _state, actionResult: _result, ...commands } = list;
     return {
-      state,
+      state: viewState,
       actions: {
         ...commands,
-        navigation: source.navigation,
+        navigation: navigation,
         back: async () => {
-          await source.navigation.close?.();
+          await navigation.close?.();
         },
       },
       bindings: {
         get list() {
-          return source.bindings.list;
+          return listBinding();
         },
-        host: source.host,
+        host: listHost,
       },
     };
   }
+  const rawId = base.entityId;
+  const id = rawId === null ? null : parseId(rawId);
   if (options.view === "detail") {
-    const { beforeOpen, afterOpen } = options.hooks ?? {};
-    const source = useCrudRuntime(module, {
-      ...options,
-      hooks: {
-        beforeOpen: beforeOpen ? (input) => beforeOpen(hookInput(input)) : undefined,
-        afterOpen: afterOpen ? (input) => afterOpen(hookInput(input)) : undefined,
+    const hooks = options.hooks;
+    const detailConfig: Detail<T> = {
+      ...config.detail,
+      beforeOpen: async (
+        id: T["Id"],
+        input: Parameters<NonNullable<typeof config.detail.beforeOpen>>[1]
+      ) => {
+        await config.detail.beforeOpen?.(id, input);
+        input.signal.throwIfAborted();
+        const result = await hooks?.beforeOpen?.({
+          ...input,
+          state: stateSnapshot(),
+          target: { mode: "detail", id },
+        });
+        input.signal.throwIfAborted();
+        if (result?.state) Object.assign(state, result.state);
       },
+      afterOpen: async (
+        entity: Parameters<NonNullable<typeof config.detail.afterOpen>>[0],
+        model: Parameters<NonNullable<typeof config.detail.afterOpen>>[1],
+        input: Parameters<NonNullable<typeof config.detail.afterOpen>>[2]
+      ) => {
+        await config.detail.afterOpen?.(entity, model, input);
+        input.signal.throwIfAborted();
+        await hooks?.afterOpen?.({ ...input, entity, model, state: stateSnapshot() });
+      },
+    };
+    if (!config.detail.beforeOpen && !hooks?.beforeOpen) delete detailConfig.beforeOpen;
+    if (!config.detail.afterOpen && !hooks?.afterOpen) delete detailConfig.afterOpen;
+    const detail = useCrudDetail(detailConfig, () => context.value);
+    const detailHost = hostBinding(detail.refresh);
+    let handledInvalidation = viewInvalidationRevision(config.key);
+    onActivated(() => {
+      const revision = viewInvalidationRevision(config.key);
+      if (revision === handledInvalidation || detail.state.phase === "loading") return;
+      // 只刷新当前实例绑定的记录；后台缓存页不读取其他标签的路由参数。
+      if (id !== null)
+        void detail.load(id).then(() => {
+          if (detail.state.phase === "ready") handledInvalidation = revision;
+        });
+    });
+    onMounted(() => {
+      if (id !== null) void detail.load(id);
+    });
+    const edit = async () => {
+      if (
+        detail.state.id !== null &&
+        detail.state.phase === "ready" &&
+        !detail.busyActionKey &&
+        crudPermission(config.form.permissions?.update) &&
+        detail.state.model &&
+        !config.form.readonlyReason?.(detail.state.model, context.value)
+      )
+        await navigation.edit?.(cloneReadonlyModel<T["Id"]>(detail.state.id));
+    };
+    const detailBinding = () => ({
+      controller: detail,
+      fields: config.detail.fields,
+      tabs: config.detail.tabs,
+      summary: config.detail.summary,
+      actions: config.detail.actions,
+      context: context.value,
+      back: navigation.close,
+      columns: base.columns,
+      layout: base.layout,
+      entityLabel: base.entityLabel,
+      host: detailHost,
+      edit,
+      canEdit: crudPermission(config.form.permissions?.update) && detail.state.id !== null,
+      editReason: detail.state.model
+        ? config.form.readonlyReason?.(detail.state.model, context.value)
+        : undefined,
     });
     const descriptionModel = computed(() =>
-      source.detail.state.model
-        ? cloneReadonlyModel<T["Model"]>(source.detail.state.model)
-        : undefined
+      detail.state.model ? cloneReadonlyModel<T["Model"]>(detail.state.model) : undefined
     );
     return {
-      state: projectState(() => source.detail.state, {
-        custom: source.state,
+      state: projectState(() => detail.state, {
+        custom: state,
         get busy() {
-          return source.busy;
+          return detail.state.phase === "loading" || !!detail.busyActionKey;
         },
-        notice: source.notice,
-        invalidReason: source.invalidReason,
+        notice: base.notice,
+        invalidReason: id === null ? "详情缺少记录 ID，请返回列表重新打开" : undefined,
         get canEdit() {
-          return source.canEdit;
+          return detailBinding().canEdit;
         },
         get editReason() {
-          return source.editReason;
+          return detailBinding().editReason;
         },
       }),
       actions: {
-        refresh: source.detail.refresh,
-        runAction: source.detail.runAction,
-        actionAvailability: source.detail.actionAvailability,
-        edit: source.edit,
+        refresh: detail.refresh,
+        runAction: detail.runAction,
+        actionAvailability: detail.actionAvailability,
+        edit: edit,
         back: async () => {
-          await source.navigation.close?.();
+          await navigation.close?.();
         },
-        navigation: source.navigation,
+        navigation: navigation,
       },
       bindings: {
         get detail() {
-          return source.bindings.detail;
+          return detailBinding();
         },
         get toolbar() {
-          const { controller, actions, back } = source.bindings.detail;
+          const { controller, actions, back } = detailBinding();
           return {
             controller,
             actions,
             back,
-            edit: source.edit,
-            canEdit: source.canEdit,
-            editReason: source.editReason,
+            edit: edit,
+            canEdit: detailBinding().canEdit,
+            editReason: detailBinding().editReason,
           };
         },
-        feedback: { controller: source.detail },
+        feedback: { controller: detail },
         get description() {
-          if (!source.detail.state.model) return undefined;
-          const { fields, context, columns } = source.bindings.detail;
+          if (!detail.state.model) return undefined;
+          const { fields, context, columns } = detailBinding();
           return {
             fields,
             context,
@@ -183,62 +343,154 @@ export function useCrudView<
             modelValue: descriptionModel.value!,
           };
         },
-        host: source.host,
+        host: detailHost,
       },
     };
   }
-  const { afterOpen, validate, beforeSave, afterSave, beforeClose } = options.hooks ?? {};
-  const hooks: Omit<CrudPageFormHooks<T, S, "add">, "beforeOpen"> = {
-    afterOpen: afterOpen ? (input) => afterOpen(hookInput(input)) : undefined,
-    validate: validate ? (input) => validate(hookInput(input)) : undefined,
-    beforeSave:
-      options.hooks?.change || beforeSave
-        ? async (input) => {
-            if (changes.pending.value || changes.error.value)
-              return {
-                proceed: false,
-                reason: changes.error.value ?? "字段变化处理中，请稍后保存",
-              };
-            return beforeSave ? beforeSave(hookInput(input)) : { proceed: true };
-          }
-        : undefined,
-    afterSave: afterSave ? (input) => afterSave(hookInput(input)) : undefined,
-    beforeClose,
+  const hooks = options.hooks;
+  const formConfig: Form<T> = {
+    ...config.form,
+    beforeOpen: async (input) => {
+      if (input.target.mode === "add" && !createPermitted()) throw new Error(createDenied);
+      const common = await config.form.beforeOpen?.(input);
+      input.signal.throwIfAborted();
+      if (options.view !== input.target.mode) throw new Error("页面场景与初始化目标不一致");
+      let defaults: Partial<T["Model"]> | undefined;
+      if (options.view === "add" && input.target.mode === "add") {
+        const result = await options.hooks?.beforeOpen?.({
+          ...input,
+          target: input.target,
+          state: stateSnapshot(),
+        });
+        input.signal.throwIfAborted();
+        if (result?.state) Object.assign(state, result.state);
+        defaults = result?.defaults;
+      } else if (options.view === "edit" && input.target.mode === "edit") {
+        const result = await options.hooks?.beforeOpen?.({
+          ...input,
+          target: input.target,
+          state: stateSnapshot(),
+        });
+        input.signal.throwIfAborted();
+        if (result?.state) Object.assign(state, result.state);
+      }
+      return common || defaults ? { ...common, ...defaults } : undefined;
+    },
+    afterOpen: async (input) => {
+      await config.form.afterOpen?.(input);
+      input.signal.throwIfAborted();
+      await hooks?.afterOpen?.({ ...input, state: stateSnapshot() });
+    },
+    validate: async (input) => {
+      const common = await config.form.validate?.(input);
+      input.signal.throwIfAborted();
+      const local = await hooks?.validate?.({ ...input, state: stateSnapshot() });
+      const results = [common, local].filter((item): item is CrudValidation<T["Model"]> => !!item);
+      const issues = results.flatMap((result) => (result.valid ? [] : [...result.issues]));
+      return results.some((result) => !result.valid) ? { valid: false, issues } : { valid: true };
+    },
+    beforeSave: async (input) => {
+      const guard = await config.form.beforeSave?.(input);
+      input.signal.throwIfAborted();
+      if (guard && !guard.proceed) return guard;
+      if (changes.pending.value || changes.error.value)
+        return { proceed: false, reason: changes.error.value ?? "字段变化处理中，请稍后保存" };
+      return (await hooks?.beforeSave?.({ ...input, state: stateSnapshot() })) ?? { proceed: true };
+    },
+    afterSave: async (entity, input) => {
+      await config.form.afterSave?.(entity, input);
+      input.signal.throwIfAborted();
+      await hooks?.afterSave?.({ ...input, entity, state: stateSnapshot() });
+    },
+    beforeClose: async (value, context) => {
+      const guard = await config.form.beforeClose?.(value, context);
+      if (guard && !guard.proceed) return guard;
+      return (await hooks?.beforeClose?.(value)) ?? { proceed: true };
+    },
   };
-  const formOptions = options;
-  function createForm() {
-    if (formOptions.view === "add") {
-      const beforeOpen = formOptions.hooks?.beforeOpen;
-      return useCrudRuntime(module, {
-        ...formOptions,
-        hooks: {
-          ...hooks,
-          beforeOpen: beforeOpen ? (input) => beforeOpen(hookInput(input)) : undefined,
-        },
-      });
+  if (options.view !== "add" && !config.form.beforeOpen && !hooks?.beforeOpen)
+    delete formConfig.beforeOpen;
+  if (!config.form.afterOpen && !hooks?.afterOpen) delete formConfig.afterOpen;
+  if (!hooks?.validate) formConfig.validate = config.form.validate;
+  if (!hooks?.beforeSave && !hooks?.change) formConfig.beforeSave = config.form.beforeSave;
+  if (!hooks?.afterSave) formConfig.afterSave = config.form.afterSave;
+  if (!hooks?.beforeClose) formConfig.beforeClose = config.form.beforeClose;
+  const target: CrudTarget<T["Id"]> =
+    options.view === "add" ? { mode: "add" } : id !== null ? { mode: "edit", id } : { mode: "add" };
+  const form = useCrudForm(formConfig, {
+    context: () => context.value,
+    navigation,
+    initialTarget: target,
+    invalidateViewKey: config.key,
+    draftIdentity: base.draftIdentity,
+  });
+  const childBindings = new Map<string, unknown>();
+  const formHost = hostBinding(async () => {});
+  const formProps = {
+    host: formHost,
+    controller: form,
+    fields: formConfig.fields,
+    sections: formConfig.sections,
+    links: module.links,
+    get context() {
+      return context.value;
+    },
+    columns: base.columns,
+    layout: base.layout,
+    entityLabel: base.entityLabel,
+    get readonlyReason() {
+      return form.readonlyReason;
+    },
+    get entityKey() {
+      const current = cloneReadonlyModel<CrudTarget<T["Id"]>>(form.state.target);
+      return current.mode === "edit" ? current.id : ("new" as const);
+    },
+  };
+  // 无权限进入的缓存新增页，在恢复权限后首次激活才初始化；普通切页不重开、不覆盖草稿。
+  let initiallyOpened = false;
+  function openInitial() {
+    if (initiallyOpened) return;
+    if ((options.view === "add" && createPermitted()) || (options.view === "edit" && id !== null)) {
+      initiallyOpened = true;
+      void form.open(target);
     }
-    const beforeOpen = formOptions.hooks?.beforeOpen;
-    return useCrudRuntime(module, {
-      ...formOptions,
-      hooks: {
-        ...hooks,
-        beforeOpen: beforeOpen ? (input) => beforeOpen(hookInput(input)) : undefined,
-      },
-    });
   }
-  const source = createForm();
-  const changes = useCrudChange(source, options.hooks?.change);
+  onMounted(openInitial);
+  onActivated(openInitial);
+  const invalidReason = () =>
+    options.view === "add" && !createPermitted()
+      ? createDenied
+      : options.view === "edit" && id === null
+        ? "编辑缺少记录 ID，请返回列表重新打开"
+        : undefined;
+  const childBinding: CrudChildBinding<T> = (key) => {
+    let binding = childBindings.get(key);
+    if (!binding) {
+      const child = Object.values(module.children).find((child) => child.modelKey === key);
+      binding = child?.createBinding?.(form);
+      if (binding) childBindings.set(key, binding);
+    }
+    if (!binding) throw new Error("子表未配置视图绑定：" + key);
+    // 同一 module.children 按 modelKey 建立绑定；条件数组类型在 Map 边界恢复。
+    return binding as CrudTableBinding<
+      T["Model"][typeof key] extends readonly (infer Row extends object)[] ? Row : never
+    >;
+  };
+  const changes = useCrudChange<T, S>(
+    { controller: form, custom: state, context: () => context.value },
+    options.hooks?.change
+  );
   const formBinding = () => ({
-    ...source.bindings.form,
+    ...formProps,
     change: changes.change,
     changePending: changes.pending.value,
     changeError: changes.error.value,
     retryChange: changes.retry,
   });
   const feedback = {
-    controller: source.form,
+    controller: form,
     get readonlyReason() {
-      return source.form.readonlyReason;
+      return form.readonlyReason;
     },
     get changePending() {
       return changes.pending.value;
@@ -250,17 +502,17 @@ export function useCrudView<
   };
   const saveDisabledReason = () =>
     changes.error.value ||
-    (changes.pending.value ? "字段变化处理中" : crudFormDisabledReason(source.form));
+    (changes.pending.value ? "字段变化处理中" : crudFormDisabledReason(form));
 
   return {
-    state: projectState(() => source.form.state, {
-      custom: source.state,
+    state: projectState(() => form.state, {
+      custom: state,
       get busy() {
-        return source.busy;
+        return form.busy;
       },
-      notice: source.notice,
+      notice: base.notice,
       get invalidReason() {
-        return source.invalidReason;
+        return invalidReason();
       },
       get changing() {
         return changes.pending.value;
@@ -269,10 +521,10 @@ export function useCrudView<
         return changes.error.value;
       },
       get readonlyReason() {
-        return source.form.readonlyReason;
+        return form.readonlyReason;
       },
       get savePermission() {
-        return source.form.savePermission;
+        return form.savePermission;
       },
       get canSave() {
         return !saveDisabledReason();
@@ -281,21 +533,21 @@ export function useCrudView<
         return saveDisabledReason();
       },
       get canClose() {
-        return !source.form.busy;
+        return !form.busy;
       },
       get childrenReady() {
-        return source.form.childrenReady !== false;
+        return form.childrenReady !== false;
       },
     }),
     actions: {
       retryChange: changes.retry,
-      patch: source.form.patch,
-      save: source.form.save,
-      retrySync: source.form.retrySync,
-      open: source.form.open,
-      canLeave: source.form.canLeave,
-      back: source.form.close,
-      navigation: source.navigation,
+      patch: form.patch,
+      save: form.save,
+      retrySync: form.retrySync,
+      open: form.open,
+      canLeave: form.canLeave,
+      back: form.close,
+      navigation: navigation,
     },
     bindings: {
       get form() {
@@ -306,7 +558,7 @@ export function useCrudView<
       },
       toolbar: feedback,
       feedback,
-      child: source.child,
+      child: childBinding,
     },
   };
 }

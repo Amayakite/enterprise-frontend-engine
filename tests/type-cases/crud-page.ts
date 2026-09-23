@@ -1,22 +1,20 @@
 import type { CrudFormSlots } from "../../src/components/business/crud/types";
 import { useCrudView } from "../../src/composables/useCrudView";
 import type { CrudFormViewOptions } from "../../src/components/business/crud/crud-view";
-import type { CrudFormPageOptions } from "../../src/components/business/crud/crud-page";
 import type { CustomerContract } from "../../src/pages/base/customer/types";
-import { useCrudRuntime } from "../../src/composables/useCrudRuntime";
 import { customerModule } from "../../src/pages/base/customer/config";
 import type { RichTextProps } from "../../src/components/business/fields/rich-text";
 
-const add = useCrudRuntime(customerModule, {
+const add = useCrudView(customerModule, {
   view: "add",
   state: () => ({ hint: "", count: 0 }),
   hooks: {
     beforeOpen: async ({ context, state, target }) => {
       context.organizationId satisfies "org-a";
-      state.count satisfies number;
+      state.custom.count satisfies number;
       target.mode satisfies "add";
       // @ts-expect-error 钩子状态快照只读
-      state.count = 1;
+      state.custom.count = 1;
       return { state: { hint: "加载完毕" }, defaults: { customerName: "新客户" } };
     },
     validate: async ({ model }) => {
@@ -27,22 +25,22 @@ const add = useCrudRuntime(customerModule, {
     },
   },
 });
-add.state.count = 1;
+add.state.custom.count = 1;
 // @ts-expect-error state 类型不应拓宽
-add.state.count = "wrong";
+add.state.custom.count = "wrong";
 // @ts-expect-error patch 必须匹配字段
-add.form.patch({ customerName: 42 });
+add.actions.patch({ customerName: 42 });
 // @ts-expect-error 新增页不暴露列表控制器
 add.list.refresh();
-const invalidEdit: CrudFormPageOptions<CustomerContract, object, "edit"> = {
+const invalidEdit: CrudFormViewOptions<CustomerContract, object, "edit"> = {
   view: "edit",
   hooks: {
     // @ts-expect-error 编辑不能返回新增默认值，即使同时包含 state
     beforeOpen: async () => ({ state: {}, defaults: { customerName: "不能覆盖" } }),
   },
 };
-useCrudRuntime(customerModule, invalidEdit);
-const detail = useCrudRuntime(customerModule, { view: "detail" });
+useCrudView(customerModule, invalidEdit);
+const detail = useCrudView(customerModule, { view: "detail" });
 // @ts-expect-error 详情不提供保存控制器
 detail.form.save();
 const rich: RichTextProps = { height: "320px", maxlength: 2000, readonlyDisplay: "html" };

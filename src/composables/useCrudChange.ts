@@ -1,6 +1,7 @@
 import { onBeforeUnmount, ref, watch } from "vue";
 import type { BusinessModuleContract } from "@/components/business/crud/module";
-import type { CrudFormPage } from "@/components/business/crud/crud-page";
+import type { CrudFormController } from "@/components/business/crud/types";
+import type { DeepReadonly, UnwrapNestedRefs } from "vue";
 import type { CrudViewFormHooks } from "@/components/business/crud/crud-view";
 import type { FormChange } from "@/components/business/fields/types";
 import { readonlyModel } from "@/components/business/fields/model";
@@ -16,7 +17,11 @@ import { createRequestChannel } from "@/utils/request-channel";
  * const changes = useCrudChange(source, options.hooks?.change);
  */
 export function useCrudChange<T extends BusinessModuleContract, S extends object>(
-  source: Pick<CrudFormPage<T, S>, "form" | "bindings" | "state">,
+  source: {
+    /** 当前唯一表单控制器。 */ controller: CrudFormController<T["Model"], T["Entity"], T["Id"]>;
+    /** 本实例辅助状态，回调结果在有效请求内合并。 */ custom: UnwrapNestedRefs<S>;
+    /** 当前上下文 getter；改变时取消旧字段事务。 */ context: () => DeepReadonly<T["Context"]>;
+  },
   callback: CrudViewFormHooks<T, S, "add">["change"]
 ) {
   const pending = ref(false);
@@ -32,23 +37,23 @@ export function useCrudChange<T extends BusinessModuleContract, S extends object
     latest = undefined;
   }
   watch(
-    () => source.form.state.model,
+    () => source.controller.state.model,
     () => {
       if (!applying) cancel();
     },
     { flush: "sync" }
   );
   watch(
-    () => source.form.state.phase,
+    () => source.controller.state.phase,
     (phase) => {
       if (phase === "loading") cancel();
     },
     { flush: "sync" }
   );
-  watch(() => source.bindings.form.context, cancel, { flush: "sync" });
+  watch(() => source.context(), cancel, { flush: "sync" });
   onBeforeUnmount(cancel);
   async function run(event: FormChange<T["Model"]>) {
-    if (source.form.busy || source.form.readonlyReason) return;
+    if (source.controller.busy || source.controller.readonlyReason) return;
     const request = channel.start();
     latest = event;
     pending.value = true;
@@ -56,15 +61,15 @@ export function useCrudChange<T extends BusinessModuleContract, S extends object
     try {
       const result = await callback?.({
         ...event,
-        state: { custom: readonlyModel(source.state) },
-        context: readonlyModel(source.bindings.form.context),
+        state: { custom: readonlyModel(source.custom) },
+        context: readonlyModel(source.context()),
         signal: request.signal,
       });
       if (!request.isCurrent()) return;
       applying = true;
       try {
-        if (result?.state) Object.assign(source.state, result.state);
-        if (result?.patch) source.form.patch(result.patch);
+        if (result?.state) Object.assign(source.custom, result.state);
+        if (result?.patch) source.controller.patch(result.patch);
       } finally {
         applying = false;
       }

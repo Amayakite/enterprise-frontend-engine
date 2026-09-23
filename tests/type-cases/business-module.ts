@@ -56,7 +56,7 @@ bind({
     persistence: { mode: "aggregate", toPayload: (rows: Model["items"]) => rows },
   },
 });
-const runtime = customerModule.createRuntime({}, "edit");
+const runtime = customerModule.createViewConfig({}, "edit");
 runtime.form.fields;
 runtime.list.columns;
 runtime.detail.fields;

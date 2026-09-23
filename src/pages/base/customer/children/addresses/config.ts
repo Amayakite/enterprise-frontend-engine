@@ -52,8 +52,6 @@ function normalizeRows(rows: readonly CustomerAddress[], preferredId?: string) {
 
 export const customerAddressesConfig = defineCustomerChildConfig({
   key: "addresses",
-  /** 保留主要项操作与行编辑体验，按需加载。 */
-  view: { component: () => import("./CustomerAddresses.vue") },
   title: "收货地址",
   draft: { version: 1, fields: ["id", "label", "recipient", "phone", "address", "primary"] },
   fields,

@@ -22,7 +22,7 @@ globalThis.__pageBase = () => ({
 });
 registerHooks({
   resolve(specifier, context, next) {
-    if (specifier === "./useBusinessPage" && context.parentURL?.endsWith("/useCrudRuntime.ts"))
+    if (specifier === "./useBusinessPage" && context.parentURL?.endsWith("/useCrudView.ts"))
       return {
         url: "data:text/javascript,export const useBusinessPage = () => globalThis.__pageBase()",
         shortCircuit: true,
@@ -36,7 +36,6 @@ registerHooks({
 });
 globalThis.ElMessageBox = { confirm: async () => "confirm" };
 const { useCrudView } = await import("../src/composables/useCrudView.ts");
-const { useCrudRuntime } = await import("../src/composables/useCrudRuntime.ts");
 const { defineAggregateBinding } = await import("../src/components/business/crud/aggregate.ts");
 const renderer = createRenderer({
   createElement: () => ({}),
@@ -78,7 +77,7 @@ function mount(options, extra = {}) {
     context: (base) => base,
     parseId: (value) => Number(value),
     children: extra.children ?? {},
-    createRuntime: () => ({
+    createViewConfig: () => ({
       key: "page-test",
       form,
       detail: {
@@ -94,7 +93,7 @@ function mount(options, extra = {}) {
   const visible = ref(true);
   const component = {
     setup() {
-      page = (extra.facade ? useCrudView : useCrudRuntime)(module, options);
+      page = useCrudView(module, options);
       return () => h("div");
     },
   };
@@ -107,12 +106,7 @@ function mount(options, extra = {}) {
 async function ready(view) {
   for (let i = 0; i < 30; i++) {
     await flush();
-    if (
-      view.page.state.phase === "ready" ||
-      view.page.form?.state.phase === "ready" ||
-      view.page.detail?.state.phase === "ready"
-    )
-      return;
+    if (view.page.state.phase === "ready" || false) return;
   }
   assert.fail("初始化未完成");
 }
@@ -147,7 +141,7 @@ test("统一页面共用校验先行，页面 state 隔离且不进入保存 DTO
       state: () => ({ hint: "" }),
       hooks: {
         beforeOpen: async (input) => {
-          assert.equal(isReadonly(input.state), true);
+          assert.equal(isReadonly(input.state.custom), true);
           return { state: { hint: "已准备" }, defaults: { name: "new" } };
         },
         validate: async () => {
@@ -156,7 +150,7 @@ test("统一页面共用校验先行，页面 state 隔离且不进入保存 DTO
         },
         afterSave: async ({ entity, state }) => {
           assert.equal(entity.id, 0);
-          assert.equal(state.hint, "已准备");
+          assert.equal(state.custom.hint, "已准备");
           sequence.push("saved");
         },
       },
@@ -171,9 +165,9 @@ test("统一页面共用校验先行，页面 state 隔离且不进入保存 DTO
     }
   );
   await ready(view);
-  assert.equal(view.page.form.state.model.name, "new");
-  assert.equal(view.page.state.hint, "已准备");
-  await view.page.form.save();
+  assert.equal(view.page.bindings.form.controller.state.model.name, "new");
+  assert.equal(view.page.state.custom.hint, "已准备");
+  await view.page.bindings.form.controller.save();
   assert.deepEqual(sequence, ["common", "local"]);
   assert.equal(
     view.events.some((event) => event[0] === "write"),
@@ -185,10 +179,10 @@ test("统一页面共用校验先行，页面 state 隔离且不进入保存 DTO
   const other = mount({ view: "add", state: () => ({ hint: "only UI" }) });
   await ready(saved);
   await ready(other);
-  saved.page.state.hint = "changed";
-  assert.equal(other.page.state.hint, "only UI");
-  saved.page.form.patch({ name: "业务字段" });
-  await saved.page.form.save();
+  saved.page.state.custom.hint = "changed";
+  assert.equal(other.page.state.custom.hint, "only UI");
+  saved.page.bindings.form.controller.patch({ name: "业务字段" });
+  await saved.page.bindings.form.controller.save();
   const dto = saved.events.find((event) => event[0] === "write")[1];
   assert.deepEqual(Object.keys(dto).sort(), ["lines", "name"]);
   saved.close();
@@ -207,7 +201,7 @@ test("统一编辑与详情保留数值 ID 0；准备不替代默认实体读取
   });
   await ready(editing);
   assert.deepEqual(editing.events[0], ["load", 0]);
-  assert.equal(editing.page.form.state.model.name, "server");
+  assert.equal(editing.page.bindings.form.controller.state.model.name, "server");
   editing.close();
   const detail = mount({
     view: "detail",
@@ -228,34 +222,24 @@ test("统一初始化迟到的 state 补丁在卸载后不应用", async () => {
   view.close();
   wait.resolve({ state: { hint: "late" }, defaults: { name: "late" } });
   await flush();
-  assert.equal(view.page.state.hint, "before");
+  assert.equal(view.page.state.custom.hint, "before");
 });
-test("子表插槽优先于懒加载专属视图，并通过同一绑定回写模型", async () => {
-  let loads = 0;
-  const config = {
-    title: "明细",
-    view: {
-      component: async () => {
-        loads++;
-        return { default: { render: () => h("p") } };
-      },
+test("子表绑定按需创建并复用，通过同一端口回写模型", async () => {
+  const binding = defineAggregateBinding()({
+    modelKey: "lines",
+    payloadKey: "lines",
+    config: {
+      title: "明细",
+      validateRows: () => [],
+      persistence: { mode: "aggregate", toPayload: (rows) => rows },
     },
-    validateRows: () => [],
-    persistence: { mode: "aggregate", toPayload: (rows) => rows },
-  };
-  const binding = defineAggregateBinding()({ modelKey: "lines", payloadKey: "lines", config });
+  });
   const view = mount({ view: "add" }, { children: { lines: binding } });
   await ready(view);
-  view.page
-    .childViews()
-    .get("lines")
-    .render(({ binding, rows }) => {
-      assert.deepEqual(rows, []);
-      binding.replace([{ name: "一行" }]);
-      return [h("p", "自定义")];
-    });
-  assert.equal(loads, 0);
-  assert.equal(view.page.form.state.model.lines[0].name, "一行");
+  const child = view.page.bindings.child("lines");
+  assert.equal(child, view.page.bindings.child("lines"));
+  child.replace([{ name: "一行" }]);
+  assert.equal(view.page.state.model.lines[0].name, "一行");
   view.close();
 });
 
@@ -265,7 +249,7 @@ test("bindings 每次提供独立 props；保存回填后更新实体 key", asyn
   const first = view.page.bindings.form;
   const originalBindings = view.page.bindings.form;
   assert.equal(first.entityKey, "new");
-  await view.page.form.save();
+  await view.page.bindings.form.controller.save();
   const next = view.page.bindings.form;
   assert.notEqual(next, first);
   assert.equal(first.entityKey, "new", "旧 props 快照不应随新绑定改变");
@@ -291,7 +275,7 @@ test("useCrudView 解构 state 始终读取最新模型，辅助状态隔离且�
         },
       },
     },
-    { facade: true }
+    {}
   );
   const { state, actions, bindings } = view.page;
   await ready(view);
@@ -326,9 +310,9 @@ test("useCrudView 子表公开绑定复用原端口，实例辅助状态互不�
   });
   const first = mount(
     { view: "add", state: () => ({ count: 0 }) },
-    { facade: true, children: { lines: binding } }
+    { children: { lines: binding } }
   );
-  const second = mount({ view: "add", state: () => ({ count: 0 }) }, { facade: true });
+  const second = mount({ view: "add", state: () => ({ count: 0 }) }, {});
   await ready(first);
   await ready(second);
   const lines = first.page.bindings.child("lines");
@@ -347,7 +331,6 @@ test("useCrudView 详情刷新更新同一 state，编辑复核只读原因并�
   const view = mount(
     { view: "detail" },
     {
-      facade: true,
       form: { readonlyReason: () => "只读演示" },
       detail: { load: async (id) => ({ id, name: "版本" + ++version, lines: [] }) },
     }
@@ -368,7 +351,7 @@ test("useCrudView 已取消初始化不发布 custom/defaults", async () => {
   const wait = pending();
   const view = mount(
     { view: "add", state: () => ({ hint: "初始" }), hooks: { beforeOpen: () => wait.promise } },
-    { facade: true }
+    {}
   );
   await flush();
   view.close();
@@ -392,7 +375,6 @@ test("useCrudView 列表分页、勾选与查询钩子复用同一状态，宿�
       },
     },
     {
-      facade: true,
       page: { add: { mode: "dialog" } },
       list: {
         query: { schema: {}, initial: { quick: [], normal: [], advanced: null } },
@@ -447,7 +429,7 @@ test("change 结果只应用最新事务；新输入取消旧请求，程序回�
         },
       },
     },
-    { facade: true }
+    {}
   );
   await ready(view);
   const { state, actions, bindings } = view.page;
@@ -479,7 +461,7 @@ test("change 待完成或失败阻止保存，错误可重试；卸载取消结�
           ++attempt === 1 ? wait.promise : Promise.resolve({ patch: { name: "重试成功" } }),
       },
     },
-    { facade: true }
+    {}
   );
   await ready(view);
   const { state, actions, bindings } = view.page;
@@ -505,7 +487,7 @@ test("change 待完成或失败阻止保存，错误可重试；卸载取消结�
   view.close();
 
   const late = pending();
-  const other = mount({ view: "add", hooks: { change: () => late.promise } }, { facade: true });
+  const other = mount({ view: "add", hooks: { change: () => late.promise } }, {});
   await ready(other);
   other.page.bindings.form.change(fieldEvent(other.page.state.model));
   other.close();
@@ -527,7 +509,7 @@ test("同一编辑实体整体回填不清级联值，后续用户修改仍联�
       },
     }
   );
-  const controller = view.page.form;
+  const controller = view.page.bindings.form.controller;
   let form;
   const events = [];
   const app = renderer.createApp({
@@ -580,7 +562,7 @@ test("主字段补丁经过表单和控制器后保持子表引用，保存仍�
     { form: { createInitial: () => ({ name: "", lines: [{ value: 1 }] }) } }
   );
   await ready(view);
-  const controller = view.page.form;
+  const controller = view.page.bindings.form.controller;
   let fields;
   const app = renderer.createApp({
     setup() {

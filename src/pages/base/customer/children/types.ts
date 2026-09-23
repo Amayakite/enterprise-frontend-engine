@@ -1,12 +1,9 @@
-import type { CrudChildView } from "@/components/business/crud/child-view";
 import type { FieldDefinition } from "@/components/business/fields/types";
 import type { TableEdit } from "@/components/table/types";
 import type { CrudChildTableChange } from "@/components/business/crud/types";
 
 /** 当前运行时只支持整单聚合保存；独立端点与按模式切换须在真实协议确认后另建合同。 */
 export interface CustomerAggregateChildConfig<Row extends object, Key extends string | number> {
-  /** 子表独立展示；省略使用标准表格，页面插槽可覆盖。 */
-  view?: CrudChildView<Row>;
   /** 子模块自己的稳定身份；父模型实际归属以主 config 的 modelKey 为准。 */
   key: "contacts" | "addresses";
   /** 子表中文标题，用于表单分区和详情页签。 */

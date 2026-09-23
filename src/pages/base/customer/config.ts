@@ -87,7 +87,7 @@ const customerRowActions = defineRowCommands<CustomerFormModel, string, Customer
  * 客户模块唯一入口：身份 → 接口 → 模型 → 字段 → 查询 → 子表 → 页面策略。
  * @remarks 当前 create/update 适配开发 Mock 的整单保存；新后端 saveMasterDetail 就绪后在 API 层适配。
  * @example
- * `const config = customerModule.createRuntime(navigation, "edit");`
+ * `const config = customerModule.createViewConfig(navigation, "edit");`
  */
 export const customerModule = defineBusinessModule<CustomerContract>()({
   /** 1. 模块身份：保存/刷新/草稿共用稳定 key，不随目录调整更名。 */

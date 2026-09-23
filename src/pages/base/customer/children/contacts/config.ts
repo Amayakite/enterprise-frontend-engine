@@ -53,8 +53,6 @@ function normalizeRows(rows: readonly CustomerContact[], preferredId?: string) {
 
 export const customerContactsConfig = defineCustomerChildConfig({
   key: "contacts",
-  /** 保留主要项操作与行编辑体验，按需加载。 */
-  view: { component: () => import("./CustomerContacts.vue") },
   title: "联系人",
   draft: { version: 1, fields: ["id", "name", "position", "phone", "email", "primary"] },
   fields,

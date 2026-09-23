@@ -169,8 +169,8 @@ function moduleConfig(children = { lines: child() }) {
 
 test("模块自动登记分区、子数组、详情页签和多行校验；页面初始状态独立", async () => {
   const module = defineBusinessModule()(moduleConfig());
-  const add = module.createRuntime({}, "add");
-  const edit = module.createRuntime({}, "edit");
+  const add = module.createViewConfig({}, "add");
+  const edit = module.createViewConfig({}, "edit");
   assert.deepEqual(add.form.childKeys, ["items"]);
   assert.deepEqual(add.form.sections, [{ key: "items", label: "明细" }]);
   assert.deepEqual(add.detail.tabs, add.form.sections);
@@ -210,7 +210,7 @@ test("fields 模块统一转换列表与批量目标的查询，初始不加额�
   const config = moduleConfig();
   config.query = { source: "fields" };
   config.fields[0].scenes.query = { normal: true, keyword: true };
-  const runtime = defineBusinessModule()(config).createRuntime({});
+  const runtime = defineBusinessModule()(config).createViewConfig({});
   assert.deepEqual(runtime.list.query.schema.keyword.entries, ["quick"]);
   assert.deepEqual(runtime.list.query.initial, { quick: [], normal: [], advanced: null });
   const scope = { key: "org", value: { organizationId: "org-a" } };
@@ -248,7 +248,7 @@ test("模块静态配置定义时检查，动态动作按场景装配且同一�
   };
   const module = defineBusinessModule()(config);
   const navigation = {};
-  const runtime = module.createRuntime(navigation);
+  const runtime = module.createViewConfig(navigation);
   assert.equal(calls.length, 0);
   assert.equal(runtime.list, runtime.list);
   assert.deepEqual(calls, [["list", navigation]]);
@@ -257,7 +257,7 @@ test("模块静态配置定义时检查，动态动作按场景装配且同一�
     ["list", navigation],
     ["detail", navigation],
   ]);
-  const second = module.createRuntime({});
+  const second = module.createViewConfig({});
   assert.notEqual(second.form, runtime.form);
   assert.notEqual(second.list, runtime.list);
   const invalid = moduleConfig();
@@ -265,6 +265,6 @@ test("模块静态配置定义时检查，动态动作按场景装配且同一�
   assert.throws(() => defineBusinessModule()(invalid), /默认页大小/);
   const duplicate = moduleConfig();
   duplicate.views.list.actions = () => [{ key: "same" }, { key: "same" }];
-  const bad = defineBusinessModule()(duplicate).createRuntime({});
+  const bad = defineBusinessModule()(duplicate).createViewConfig({});
   assert.throws(() => bad.list, /动作 key为空或重复/);
 });

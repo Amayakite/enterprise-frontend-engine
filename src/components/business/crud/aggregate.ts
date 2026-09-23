@@ -1,8 +1,5 @@
-import type { DeepReadonly } from "vue";
 import { useCrudTableChild } from "@/composables/useCrudTableChild";
 import type { CrudFormController } from "./types";
-import { createChildRenderer } from "./child-view";
-import type { AggregateViewConfig, CrudChildRenderer } from "./child-view";
 import type { FieldKey } from "../fields/types";
 import type { CrudIssue } from "./types";
 
@@ -29,11 +26,10 @@ export type AggregatePayloadBindings<M, DTO> = {
 
 /** 模块组合器所需的最小绑定；具体子配置与精确 key 在工厂返回值中保留。 */
 export interface AggregateBinding<M> {
-  /** 自动视图装配；由绑定工厂提供，省略时需页面自定义插槽。 */
-  mountView?: <Entity, Id extends string | number>(
-    read: () => DeepReadonly<M>,
-    form?: CrudFormController<M, Entity, Id>
-  ) => CrudChildRenderer;
+  /** 按需登记聚合编辑端口；页面负责呈现，省略时由页面自行登记。 */
+  createBinding?: <Entity, Id extends string | number>(
+    form: CrudFormController<M, Entity, Id>
+  ) => unknown;
   /** 主表单数组字段，同时作为 section/child registration key。 */
   modelKey: ArrayModelKey<M>;
   /** 整单 DTO 内的数组字段，不要求与主模型字段同名。 */
@@ -60,9 +56,14 @@ export function defineAggregateBinding<M extends object, DTO>() {
   return <
     const K extends ArrayModelKey<M>,
     const P extends ArrayModelKey<DTO>,
-    Child extends AggregateViewConfig<
-      M[K] extends readonly (infer Row extends object)[] ? Row : never
-    > & {
+    Child extends {
+      /** 子行草稿；省略不持久化未提交的行编辑。 */
+      draft?: {
+        /** 草稿结构版本，结构变化时递增。 */ version: number;
+        /** 可恢复字段白名单，不含组件状态。 */ fields: readonly FieldKey<
+          M[K] extends readonly (infer Row extends object)[] ? Row : never
+        >[];
+      };
       /**
        * 界面展示标题；通常填写业务中文名称，不作为稳定身份。
        */
@@ -113,24 +114,12 @@ export function defineAggregateBinding<M extends object, DTO>() {
     };
     return {
       ...options,
-      mountView<Entity, Id extends string | number>(
-        read: () => DeepReadonly<M>,
-        form?: CrudFormController<M, Entity, Id>
-      ): CrudChildRenderer {
-        type Row = M[K] extends readonly (infer R extends object)[] ? R : never;
-        // K 已由 ArrayModelKey 限定为数组字段，泛型实现无法反向缩窄条件类型。
-        // 唯一恢复点与 useCrudTableChild 的公开合同一致，不改变 ID/行结构。
-        const binding = form
-          ? useCrudTableChild<M, Entity, Id, K>(
-              form,
-              modelKey as K & (M[K] extends readonly object[] ? unknown : never),
-              { draft: config.draft }
-            )
-          : undefined;
-        return createChildRenderer<Row>(
-          config,
-          () => read()[modelKey as keyof DeepReadonly<M>] as DeepReadonly<Row[]>,
-          binding
+      createBinding<Entity, Id extends string | number>(form: CrudFormController<M, Entity, Id>) {
+        // K 已约束为数组字段，仅在 TS 无法反向收窄条件类型的边界恢复关联。
+        return useCrudTableChild<M, Entity, Id, K>(
+          form,
+          modelKey as K & (M[K] extends readonly object[] ? unknown : never),
+          { draft: config.draft }
         );
       },
       title: config.title,

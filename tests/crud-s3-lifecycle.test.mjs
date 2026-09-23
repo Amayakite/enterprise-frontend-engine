@@ -604,6 +604,12 @@ test("S3 过期验证不写入；已提交回填失败只读重试，后置失�
       { context: defaultContext }
     )
   );
+  const observed = [];
+  const stop = watch(
+    () => [view.state.state.phase, view.state.state.mutationOutcome],
+    (value) => observed.push(value),
+    { flush: "sync" }
+  );
   const old = view.state.save();
   await flush();
   view.state.patch({ name: "new" });
@@ -624,7 +630,52 @@ test("S3 过期验证不写入；已提交回填失败只读重试，后置失�
   assert.equal(view.state.state.dirty, false);
   assert.equal(view.state.state.baseline.version, 3);
   assert.match(view.state.state.error, /保存成功，后续处理失败/);
+  assert.ok(observed.some(([phase, outcome]) => phase === "saving" && outcome === "pending"));
+  assert.ok(observed.some(([phase, outcome]) => phase === "resolving" && outcome === "committed"));
+  assert.equal(
+    observed.some(
+      ([phase, outcome]) =>
+        (phase === "saving" && outcome !== "pending") ||
+        (["resolving", "committed-needs-sync", "saved"].includes(phase) && outcome !== "committed")
+    ),
+    false,
+    "同步观察者不能看到阶段与写入结果只更新一半的状态"
+  );
+  stop();
   view.close();
+});
+
+test("保存成功后的导航可通过离开守卫，后续处理期间仍禁止重复提交", async () => {
+  let navigated = false;
+  let writes = 0;
+  const view = mount(() =>
+    useCrudForm(
+      formConfig({
+        create: async (dto) => {
+          writes++;
+          return { id: 1, dto };
+        },
+      }),
+      {
+        context: defaultContext,
+        navigation: {
+          saved: async () => {
+            assert.equal(view.state.busy, true);
+            assert.equal(await view.state.canLeave(), true);
+            await view.state.save();
+            navigated = true;
+          },
+        },
+      }
+    )
+  );
+  try {
+    await view.state.save();
+    assert.equal(navigated, true);
+    assert.equal(writes, 1);
+  } finally {
+    view.close();
+  }
 });
 
 test("S3 明确拒绝保留输入可重试；未知结果禁重写；脏草稿取消切换不丢数据", async () => {

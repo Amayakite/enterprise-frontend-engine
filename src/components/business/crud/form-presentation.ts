@@ -1,3 +1,4 @@
+import { crudFormActivity } from "./form-state";
 import type { CrudViewEnvironment } from "./crud-page";
 import type { FormChange, FieldDefinition, FieldDensity, FieldLink } from "../fields/types";
 import type { CrudFormController, CrudDetailController } from "./types";
@@ -74,9 +75,7 @@ export function crudFormDisabledReason<M, E, I extends string | number>(
   if (controller.childrenReady === false) return "子表正在准备";
   if (["checking", "available", "conflict", "unsafe"].includes(controller.draft?.state.phase ?? ""))
     return "请先处理本机草稿";
-  if (controller.state.phase === "load-error") return "请先重新加载";
-  if (controller.state.phase === "committed-needs-sync") return "保存已提交，请先回填";
-  if (controller.state.mutationOutcome === "unknown") return "提交结果待核实";
+  return crudFormActivity(controller.state).saveDisabledReason;
 }
 
 /** 标准详情及拆分呈现组件共用合同，复用原详情控制器。 */

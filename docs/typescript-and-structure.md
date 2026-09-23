@@ -80,7 +80,7 @@ src/pages/base/customer/
 2. 新标准模块在 config.fields 声明查询意图，公共层按控件类型推导 schema；业务 API 只维护排序白名单和 SearchRequest/协议适配。旧费用模块的显式 API schema 接法仍兼容。
 3. `CrudListConfig.toQuery` 把包含分页、排序、AST 和固定 scope 的 `CrudListRequest` 转成业务 API DTO；页面不能把查询 UI 值直接拼进 URL，也不能让用户条件覆盖固定组织范围。
 
-标准模块采用 `defineBusinessModule<Contract>()` 的命名合同（见 [module.ts](../src/components/business/crud/module.ts)）：Model、Entity、Id、Schema、Scope、Query、Create、Update、Result、Context。字段 key/控件值、查询操作符覆盖、子表 modelKey/payloadKey 与行转换结果均保持类型关联；`createRuntime()` 返回明确的 list/form/detail，无需非空断言。fields 模式的 Schema 使用 QuerySchema，派生 AST 的键在运行时按实际 fields 校验，不宣称任意手写 AST 都有有限键的编译期提示。查询和保存 DTO 不因共享字段而改为页面模型。
+标准模块采用 `defineBusinessModule<Contract>()` 的命名合同（见 [module.ts](../src/components/business/crud/module.ts)）：Model、Entity、Id、Schema、Scope、Query、Create、Update、Result、Context。字段 key/控件值、查询操作符覆盖、子表 modelKey/payloadKey 与行转换结果均保持类型关联；`createViewConfig()` 返回明确的 list/form/detail，无需非空断言。fields 模式的 Schema 使用 QuerySchema，派生 AST 的键在运行时按实际 fields 校验，不宣称任意手写 AST 都有有限键的编译期提示。查询和保存 DTO 不因共享字段而改为页面模型。
 
 低层兼容入口 `CrudConfig` 的泛型顺序是 `Row, Entity, Model, Id, Schema, Scope, QueryDTO, CreateDTO, UpdateDTO, SaveResult, Context`。这些参数保持列表行、详情实体、页面模型、ID、查询、保存与上下文之间的关联，不用 `any` 或宽泛断言擦除。配置较大时可把字段放在 `*.config.ts`，但由模块 `config.ts` 作为唯一入口汇总；类型所有者不随配置拆分而改变。
 

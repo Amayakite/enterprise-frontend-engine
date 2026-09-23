@@ -88,7 +88,7 @@ test("model 工厂直接取得内联 children，不反向读取主 config", () =
   });
   assert.equal(received, children);
   assert.equal(typeof module.model.create, "function");
-  assert.deepEqual(module.createRuntime({}).form.childKeys, []);
+  assert.deepEqual(module.createViewConfig({}).form.childKeys, []);
 });
 
 test("行命令生成权限/确认/回执，透传 signal，失败不吞掉也不重试", async () => {

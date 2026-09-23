@@ -1,3 +1,5 @@
+import type { CrudFormStatus } from "@/components/business/crud/form-state";
+import { crudFormActivity } from "@/components/business/crud/form-state";
 import { useCrudFormLifecycle } from "./useCrudFormLifecycle";
 import {
   computed,
@@ -69,13 +71,6 @@ export function useCrudForm<
     draftIdentity?: () => CrudDraftIdentity | undefined;
   }
 ): CrudFormController<Model, Entity, Id> {
-  type State = {
-    -readonly [K in keyof CrudFormController<Model, Entity, Id>["state"]]: CrudFormController<
-      Model,
-      Entity,
-      Id
-    >["state"][K];
-  };
   // shallowRef 保留 Model 的字段关联；对外通过深只读视图暴露。
   const model = shallowRef(config.createInitial(options.context()));
   const baseline = shallowRef<Entity | null>(null);
@@ -87,10 +82,17 @@ export function useCrudForm<
   const initialTarget = cloneModel<CrudTarget<Id>>(options.initialTarget ?? { mode: "add" });
   const target = shallowRef<CrudTarget<Id>>(initialTarget);
   // 编辑深链首屏直接进入加载态，避免先挂载可编辑控件再于同一周期卸载。
-  const phase = shallowRef<State["phase"]>(
-    initialTarget.mode === "edit" || config.beforeOpen ? "loading" : "ready"
-  );
-  const mutationOutcome = shallowRef<State["mutationOutcome"]>("none");
+  const status = shallowRef<CrudFormStatus>({
+    phase: initialTarget.mode === "edit" || config.beforeOpen ? "loading" : "ready",
+    mutationOutcome: "none",
+  });
+  const phase = computed(() => status.value.phase);
+  const mutationOutcome = computed(() => status.value.mutationOutcome);
+  // 阶段与写入结果原子更新，同步 watcher 不会看到一半转换的状态。
+  function transition(next: CrudFormStatus["phase"], outcome = mutationOutcome.value) {
+    status.value = { phase: next, mutationOutcome: outcome };
+  }
+  const activity = computed(() => crudFormActivity(status.value));
   const issues = shallowRef<readonly CrudIssue<Model>[]>([]);
   const error = shallowRef<string | null>(null);
   const cleanModel = shallowRef(cloneModel(model.value));
@@ -156,7 +158,7 @@ export function useCrudForm<
     issues: issues.value,
     error: error.value,
   }));
-  const critical = () => phase.value === "saving" || phase.value === "resolving";
+  const critical = () => activity.value.critical;
   const drafts = useCrudDraft(config.draft, {
     identity: () => options.draftIdentity?.(),
     moduleKey: options.invalidateViewKey ?? "",
@@ -168,8 +170,7 @@ export function useCrudForm<
       alive &&
       childrenReady.value &&
       !busy() &&
-      mutationOutcome.value !== "unknown" &&
-      phase.value !== "committed-needs-sync" &&
+      !activity.value.reconciliationReason &&
       crudPermission(
         target.value.mode === "add" ? config.permissions?.create : config.permissions?.update
       ) &&
@@ -193,11 +194,7 @@ export function useCrudForm<
       if (model.value !== previous) hydrationRevision.value++;
     },
   });
-  const busy = () =>
-    critical() ||
-    phase.value === "committing" ||
-    phase.value === "validating" ||
-    phase.value === "loading";
+  const busy = () => activity.value.busy;
   const snapshot = readonlyModel;
   const message = (cause: unknown) => (cause instanceof Error ? cause.message : "操作失败，请重试");
   function lock(value: boolean) {
@@ -208,14 +205,7 @@ export function useCrudForm<
     channel.cancel();
   }
   function patch(value: Partial<Model>) {
-    if (
-      !alive ||
-      critical() ||
-      phase.value === "loading" ||
-      mutationOutcome.value === "unknown" ||
-      (mutationOutcome.value === "committed" && phase.value === "committed-needs-sync")
-    )
-      return;
+    if (!alive || !activity.value.canPatch) return;
     if (config.readonlyReason?.(snapshot(model.value), options.context())) return;
     const next = { ...model.value, ...cloneModel(value) };
     if (sameModelValue(next, model.value)) return;
@@ -237,8 +227,8 @@ export function useCrudForm<
   }
   async function guardLeave() {
     if (approvedNavigation) return true;
-    if (critical() || phase.value === "committing" || phase.value === "validating" || closing)
-      return false;
+    // saved 后的自动导航仍处于 saveFlight 内；离开守卫按流程阶段判断，不能拦截成功导航。
+    if (!activity.value.canLeave || closing) return false;
     closing = true;
     const version = revision;
     try {
@@ -250,11 +240,7 @@ export function useCrudForm<
         error.value = guard.reason;
         return false;
       }
-      if (
-        dirty.value ||
-        phase.value === "committed-needs-sync" ||
-        mutationOutcome.value === "unknown"
-      ) {
+      if (dirty.value || activity.value.reconciliationReason) {
         const notice =
           phase.value === "committed-needs-sync"
             ? "数据已提交，但尚未回填。离开不会撤销已提交的数据，确定离开吗？"
@@ -264,35 +250,21 @@ export function useCrudForm<
         try {
           await ElMessageBox.confirm(notice, "离开页面", {
             confirmButtonText:
-              config.draft &&
-              mutationOutcome.value !== "unknown" &&
-              phase.value !== "committed-needs-sync"
-                ? "保留草稿并离开"
-                : "离开",
+              config.draft && !activity.value.reconciliationReason ? "保留草稿并离开" : "离开",
             cancelButtonText:
-              config.draft &&
-              mutationOutcome.value !== "unknown" &&
-              phase.value !== "committed-needs-sync"
-                ? "丢弃草稿并离开"
-                : "继续编辑",
+              config.draft && !activity.value.reconciliationReason ? "丢弃草稿并离开" : "继续编辑",
             distinguishCancelAndClose: !!config.draft,
             type: "warning",
           });
           if (
             config.draft &&
-            mutationOutcome.value !== "unknown" &&
-            phase.value !== "committed-needs-sync" &&
+            !activity.value.reconciliationReason &&
             !drafts.pending &&
             !(await drafts.flush())
           )
             return false;
         } catch (cause) {
-          if (
-            cause === "cancel" &&
-            config.draft &&
-            mutationOutcome.value !== "unknown" &&
-            phase.value !== "committed-needs-sync"
-          )
+          if (cause === "cancel" && config.draft && !activity.value.reconciliationReason)
             discardDraftOnLeave = true;
           else if (cause === "cancel" || cause === "close") return false;
           else throw cause;
@@ -341,11 +313,10 @@ export function useCrudForm<
     receipt = undefined;
     target.value = cloneModel(next);
     baseline.value = null;
-    mutationOutcome.value = "none";
     error.value = null;
     issues.value = [];
     const run = channel.start();
-    phase.value = "loading";
+    transition("loading", "none");
     try {
       const input = {
         target: cloneModel(next),
@@ -363,26 +334,26 @@ export function useCrudForm<
         hydrateModel(config.toModel(cloneModel(entity), options.context()));
       }
       cleanModel.value = cloneModel(model.value);
-      phase.value = "ready";
+      transition("ready");
       await drafts.open();
       if (!alive || !run.isCurrent()) return false;
       if (config.afterOpen) {
         if (drafts.pending) await waitForDraftDecision(run.signal);
         if (!alive || !run.isCurrent()) return false;
-        phase.value = "loading";
+        transition("loading");
         await config.afterOpen({
           ...input,
           model: snapshot(model.value),
           baseline: snapshot(baseline.value),
         });
         if (!alive || !run.isCurrent()) return false;
-        phase.value = "ready";
+        transition("ready");
       }
       return true;
     } catch (cause) {
       if (alive && run.isCurrent()) {
         error.value = message(cause);
-        phase.value = "load-error";
+        transition("load-error");
       }
       return false;
     }
@@ -391,8 +362,10 @@ export function useCrudForm<
     saved: NonNullable<typeof receipt>,
     run: ReturnType<typeof channel.start>
   ) {
-    phase.value = "resolving";
+    transition("resolving", "committed");
     try {
+      await drafts.mark("committed");
+      if (!alive || !run.isCurrent()) return;
       const entity = await config.resolveSaved(saved.result, {
         ...saved.input,
         signal: run.signal,
@@ -407,7 +380,7 @@ export function useCrudForm<
       issues.value = [];
       form?.clear();
       children.forEach((child) => child.cancel());
-      phase.value = "saved";
+      transition("saved");
       await drafts.discard();
       await drafts.open();
       receipt = undefined;
@@ -431,22 +404,13 @@ export function useCrudForm<
       }
     } catch (cause) {
       if (alive && run.isCurrent()) {
-        phase.value = "committed-needs-sync";
+        transition("committed-needs-sync");
         error.value = `保存已提交，回填失败：${message(cause)}`;
       }
     }
   }
   async function save() {
-    if (
-      !alive ||
-      busy() ||
-      saveFlight.value ||
-      closing ||
-      phase.value === "load-error" ||
-      phase.value === "committed-needs-sync" ||
-      mutationOutcome.value === "unknown"
-    )
-      return;
+    if (!alive || saveFlight.value || closing || activity.value.saveDisabledReason) return;
     if (config.draft && drafts.pending) {
       error.value = "请先处理本机草稿提示；提交结果待核实的草稿不能重复提交";
       return;
@@ -468,10 +432,9 @@ export function useCrudForm<
     saveFlight.value = true;
     let submitted = false;
     let focusValidationIssue = false;
-    phase.value = "committing";
+    transition("committing", "none");
     error.value = null;
     issues.value = [];
-    mutationOutcome.value = "none";
     const current = () => alive && run.isCurrent() && session === currentSession;
     try {
       if (config.fields.length && !form) throw new Error("主表单尚未登记，不能保存");
@@ -482,7 +445,7 @@ export function useCrudForm<
         if (!current()) return;
         if (!result.proceed) {
           issues.value = [{ section: key, message: result.reason ?? "请完成明细草稿" }];
-          phase.value = "ready";
+          transition("ready");
           focusValidationIssue = true;
           return;
         }
@@ -490,7 +453,7 @@ export function useCrudForm<
       await nextTick();
       if (!current()) return;
       lock(true);
-      phase.value = "validating";
+      transition("validating");
       const version = revision;
       const modelSnapshot = cloneModel(model.value);
       const input: CrudSaveInput<Model, Entity, Id, C> = {
@@ -514,7 +477,7 @@ export function useCrudForm<
       if (!issues.value.length && results.some((result) => !result.valid))
         issues.value = [{ message: "校验未通过或已过期，请重试" }];
       if (issues.value.length) {
-        phase.value = "ready";
+        transition("ready");
         focusValidationIssue = true;
         return;
       }
@@ -522,12 +485,12 @@ export function useCrudForm<
       if (!valid()) return;
       if (guard && !guard.proceed) {
         error.value = guard.reason;
-        phase.value = "ready";
+        transition("ready");
         return;
       }
       if (!crudPermission(permission)) {
         error.value = "保存权限已变化";
-        phase.value = "ready";
+        transition("ready");
         return;
       }
       let request: () => Promise<SaveResult>;
@@ -543,27 +506,23 @@ export function useCrudForm<
       if (!valid()) return;
       if (!(await drafts.mark("pending"))) {
         error.value = "草稿提交保护标记写入失败，请重试后再提交";
-        phase.value = "ready";
+        transition("ready");
         return;
       }
       if (!valid()) return;
-      phase.value = "saving";
-      mutationOutcome.value = "pending";
+      transition("saving", "pending");
       submitted = true;
       const result = await request();
-      if (!current()) return;
-      mutationOutcome.value = "committed";
-      await drafts.mark("committed");
       if (!current()) return;
       receipt = { result, input };
       await synchronize(receipt, run);
     } catch (cause) {
       if (!current()) return;
       // 无幂等/提交查询协议，写入异常不能猜测服务端回滚。
-      mutationOutcome.value = submitted
-        ? (config.classifySaveError?.(cause) ?? "unknown")
-        : "rejected";
-      phase.value = "save-error";
+      transition(
+        "save-error",
+        submitted ? (config.classifySaveError?.(cause) ?? "unknown") : "rejected"
+      );
       if (mutationOutcome.value === "rejected") await drafts.rejectSubmission();
       error.value =
         mutationOutcome.value === "unknown"
@@ -572,7 +531,7 @@ export function useCrudForm<
     } finally {
       if (flight === flightVersion) saveFlight.value = false;
       if (current()) {
-        if (phase.value === "validating" || phase.value === "committing") phase.value = "ready";
+        if (phase.value === "validating" || phase.value === "committing") transition("ready");
         lock(false);
         if (focusValidationIssue) {
           // 先释放整单校验锁并更新子表 readonly，再进入错误行编辑。
@@ -583,7 +542,8 @@ export function useCrudForm<
     }
   }
   async function retrySync() {
-    if (!receipt || phase.value !== "committed-needs-sync") return;
+    if (!alive || closing || saveFlight.value || !receipt || phase.value !== "committed-needs-sync")
+      return;
     const run = channel.start();
     const flight = ++flightVersion;
     saveFlight.value = true;
@@ -642,8 +602,7 @@ export function useCrudForm<
       cleanModel.value = cloneModel(model.value);
       baseline.value = null;
       issues.value = [];
-      mutationOutcome.value = outcomeUnknown ? "unknown" : "none";
-      phase.value = "load-error";
+      transition("load-error", outcomeUnknown ? "unknown" : "none");
       error.value = outcomeUnknown
         ? "上下文已变化，原提交结果需核实；请重新加载当前记录"
         : "上下文已变化，请重新加载当前记录";

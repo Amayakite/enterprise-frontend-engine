@@ -3,7 +3,7 @@ import type { SaleRecord, SaleScope } from "@/api/base/sale/types";
 import type { ReferenceSource } from "@/components/business/MyReference/types";
 import { saleModule } from "./config";
 import { checkQuerySort } from "@/components/business/search/model";
-const list = saleModule.createRuntime({}).list;
+const list = saleModule.createViewConfig({}).list;
 /** 复用 Sale 的查询字段与关键词展开；导航由使用它的字段配置决定。 */
 export const saleReference: ReferenceSource<SaleRecord, string, SaleScope> = {
   key: "base.sale",

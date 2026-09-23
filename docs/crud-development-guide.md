@@ -13,9 +13,10 @@
 标准模块使用 `useCrudView(module, { view, state?, hooks?, navigation?, batch? })`，
 解构 `{ state, actions, bindings }`，模板直接引用 `MyCrudList/MyCrudForm/MyCrudDetail`，
 从组件名即可跳转真实源码。[五类文件接法](./module-development-example.md#6-页面最终形态)
-以客户为参照。页面统一采用 `useCrudView`，复用 `useCrudRuntime` 的控制器与生命周期装配，
-新入口不经过兼容渲染器；旧入口只把同一份 bindings 转为视图，不要在同一界面同时调用。
-模块定义时检查静态字段、分区和必需方法；`createRuntime()` 首次读取 list/detail 时才执行
+以客户为参照。`useCrudView` 是标准模块唯一页面入口，直接装配当前场景的
+`useCrudList/useCrudForm/useCrudDetail`，公开 state/actions/bindings；不再转接另一套页面 Runtime。
+`createViewConfig()` 只生成配置，不创建页面实例或请求数据。
+模块定义时检查静态字段、分区和必需方法；`createViewConfig()` 首次读取 list/detail 时才执行
 对应动作工厂并检查动作键，同一实例复用结果。动作工厂应只返回配置，不承担初始化副作用。
 
 | 位置                              | 内容与所有权                                                   |
@@ -114,6 +115,22 @@ state 合并 custom；patch 走原表单更新/联动，不递归触发用户 ch
 `setValue/commit` 插槽与可选 `change` 回调；实际客户备注、简称和地区示例见
 [客户演示](./customer-example.md#四个页面的可操作示例)。
 
+### 扩展位置与调用边界
+
+稳定的字段、接口适配和共享规则留在 config；单页交互使用 options.hooks，特殊布局使用模板和插槽。
+没有第二个真实业务调用点时，不为一次性需求增加公共开关。DTO 转换留在模型/API 适配层，
+MyCrud 组件只读取控制器并触发公开命令，不自行决定提交结果。
+
+每个钩子先执行模块规则，再执行页面规则；守卫拒绝时不调用页面对应守卫。
+validate 是例外：两级依次执行并收集合并全部问题，而非第一条失败就结束。
+新增 beforeOpen 的页面 defaults 浅覆盖模块 defaults；返回 state 仅合并当前辅助状态。
+模块钩子抛错或信号取消时不继续页面钩子；页面钩子抛错沿当前查询、加载、保存或关闭流程处理。
+options.navigation 替换指定导航，模型 overrides 替换指定转换步骤，两者不套用追加钩子的规则。
+
+子表配置只提供行规则、DTO 映射和草稿定义；`bindings.child(key)` 按需创建同一编辑端口，
+不隐式加载组件、不创建额外模型。页面显式导入子组件，详情直接从只读模型取得行。
+模型基线由表单控制器拥有，行编辑草稿由子表拥有，本机持久化由现有 useCrudDraft/公共存储拥有。
+
 ### 初始化与查询顺序
 
 - 新增：初始模型 → beforeOpen 准备 → 合并 defaults → 草稿决定 → afterOpen。
@@ -130,6 +147,12 @@ afterOpen 指本次 open/load 数据准备完成，不保证 DOM 完成布局；
 准备失败进入原加载错误态并可重试；取消、卸载或旧请求结果不发布。
 
 ### 保存与关闭顺序
+
+`useCrudForm` 通过单一 transition 原子更新流程阶段和写入结果；`form-state.ts` 派生阶段操作限制，
+控制器与展示层复用，不维护第二份按钮状态。saveFlight 只负责异步流程的单飞锁，
+请求身份、模型 revision 与 session 仍防止迟到结果生效，不能仅由 UI busy 替代。
+写入结果确认后立即保留回执，再执行草稿标记和回填；本地同步失败进入 committed-needs-sync，
+retrySync 仅重试同步，不再次执行 create/update。未知写入结果仍须核实真实后端，不能盲目重发。
 
 子表完成编辑草稿 → 字段/子表/公共及页面 validate → 公共与页面 beforeSave →
 DTO 白名单转换 → create/update → resolveSaved →

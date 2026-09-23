@@ -72,7 +72,7 @@ export type Detail<T extends BusinessModuleContract> = CrudDetailConfig<
 
 /**
  * 标准 CRUD 模块唯一配置入口；简单只读模块仍可使用 defineCrudConfig。
- * @remarks 配置描述能力，createRuntime 只装配合同；控制器仍在页面各自创建。
+ * @remarks 配置描述能力，createViewConfig 只装配合同；控制器仍在页面各自创建。
  */
 export interface BusinessModuleConfig<T extends BusinessModuleContract> {
   /** 统一页面上下文适配；纯函数，不发请求。
@@ -205,13 +205,13 @@ export interface BusinessModuleConfig<T extends BusinessModuleContract> {
 /**
  * 定义标准业务模块，编译字段一次，按页面装配 CRUD 合同。
  * @typeParam T 用命名合同关联页面、实体、查询和保存类型。
- * @returns 原配置及 createRuntime；原 children 的具体配置和字面量 key 保留。
+ * @returns 原配置及 createViewConfig；原 children 的具体配置和字面量 key 保留。
  * @remarks 不产生响应式单例、网络请求或缓存。每页仍独立 useCrudForm/useCrudList。
  * @example
  * ```ts
  * export const customerModule = defineBusinessModule<Contract>()({ meta, api, model,
  *   fields, query, children, views });
- * const config = customerModule.createRuntime(navigation, "edit");
+ * const config = customerModule.createViewConfig(navigation, "edit");
  * const controller = useCrudForm(config.form, options);
  * ```
  */
@@ -313,14 +313,17 @@ export function defineBusinessModule<T extends BusinessModuleContract>() {
     defineCrudConfig({ key: config.meta.key, list: listBase, form: forms.add, detail: detailBase });
     defineCrudConfig({ key: config.meta.key, form: forms.edit });
     /**
-     * 按需装配当前页面合同；同一 runtime 的场景配置复用，不创建 controller 或请求。
+     * 按需生成当前页面配置；同一次装配的场景配置复用，不创建控制器或请求。
      * @param navigation 当前路由实例的导航函数，仅对应场景动作工厂会读取。
      * @param mode 表单场景，默认 add；编辑页传 edit。
      * @returns 独立表单配置及延迟装配的列表、详情；静态字段配置只读复用。
      * @example
-     * const runtime = customerModule.createRuntime(navigation, "edit");
+     * const viewConfig = customerModule.createViewConfig(navigation, "edit");
      */
-    const createRuntime = (navigation: CrudNavigation<T["Id"]>, mode: "add" | "edit" = "add") => {
+    const createViewConfig = (
+      navigation: CrudNavigation<T["Id"]>,
+      mode: "add" | "edit" = "add"
+    ) => {
       let list: List<T> | undefined;
       let detail: Detail<T> | undefined;
       const form: Form<T> = { ...forms[mode] };
@@ -358,6 +361,6 @@ export function defineBusinessModule<T extends BusinessModuleContract>() {
     const marker: {
       /** 模块命名合同；业务不读写。 */ readonly __contract?: T;
     } = {};
-    return { ...config, model, createRuntime, ...marker };
+    return { ...config, model, createViewConfig, ...marker };
   };
 }

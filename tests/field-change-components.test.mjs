@@ -243,7 +243,7 @@ test("真实 customer 配置将地区 ID/名称一起回填，编辑换上级时
   const { customerModule } = await import("../src/pages/base/customer/config.ts");
   const { createCustomerForm } = await import("../src/pages/base/customer/adapters.ts");
   const { compileLinks } = await import("../src/components/business/fields/links.ts");
-  const runtime = customerModule.createRuntime({});
+  const runtime = customerModule.createViewConfig({});
   const applyLinks = compileLinks(customerModule.links);
   let model = {
     ...createCustomerForm(),

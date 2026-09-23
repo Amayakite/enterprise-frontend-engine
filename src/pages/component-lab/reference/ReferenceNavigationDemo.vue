@@ -40,7 +40,7 @@ import { customerModule } from "@/pages/base/customer/config";
 import { checkQuerySort } from "@/components/business/search/model";
 import { customerSortKeys } from "@/api/base/customer/query";
 import ReferencePermissionPreview from "@/components/dev/ReferencePermissionPreview.vue";
-const customerList = customerModule.createRuntime({}).list;
+const customerList = customerModule.createViewConfig({}).list;
 const note = ref("");
 const selected = ref<string | null>(null);
 const selectedMany = ref<string[]>([]);
