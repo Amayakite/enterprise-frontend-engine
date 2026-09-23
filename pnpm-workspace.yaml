@@ -2,3 +2,5 @@
 allowBuilds:
   "@parcel/watcher": false
   es5-ext: false
+  # Reka UI 的间接依赖，安装时匹配本项目的 Vue 3 入口。
+  vue-demi: true

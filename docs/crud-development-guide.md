@@ -13,7 +13,7 @@
 标准模块使用 `useCrudView(module, { view, state?, hooks?, navigation?, batch? })`，
 解构 `{ state, actions, bindings }`，模板直接引用 `MyCrudList/MyCrudForm/MyCrudDetail`，
 从组件名即可跳转真实源码。[五类文件接法](./module-development-example.md#6-页面最终形态)
-以客户为参照。旧 `useCrudPage/MyCrudPage` 保留配置自动渲染兼容入口；两种入口直接复用 `useCrudRuntime` 的控制器与生命周期装配，
+以客户为参照。页面统一采用 `useCrudView`，复用 `useCrudRuntime` 的控制器与生命周期装配，
 新入口不经过兼容渲染器；旧入口只把同一份 bindings 转为视图，不要在同一界面同时调用。
 模块定义时检查静态字段、分区和必需方法；`createRuntime()` 首次读取 list/detail 时才执行
 对应动作工厂并检查动作键，同一实例复用结果。动作工厂应只返回配置，不承担初始化副作用。
@@ -311,7 +311,7 @@ create 直接打开新增，view 打开详情或列表，按统一展示策略�
 目标列表可访问但 `form.permissions.create` 不允许时，不显示新增按钮，使用内联 status 说明：
 “当前账号没有新增该单据的权限，请联系管理员授权，或联系对应人员新增。”不要求确认。
 新增入口和直接 add 路由也检查同一权限；正式数据/动作权限仍由后端鉴权，Mock 不能证明授权安全。
-`useCrudView`/`useCrudPage` 会生成 `createPermitted` 绑定；独立 MyCrudList 需由页面传入，省略沿用旧行为。
+`useCrudView` 会生成 `createPermitted` 绑定；独立 MyCrudList 需由页面传入，省略沿用旧行为。
 
 `page.guideMode` 默认为 `halo`，可选 `spotlight` 或 false。客户示例使用 spotlight。
 `PageActionGuide` 只在有可执行 create 意图时挂载，定位新增按钮的自有 wrapper ref。

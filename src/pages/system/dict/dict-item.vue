@@ -93,9 +93,16 @@
       v-model="dialogState.visible"
       :title="dialogState.title"
       width="600px"
+      :before-close="() => !saving"
       @close="closeDialog"
     >
-      <el-form ref="dictItemFormRef" :model="formData" :rules="rules" label-width="100px">
+      <el-form
+        ref="dictItemFormRef"
+        :model="formData"
+        :rules="rules"
+        :disabled="saving"
+        label-width="100px"
+      >
         <el-form-item label="字典项标签" prop="label">
           <el-input v-model="formData.label" placeholder="请输入字典标签" />
         </el-form-item>
@@ -136,7 +143,7 @@
             </template>
             <el-option v-for="type in tagTypeOptions" :key="type" :label="type" :value="type">
               <div flex-y-center gap-10px>
-                <el-tag :type="type as any">{{ formData.label ?? "字典标签" }}</el-tag>
+                <el-tag :type="type || undefined">{{ formData.label ?? "字典标签" }}</el-tag>
                 <span>{{ type }}</span>
               </div>
             </el-option>
@@ -146,8 +153,8 @@
 
       <template #footer>
         <div class="dialog-footer">
-          <el-button type="primary" @click="handleSubmit">确 定</el-button>
-          <el-button @click="closeDialog">取 消</el-button>
+          <el-button type="primary" :loading="saving" @click="handleSubmit">确定</el-button>
+          <el-button :disabled="saving" @click="closeDialog">取消</el-button>
         </div>
       </template>
     </MyDialog>
@@ -275,18 +282,20 @@ async function handleEditClick(row: DictItem): Promise<void> {
 /**
  * 校验并提交字典项表单。
  */
+const saving = ref(false);
 async function handleSubmit(): Promise<void> {
-  const valid = await dictItemFormRef.value?.validate().then(
-    () => true,
-    () => false
-  );
-  if (!valid) return;
-
-  formData.dictCode = dictCode.value;
-  const id = formData.id;
-
-  loading.value = true;
+  if (saving.value) return;
+  saving.value = true;
   try {
+    const valid = await dictItemFormRef.value?.validate().then(
+      () => true,
+      () => false
+    );
+    if (!valid) return;
+
+    formData.dictCode = dictCode.value;
+    const id = formData.id;
+
     if (id) {
       await DictAPI.updateDictItem(dictCode.value, id, formData);
       ElMessage.success("修改成功");
@@ -295,9 +304,9 @@ async function handleSubmit(): Promise<void> {
       ElMessage.success("新增成功");
     }
     closeDialog();
-    handleQuery();
+    await handleQuery();
   } finally {
-    loading.value = false;
+    saving.value = false;
   }
 }
 

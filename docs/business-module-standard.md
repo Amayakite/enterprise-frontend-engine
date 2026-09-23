@@ -78,7 +78,7 @@ src/api/<领域>/<模块>/
 
 ### 3.3 主子表 CRUD
 
-标准模块在 `children` 登记绑定，由 `defineBusinessModule` 自动生成 `CrudFormConfig.sections/childKeys` 与详情 tabs、子表多行校验；低层使用者仍可显式登记。useCrudView 复用 useCrudTableChild 建立绑定，bindings.child(key) 不重复注册；页面显式使用子表组件，详情从 state.model 读取只读子行。旧 useCrudPage/MyCrudPage 仍兼容配置自动渲染；非表格子模块使用 `controller.registerChild` 的公开合同。保存顺序、锁定、校验、失败状态和回填由 `useCrudForm` 统一编排。
+标准模块在 `children` 登记绑定，由 `defineBusinessModule` 自动生成 `CrudFormConfig.sections/childKeys` 与详情 tabs、子表多行校验；低层使用者仍可显式登记。useCrudView 复用 useCrudTableChild 建立绑定，bindings.child(key) 不重复注册；页面显式使用子表组件，详情从 state.model 读取只读子行。非表格子模块使用 `controller.registerChild` 的公开合同。保存顺序、锁定、校验、失败状态和回填由 `useCrudForm` 统一编排。
 
 客户是实际样例：联系人和地址分别位于 `children/contacts/`、`children/addresses/`，各自拥有配置和呈现组件；新增、编辑时可维护，详情时只读。主要联系人、默认地址、初始行、子行校验和 DTO 白名单归子模块，地区级联仍归父模块，不进入公共组件。
 

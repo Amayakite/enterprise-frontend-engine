@@ -144,13 +144,13 @@ function handleInputKeydown(event: KeyboardEvent) {
   min-width: 0;
   padding: 10px 12px;
   border: 1px solid var(--el-border-color);
-  border-radius: 6px;
+  border-radius: var(--ui-control-radius);
   background: var(--el-fill-color-blank);
   color: var(--el-text-color-primary);
   font: inherit;
 }
 .command-palette-input:focus-visible {
-  outline: 2px solid var(--el-color-primary);
+  outline: var(--ui-focus-ring);
   outline-offset: 2px;
 }
 .command-palette-section {
@@ -221,7 +221,7 @@ function handleInputKeydown(event: KeyboardEvent) {
   color: var(--el-text-color-regular);
 }
 button:focus-visible {
-  outline: 2px solid var(--el-color-primary);
+  outline: var(--ui-focus-ring);
   outline-offset: 2px;
 }
 </style>

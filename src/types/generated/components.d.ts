@@ -112,7 +112,6 @@ declare module 'vue' {
     MyCrudFormToolbar: typeof import('./../../components/business/crud/MyCrudFormToolbar.vue')['default']
     MyCrudLayout: typeof import('./../../components/business/crud/MyCrudLayout.vue')['default']
     MyCrudList: typeof import('./../../components/business/crud/MyCrudList.vue')['default']
-    MyCrudPage: typeof import('./../../components/business/crud/MyCrudPage.vue')['default']
     MyDesc: typeof import('./../../components/business/MyDesc.vue')['default']
     MyDialog: typeof import('./../../components/common/MyDialog.vue')['default']
     MyDrawer: typeof import('./../../components/common/MyDrawer.vue')['default']

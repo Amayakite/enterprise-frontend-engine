@@ -12,7 +12,7 @@
   background: var(--page-bg);
 }
 
-// 直接组件布局与兼容容器共用间距，不依赖 MyCrudPage 加载。
+// 标准 CRUD 页面统一间距，由全局入口加载。
 .crud-page {
   gap: 12px;
 }

@@ -36,7 +36,7 @@ registerHooks({
 });
 globalThis.ElMessageBox = { confirm: async () => "confirm" };
 const { useCrudView } = await import("../src/composables/useCrudView.ts");
-const { useCrudPage } = await import("../src/composables/useCrudPage.ts");
+const { useCrudRuntime } = await import("../src/composables/useCrudRuntime.ts");
 const { defineAggregateBinding } = await import("../src/components/business/crud/aggregate.ts");
 const renderer = createRenderer({
   createElement: () => ({}),
@@ -94,7 +94,7 @@ function mount(options, extra = {}) {
   const visible = ref(true);
   const component = {
     setup() {
-      page = (extra.facade ? useCrudView : useCrudPage)(module, options);
+      page = (extra.facade ? useCrudView : useCrudRuntime)(module, options);
       return () => h("div");
     },
   };
@@ -246,30 +246,29 @@ test("子表插槽优先于懒加载专属视图，并通过同一绑定回写�
   const binding = defineAggregateBinding()({ modelKey: "lines", payloadKey: "lines", config });
   const view = mount({ view: "add" }, { children: { lines: binding } });
   await ready(view);
-  const frame = view.page.render({
-    "section-lines": ({ binding, rows }) => {
+  view.page
+    .childViews()
+    .get("lines")
+    .render(({ binding, rows }) => {
       assert.deepEqual(rows, []);
       binding.replace([{ name: "一行" }]);
       return [h("p", "自定义")];
-    },
-  });
-  const content = frame.children[2];
-  content.children["section-lines"]();
+    });
   assert.equal(loads, 0);
   assert.equal(view.page.form.state.model.lines[0].name, "一行");
   view.close();
 });
 
-test("默认渲染与高级 bindings 每次提供独立 props；保存回填后更新实体 key", async () => {
+test("bindings 每次提供独立 props；保存回填后更新实体 key", async () => {
   const view = mount({ view: "add" });
   await ready(view);
-  const first = view.page.render({}).children[2].props;
+  const first = view.page.bindings.form;
   const originalBindings = view.page.bindings.form;
   assert.equal(first.entityKey, "new");
   await view.page.form.save();
-  const next = view.page.render({}).children[2].props;
+  const next = view.page.bindings.form;
   assert.notEqual(next, first);
-  assert.equal(first.entityKey, "new", "旧 VNode 不应通过 getter 变成新 props");
+  assert.equal(first.entityKey, "new", "旧 props 快照不应随新绑定改变");
   assert.equal(next.entityKey, 0);
   assert.notEqual(view.page.bindings.form, originalBindings);
   view.close();

@@ -23,6 +23,10 @@
   --custom-radius: 8px;
   --page-padding: 10px;
   --page-gap: 10px;
+  // 项目自有交互控件共用的视觉尺度；颜色跟随 Element Plus 主题。
+  --ui-control-radius: 6px;
+  --ui-popover-radius: 10px;
+  --ui-focus-ring: 2px solid var(--el-color-primary);
 }
 
 // 深蓝色侧边栏

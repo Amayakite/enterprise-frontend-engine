@@ -1,17 +1,4 @@
 <template>
-  <MyCrudPage :page="page">
-    <template #field-customerName="{ value, update, commit }">
-      <span>{{ value.trim() }}</span>
-      <button @click="commit()">确认完成</button>
-      <button @click="update('新名称')">更新</button>
-      <!-- @vue-expect-error 字符串字段不能传数字 -->
-      <button @click="update(42)">错误</button>
-    </template>
-    <template #section-contacts="{ binding, rows }">
-      <span>{{ rows[0]?.name }}</span>
-      <button @click="binding.replace([])">清空</button>
-    </template>
-  </MyCrudPage>
   <MyCrudForm v-bind="bindings.form">
     <template #header="{ state }">
       <span>{{ state.model.customerName.trim() }}</span>
@@ -56,10 +43,7 @@ import MyFormField from "../../src/components/business/MyForm/MyFormField.vue";
 import MyCrudForm from "../../src/components/business/crud/MyCrudForm.vue";
 import CustomerContacts from "../../src/pages/base/customer/children/contacts/CustomerContacts.vue";
 import { useCrudView } from "../../src/composables/useCrudView";
-import MyCrudPage from "../../src/components/business/crud/MyCrudPage.vue";
-import { useCrudPage } from "../../src/composables/useCrudPage";
 import { customerModule } from "../../src/pages/base/customer/config";
-const page = useCrudPage(customerModule, { view: "add" });
 const { bindings } = useCrudView(customerModule, { view: "add" });
 const contacts = bindings.child("contacts");
 </script>

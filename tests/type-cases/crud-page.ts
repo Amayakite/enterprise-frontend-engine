@@ -3,11 +3,11 @@ import { useCrudView } from "../../src/composables/useCrudView";
 import type { CrudFormViewOptions } from "../../src/components/business/crud/crud-view";
 import type { CrudFormPageOptions } from "../../src/components/business/crud/crud-page";
 import type { CustomerContract } from "../../src/pages/base/customer/types";
-import { useCrudPage } from "../../src/composables/useCrudPage";
+import { useCrudRuntime } from "../../src/composables/useCrudRuntime";
 import { customerModule } from "../../src/pages/base/customer/config";
 import type { RichTextProps } from "../../src/components/business/fields/rich-text";
 
-const add = useCrudPage(customerModule, {
+const add = useCrudRuntime(customerModule, {
   view: "add",
   state: () => ({ hint: "", count: 0 }),
   hooks: {
@@ -41,8 +41,8 @@ const invalidEdit: CrudFormPageOptions<CustomerContract, object, "edit"> = {
     beforeOpen: async () => ({ state: {}, defaults: { customerName: "不能覆盖" } }),
   },
 };
-useCrudPage(customerModule, invalidEdit);
-const detail = useCrudPage(customerModule, { view: "detail" });
+useCrudRuntime(customerModule, invalidEdit);
+const detail = useCrudRuntime(customerModule, { view: "detail" });
 // @ts-expect-error 详情不提供保存控制器
 detail.form.save();
 const rich: RichTextProps = { height: "320px", maxlength: 2000, readonlyDisplay: "html" };

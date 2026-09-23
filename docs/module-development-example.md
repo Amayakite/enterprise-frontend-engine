@@ -296,9 +296,8 @@ state 只合并到 custom；defaults 先于草稿恢复，不覆盖恢复内容�
 客户 ID 仍为字符串；数字 ID 模块自行验证数值及安全范围。
 
 `bindings.child("contacts")` 返回已按子配置创建的同一个端口，必须传给对应子表，
-不在页面另建 useCrudTableChild。直接组件方式需要显式写 section/tab 插槽；
-旧 MyCrudPage 的自动渲染仍支持“页面插槽 → 子表 view.component → 默认表格”，
-但它不是新 customer 的模板入口。
+不在页面另建 useCrudTableChild。页面显式写 section/tab 插槽装配子表；
+不再提供额外的自动渲染页面入口，生命周期和绑定继续由共享运行时负责。
 
 可以自由增加业务组件、事件、custom 状态、生命周期、导航覆盖和字段/子表插槽。
 公共配置继续解决标准字段与流程；特殊布局可使用 MyForm 等基础组件，

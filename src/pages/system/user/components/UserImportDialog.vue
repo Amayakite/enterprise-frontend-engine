@@ -5,6 +5,7 @@
       :align-center="true"
       title="导入数据"
       width="600px"
+      :before-close="() => !uploading"
       @close="closeDialog"
     >
       <el-scrollbar max-height="60vh">
@@ -23,6 +24,7 @@
               :drag="true"
               :limit="1"
               :auto-upload="false"
+              :disabled="uploading"
               :on-exceed="handleFileExceed"
             >
               <el-icon class="el-icon--upload"><upload-filled /></el-icon>
@@ -54,12 +56,13 @@
           </el-button>
           <el-button
             type="primary"
+            :loading="uploading"
             :disabled="importFormData.files.length === 0"
             @click="handleUpload"
           >
             确定
           </el-button>
-          <el-button @click="closeDialog">取消</el-button>
+          <el-button :disabled="uploading" @click="closeDialog">取消</el-button>
         </div>
       </template>
     </MyDialog>
@@ -70,11 +73,14 @@
         type="warning"
         :closable="false"
       />
-      <el-table :data="resultData as any" style="width: 100%; max-height: 400px">
+      <el-table
+        :data="resultData.map((message) => ({ message }))"
+        style="width: 100%; max-height: 400px"
+      >
         <el-table-column prop="index" align="center" width="100" type="index" label="序号" />
         <el-table-column prop="message" label="错误信息" width="400">
           <template #default="scope">
-            {{ scope.row }}
+            {{ scope.row.message }}
           </template>
         </el-table-column>
       </el-table>
@@ -104,6 +110,7 @@ const visible = defineModel("modelValue", {
 
 // 结果弹窗状态
 const resultVisible = ref(false);
+const uploading = ref(false);
 const resultData = ref<string[]>([]);
 const invalidCount = ref(0);
 const validCount = ref(0);
@@ -153,22 +160,29 @@ function downloadTemplate(): void {
  * 上传文件
  */
 async function handleUpload(): Promise<void> {
-  if (!importFormData.files.length) {
+  if (uploading.value) return;
+  const file = importFormData.files[0]?.raw;
+  if (!file) {
     ElMessage.warning("请选择文件");
     return;
   }
 
-  const result = await UserAPI.import(importFormData.files[0].raw as File);
-  if (result.code === ApiCodeEnum.SUCCESS && result.invalidCount === 0) {
-    ElMessage.success("导入成功，导入数据：" + result.validCount + "条");
-    emit("import-success");
-    closeDialog();
-  } else {
-    ElMessage.error("上传失败");
-    resultVisible.value = true;
-    resultData.value = result.messageList;
-    invalidCount.value = result.invalidCount;
-    validCount.value = result.validCount;
+  uploading.value = true;
+  try {
+    const result = await UserAPI.import(file);
+    if (result.code === ApiCodeEnum.SUCCESS && result.invalidCount === 0) {
+      ElMessage.success("导入成功，导入数据：" + result.validCount + "条");
+      emit("import-success");
+      closeDialog();
+    } else {
+      ElMessage.error("上传失败");
+      resultVisible.value = true;
+      resultData.value = result.messageList;
+      invalidCount.value = result.invalidCount;
+      validCount.value = result.validCount;
+    }
+  } finally {
+    uploading.value = false;
   }
 }
 

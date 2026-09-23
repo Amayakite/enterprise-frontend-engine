@@ -4,6 +4,12 @@
 
 ## 先选择所需能力
 
+基础交互先复用已有组件。标签右键菜单采用 [Reka UI Context Menu](https://reka-ui.com/docs/components/context-menu)
+的组合原语，管理键盘选择、焦点返回与边界定位；标签关闭、草稿确认和缓存仍归原 store。
+这是借鉴 shadcn-vue 组合方式的局部用法，不建立第二套表单、表格或样式工具链。
+单选等已有能力继续使用 Element Plus。项目自有控件共用 `theme.scss` 的
+`--ui-control-radius`、`--ui-popover-radius` 和 `--ui-focus-ring`，颜色跟随现有明暗主题。
+
 | 场景                     | 入口                                                     | 状态归属与选择原则                                                                  |
 | ------------------------ | -------------------------------------------------------- | ----------------------------------------------------------------------------------- |
 | 普通业务弹窗             | `src/components/common/MyDialog.vue`                     | 容器管理尺寸、桌面拖拽、全屏、复位、loading、默认动作和无障碍；业务管理内容与状态   |
@@ -104,7 +110,7 @@ const navigation: ReferenceNavigation<CustomerRecord, string> = {
 
 共享参照可放业务模块 `references.ts`，主字段注册仍在 `config.ts` 内联。
 `reference.withMap(callback)` 创建新实例，仅替换 map，不修改共享对象，不替换 source、filters、守卫或导航。
-在 `add.vue/edit.vue` 的 `useCrudView` 或 `useCrudPage` 选项传入：
+在 `add.vue/edit.vue` 的 `useCrudView` 选项传入：
 
 ```ts
 form: {

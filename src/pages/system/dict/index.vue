@@ -62,12 +62,7 @@
           </el-table-column>
           <el-table-column fixed="right" label="操作" align="center" width="220">
             <template #default="scope">
-              <el-button
-                type="primary"
-                link
-                size="small"
-                @click.stop="openDictData(scope.row as any)"
-              >
+              <el-button type="primary" link size="small" @click.stop="openDictData(scope.row)">
                 字典数据
               </el-button>
 
@@ -300,7 +295,17 @@ async function handleDelete(id?: string): Promise<void> {
  *
  * @param row 当前字典行
  */
-function openDictData(row: DictTypeItem): void {
+function openDictData(row: unknown): void {
+  // Element Plus 默认插槽不保留行泛型，只读取导航需要的两个字段。
+  if (
+    !row ||
+    typeof row !== "object" ||
+    !("dictCode" in row) ||
+    typeof row.dictCode !== "string" ||
+    !("name" in row) ||
+    typeof row.name !== "string"
+  )
+    return;
   try {
     const route = router.resolve({
       name: "DictItem",

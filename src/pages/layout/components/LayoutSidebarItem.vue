@@ -30,7 +30,13 @@
       </AppLink>
     </template>
 
-    <el-sub-menu v-else :index="resolvePath(item.path)" :data-path="item.path" teleported>
+    <el-sub-menu
+      v-else
+      :class="{ 'has-active-child': hasActiveChild }"
+      :index="resolvePath(item.path)"
+      :data-path="item.path"
+      teleported
+    >
       <template #title>
         <template v-if="item.meta">
           <LayoutMenuIcon :icon="item.meta.icon" />
@@ -45,6 +51,7 @@
         :key="child.path"
         :is-nest="true"
         :item="child"
+        :active-path="activePath"
         :base-path="resolvePath(child.path)"
       />
     </el-sub-menu>
@@ -79,11 +86,26 @@ const props = defineProps({
     required: true,
   },
 
+  /** 当前激活的业务菜单路径；详情页面传入 meta.activeMenu，递归用于父菜单高亮。 */
+  activePath: { type: String, required: true },
+
   /** 是否为嵌套路由 */
   isNest: {
     type: Boolean,
     default: false,
   },
+});
+
+// 激活态由路由数据推导，不读取 Element Plus 的内部节点。
+const hasActiveChild = computed(() => {
+  function contains(item: RouteRecordRaw, fullPath: string): boolean {
+    if (item.meta?.hidden || isExternal(fullPath)) return false;
+    return (
+      fullPath === props.activePath ||
+      (item.children ?? []).some((child) => contains(child, path.resolve(fullPath, child.path)))
+    );
+  }
+  return contains(props.item, props.basePath);
 });
 
 const onlyOneChild = ref<SidebarRoute>({} as SidebarRoute);

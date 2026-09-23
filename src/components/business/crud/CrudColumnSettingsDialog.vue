@@ -369,28 +369,19 @@
               </div>
               <div class="column-settings__setting-block">
                 <label>分组标题对齐</label>
-                <div
-                  class="column-settings__align-control"
-                  role="radiogroup"
+                <el-radio-group
+                  :model-value="selectedGroupAlign"
+                  @update:model-value="setSelectedGroupAlign"
                   aria-label="分组标题对齐"
                 >
-                  <button
+                  <el-radio-button
                     v-for="option in alignOptions"
                     :key="option.value"
-                    type="button"
-                    role="radio"
-                    :aria-checked="selectedGroupAlign === option.value"
-                    :class="{ 'is-active': selectedGroupAlign === option.value }"
-                    @click="setSelectedGroupAlign(option.value)"
+                    :value="option.value"
                   >
-                    <span class="column-settings__align-glyph" :class="`is-${option.value}`">
-                      <i />
-                      <i />
-                      <i />
-                    </span>
                     {{ option.label }}
-                  </button>
-                </div>
+                  </el-radio-button>
+                </el-radio-group>
                 <small>只影响上层分组标题，子栏目标题和内容保持各自设置。</small>
               </div>
               <div class="column-settings__setting-block">
@@ -435,24 +426,15 @@
               </div>
               <div class="column-settings__setting-block">
                 <label>内容对齐</label>
-                <div class="column-settings__align-control" role="radiogroup" aria-label="内容对齐">
-                  <button
+                <el-radio-group v-model="selected.align" aria-label="内容对齐">
+                  <el-radio-button
                     v-for="option in alignOptions"
                     :key="option.value"
-                    type="button"
-                    role="radio"
-                    :aria-checked="selected.align === option.value"
-                    :class="{ 'is-active': selected.align === option.value }"
-                    @click="selected.align = option.value"
+                    :value="option.value"
                   >
-                    <span class="column-settings__align-glyph" :class="`is-${option.value}`">
-                      <i />
-                      <i />
-                      <i />
-                    </span>
                     {{ option.label }}
-                  </button>
-                </div>
+                  </el-radio-button>
+                </el-radio-group>
                 <small>列标题和单元格使用同一对齐方式；上层分组标题单独设置。</small>
               </div>
               <div v-if="!selectedHeaderGroup" class="column-settings__setting-block">
@@ -778,7 +760,8 @@ function setSelectedGroupFixed(value: string | number | boolean | undefined) {
   if (!selectedGroup.value || !["left", "none", "right"].includes(String(value))) return;
   moveUnit(selectedGroup.value, String(value) as CrudColumnFixed);
 }
-function setSelectedGroupAlign(value: CrudColumnAlign) {
+function setSelectedGroupAlign(value: string | number | boolean | undefined) {
+  if (value !== "left" && value !== "center" && value !== "right") return;
   if (!selectedGroup.value) return;
   for (const item of selectedGroup.value.items) item.groupAlign = value;
 }
@@ -874,8 +857,17 @@ function draftColumn(item: CrudColumnPreference): TableColumn<Row> | undefined {
       : undefined,
   };
 }
+const previewColumns = computed(
+  () =>
+    new Map(
+      allUnits.value.map((unit) => [
+        unit.key,
+        unit.items.flatMap((item) => draftColumn(item) ?? []),
+      ])
+    )
+);
 function previewUnitColumns(unit: ColumnUnit): TableViewColumn<Row>[] {
-  return unit.items.flatMap((item) => draftColumn(item) ?? []);
+  return previewColumns.value.get(unit.key) ?? [];
 }
 function previewSize(column: TableViewColumn<Row>) {
   return Math.max(68, Math.min(142, (column.width ?? column.minWidth ?? 160) * 0.52));
@@ -1390,43 +1382,6 @@ function confirm() {
     color: var(--el-text-color-secondary);
     font-size: 12px;
     line-height: 1.5;
-  }
-}
-.column-settings__align-control {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  overflow: hidden;
-  border: 1px solid var(--el-border-color);
-  border-radius: var(--el-border-radius-small);
-  button {
-    display: inline-flex;
-    min-height: 34px;
-    gap: 6px;
-    align-items: center;
-    justify-content: center;
-    padding: 0 8px;
-    color: var(--el-text-color-regular);
-    cursor: pointer;
-    background: var(--el-bg-color);
-    border: 0;
-    & + button {
-      border-left: 1px solid var(--el-border-color);
-    }
-    &:hover {
-      color: var(--el-color-primary);
-      background: var(--el-fill-color-extra-light);
-    }
-    &:focus-visible {
-      position: relative;
-      outline: 2px solid var(--el-color-primary);
-      outline-offset: -2px;
-    }
-    &.is-active {
-      color: var(--el-color-primary);
-      font-weight: 600;
-      background: var(--el-color-primary-light-9);
-      box-shadow: inset 0 0 0 1px var(--el-color-primary);
-    }
   }
 }
 .column-settings__fixed-control {

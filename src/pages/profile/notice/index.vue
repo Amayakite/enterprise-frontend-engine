@@ -89,6 +89,9 @@
       custom-class="notice-detail"
       :show-footer="false"
     >
+      <template #title>
+        <span class="notice-detail-title">{{ noticeDetail?.title ?? "通知详情" }}</span>
+      </template>
       <div v-if="noticeDetail" class="notice-detail__wrapper">
         <div class="notice-detail__meta">
           <span>
@@ -160,7 +163,8 @@ onMounted(() => {
 </script>
 
 <style lang="scss" scoped>
-:deep(.el-dialog__header) {
+.notice-detail-title {
+  display: block;
   text-align: center;
 }
 

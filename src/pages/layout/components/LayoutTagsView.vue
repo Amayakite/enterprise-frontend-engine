@@ -7,35 +7,86 @@
       @wheel="handleScroll"
     >
       <div class="layout-tabs__list">
-        <div
+        <ContextMenuRoot
           v-for="tag in visitedViews"
           :key="tag.fullPath"
-          class="layout-tabs__item"
-          :class="{
-            'is-active': tagsViewStore.isActive(tag),
-            'is-affix': tag.affix,
-          }"
-          @click="openTag(tag)"
-          @click.middle="handleMiddleClick(tag)"
-          @contextmenu.prevent="openContextMenu(tag, $event)"
+          @update:open="
+            (open) => {
+              if (open) selectedTag = tag;
+            }
+          "
         >
-          <template v-if="tag.icon">
-            <el-icon v-if="isEpIcon(tag.icon)" :size="14">
-              <component :is="toEpIconName(tag.icon)" />
-            </el-icon>
-            <span v-else class="layout-tabs__item-icon" :class="`i-svg:${tag.icon}`" />
-          </template>
-          <span class="layout-tabs__item-text">
-            {{ tag.title }}
-          </span>
-          <span
-            v-if="!tag.affix"
-            class="layout-tabs__item-close"
-            @click.stop="closeSelectedTag(tag)"
+          <div
+            class="layout-tabs__item"
+            :class="{
+              'is-active': tagsViewStore.isActive(tag),
+              'is-affix': tag.affix,
+            }"
+            @click.middle="handleMiddleClick(tag)"
           >
-            <div class="i-svg:close" />
-          </span>
-        </div>
+            <ContextMenuTrigger as-child>
+              <button
+                type="button"
+                class="layout-tabs__item-link"
+                :aria-current="tagsViewStore.isActive(tag) ? 'page' : undefined"
+                @click="openTag(tag)"
+              >
+                <template v-if="tag.icon">
+                  <el-icon v-if="isEpIcon(tag.icon)" :size="14">
+                    <component :is="toEpIconName(tag.icon)" />
+                  </el-icon>
+                  <span v-else class="layout-tabs__item-icon" :class="`i-svg:${tag.icon}`" />
+                </template>
+                <span class="layout-tabs__item-text">
+                  {{ tag.title }}
+                </span>
+              </button>
+            </ContextMenuTrigger>
+            <button
+              type="button"
+              :aria-label="`关闭${tag.title}`"
+              v-if="!tag.affix"
+              class="layout-tabs__item-close"
+              @click.stop="closeSelectedTag(tag)"
+            >
+              <span class="i-svg:close" aria-hidden="true" />
+            </button>
+          </div>
+          <ContextMenuPortal>
+            <ContextMenuContent class="layout-tabs-menu" :collision-padding="8" loop>
+              <ContextMenuItem @select="refreshSelectedTag(selectedTag)">
+                <el-icon :size="16" class="layout-tabs-menu__icon"><Refresh /></el-icon>
+                <span>刷新</span>
+              </ContextMenuItem>
+              <ContextMenuItem
+                v-if="!selectedTag?.affix"
+                class="layout-tabs-menu__danger"
+                @select="closeSelectedTag(selectedTag)"
+              >
+                <div class="i-svg:close layout-tabs-menu__icon" />
+                <span>关闭</span>
+              </ContextMenuItem>
+              <ContextMenuSeparator class="layout-tabs-menu__divider" />
+              <ContextMenuItem @select="closeOtherTags">
+                <div class="i-svg:close_other layout-tabs-menu__icon" />
+                <span>关闭其它</span>
+              </ContextMenuItem>
+              <ContextMenuItem v-if="!isFirstView" @select="closeLeftTags">
+                <div class="i-svg:close_left layout-tabs-menu__icon" />
+                <span>关闭左侧</span>
+              </ContextMenuItem>
+              <ContextMenuItem v-if="!isLastView" @select="closeRightTags">
+                <div class="i-svg:close_right layout-tabs-menu__icon" />
+                <span>关闭右侧</span>
+              </ContextMenuItem>
+              <ContextMenuSeparator class="layout-tabs-menu__divider" />
+              <ContextMenuItem @select="closeAllTags(selectedTag)">
+                <div class="i-svg:close_all layout-tabs-menu__icon" />
+                <span>关闭所有</span>
+              </ContextMenuItem>
+            </ContextMenuContent>
+          </ContextMenuPortal>
+        </ContextMenuRoot>
       </div>
     </el-scrollbar>
 
@@ -93,57 +144,25 @@
         </template>
       </el-dropdown>
     </div>
-
-    <Teleport to="body">
-      <ul v-show="contextMenu.visible" class="layout-tabs-menu" :style="contextMenuStyle">
-        <li @click="refreshSelectedTag(selectedTag)">
-          <el-icon :size="16" class="layout-tabs-menu__icon"><Refresh /></el-icon>
-          <span>刷新</span>
-        </li>
-        <li
-          v-if="!selectedTag?.affix"
-          class="layout-tabs-menu__danger"
-          @click="closeSelectedTag(selectedTag)"
-        >
-          <div class="i-svg:close layout-tabs-menu__icon" />
-          <span>关闭</span>
-        </li>
-        <li class="layout-tabs-menu__divider" />
-        <li @click="closeOtherTags">
-          <div class="i-svg:close_other layout-tabs-menu__icon" />
-          <span>关闭其它</span>
-        </li>
-        <li v-if="!isFirstView" @click="closeLeftTags">
-          <div class="i-svg:close_left layout-tabs-menu__icon" />
-          <span>关闭左侧</span>
-        </li>
-        <li v-if="!isLastView" @click="closeRightTags">
-          <div class="i-svg:close_right layout-tabs-menu__icon" />
-          <span>关闭右侧</span>
-        </li>
-        <li class="layout-tabs-menu__divider" />
-        <li @click="closeAllTags(selectedTag)">
-          <div class="i-svg:close_all layout-tabs-menu__icon" />
-          <span>关闭所有</span>
-        </li>
-      </ul>
-    </Teleport>
   </div>
 </template>
 
 <script setup lang="ts">
+import {
+  ContextMenuRoot,
+  ContextMenuTrigger,
+  ContextMenuPortal,
+  ContextMenuContent,
+  ContextMenuItem,
+  ContextMenuSeparator,
+} from "reka-ui";
+import type { ScrollbarInstance } from "element-plus";
 import { useRoute, useRouter, type RouteRecordRaw } from "vue-router";
 import { resolve } from "path-browserify";
 import { TagsViewStyle } from "@/config/ui";
 import { useAppStore, usePermissionStore, useSettingsStore, useTagsViewStore } from "@/stores";
 import { isExternal } from "@/utils";
 import type { TagView } from "@/stores/tags-view";
-
-interface ContextMenu {
-  visible: boolean;
-  x: number;
-  y: number;
-}
 
 const router = useRouter();
 const route = useRoute();
@@ -157,13 +176,7 @@ const { visitedViews } = storeToRefs(tagsViewStore);
 
 const selectedTag = ref<TagView | null>(null);
 
-const contextMenu = reactive<ContextMenu>({
-  visible: false,
-  x: 0,
-  y: 0,
-});
-
-const scrollbarRef = ref();
+const scrollbarRef = ref<ScrollbarInstance>();
 
 const currentTag = computed(() => {
   return visitedViews.value.find((tag) => tagsViewStore.isActive(tag)) || null;
@@ -183,27 +196,6 @@ const isEpIcon = (icon: string) => icon.startsWith("el-icon");
 
 const toEpIconName = (icon: string) =>
   icon.replace("el-icon-", "").replace(/(^|-)\w/g, (s) => s.slice(-1).toUpperCase());
-
-const contextMenuStyle = computed(() => {
-  const menuWidth = 160;
-  const menuHeight = 220;
-  const padding = 8;
-
-  let x = contextMenu.x;
-  let y = contextMenu.y;
-
-  if (x + menuWidth > window.innerWidth) {
-    x = window.innerWidth - menuWidth - padding;
-  }
-  if (y + menuHeight > window.innerHeight) {
-    y = window.innerHeight - menuHeight - padding;
-  }
-
-  return {
-    left: `${Math.max(padding, x)}px`,
-    top: `${Math.max(padding, y)}px`,
-  };
-});
 
 const handleActionCommand = (command: string) => {
   switch (command) {
@@ -341,24 +333,11 @@ const handleMiddleClick = (tag: TagView) => {
   }
 };
 
-const openContextMenu = (tag: TagView, event: MouseEvent) => {
-  contextMenu.x = event.clientX;
-  contextMenu.y = event.clientY;
-  contextMenu.visible = true;
-  selectedTag.value = tag;
-};
-
-const closeContextMenu = () => {
-  contextMenu.visible = false;
-};
-
 const sameViews = (left: readonly TagView[], right: readonly TagView[]) =>
   left.length === right.length &&
   left.every((view, index) => view.fullPath === right[index]?.fullPath);
 
 const handleScroll = (event: WheelEvent) => {
-  closeContextMenu();
-
   const scrollWrapper = scrollbarRef.value?.wrapRef;
   if (!scrollWrapper) return;
 
@@ -369,7 +348,7 @@ const handleScroll = (event: WheelEvent) => {
   const deltaY = event.deltaY || -(legacyEvent.wheelDelta ?? 0);
   const newScrollLeft = scrollWrapper.scrollLeft + deltaY;
 
-  scrollbarRef.value.setScrollLeft(newScrollLeft);
+  scrollbarRef.value?.setScrollLeft(newScrollLeft);
 };
 
 const refreshSelectedTag = async (tag: TagView | null) => {
@@ -482,24 +461,6 @@ const closeAllTags = async (tag: TagView | null) => {
   });
 };
 
-const useContextMenuManager = () => {
-  const handleOutsideClick = () => {
-    closeContextMenu();
-  };
-
-  watchEffect(() => {
-    if (contextMenu.visible) {
-      document.addEventListener("click", handleOutsideClick);
-    } else {
-      document.removeEventListener("click", handleOutsideClick);
-    }
-  });
-
-  onBeforeUnmount(() => {
-    document.removeEventListener("click", handleOutsideClick);
-  });
-};
-
 watch(
   route,
   () => {
@@ -512,8 +473,6 @@ watch(
 onMounted(() => {
   initAffixTags();
 });
-
-useContextMenuManager();
 </script>
 
 <style lang="scss" scoped>
@@ -546,6 +505,26 @@ useContextMenuManager();
   height: 100%;
 }
 
+.layout-tabs__item-link {
+  display: inline-flex;
+  gap: 6px;
+  align-items: center;
+  height: 100%;
+  padding: 0;
+  font: inherit;
+  color: inherit;
+  background: transparent;
+  border: 0;
+  cursor: pointer;
+}
+.layout-tabs__item-link:focus-visible,
+.layout-tabs__item-close:focus-visible {
+  outline: var(--ui-focus-ring);
+  outline-offset: 2px;
+}
+.layout-tabs__item:focus-within .layout-tabs__item-close {
+  opacity: 1;
+}
 .layout-tabs__item {
   position: relative;
   display: inline-flex;
@@ -558,7 +537,7 @@ useContextMenuManager();
   color: var(--el-text-color-regular);
   cursor: pointer;
   user-select: none;
-  background: #f8fafc;
+  background: var(--el-fill-color-light);
   border: 1px solid var(--card-border);
   border-radius: 2px;
   transition:
@@ -586,13 +565,18 @@ useContextMenuManager();
     height: 16px;
     margin-left: 1px;
     font-size: 0;
+    padding: 0;
+    border: 0;
+    color: inherit;
+    background: transparent;
+    cursor: pointer;
     border-radius: 4px;
     opacity: 0;
     transition:
       opacity 0.12s ease,
       background-color 0.12s ease;
 
-    :deep(div) {
+    > span {
       width: 12px;
       height: 12px;
     }
@@ -737,7 +721,7 @@ useContextMenuManager();
     cursor: pointer;
     background: transparent;
     border: 0;
-    border-radius: 6px;
+    border-radius: var(--ui-control-radius);
     transition:
       color 0.15s ease,
       background-color 0.15s ease;
@@ -781,9 +765,11 @@ useContextMenuManager();
     height: 14px;
   }
 }
+</style>
 
+<!-- Reka 的 Portal 跨越组件作用域，样式仅限定在本项目拥有的菜单类名下。 -->
+<style lang="scss">
 .layout-tabs-menu {
-  position: fixed;
   z-index: 3000;
   min-width: 150px;
   padding: 6px;
@@ -793,20 +779,21 @@ useContextMenuManager();
   list-style-type: none;
   background: var(--el-bg-color-overlay);
   border: 1px solid var(--el-border-color-lighter);
-  border-radius: 10px;
+  border-radius: var(--ui-popover-radius);
   box-shadow: var(--el-box-shadow);
 
-  li {
+  [role="menuitem"] {
     display: flex;
     gap: 10px;
     align-items: center;
     padding: 7px 10px;
     margin: 1px 0;
     cursor: pointer;
-    border-radius: 6px;
+    border-radius: var(--ui-control-radius);
     transition: background-color 0.15s ease;
 
-    &:hover {
+    &[data-highlighted] {
+      outline: none;
       background: var(--el-fill-color-light);
     }
   }
@@ -819,7 +806,7 @@ useContextMenuManager();
   }
 
   &__danger {
-    &:hover {
+    &[data-highlighted] {
       color: var(--el-color-danger);
       background-color: var(--el-color-danger-light-9);
 

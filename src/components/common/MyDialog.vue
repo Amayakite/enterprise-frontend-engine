@@ -105,32 +105,55 @@ import ActionButton from "@/components/business/ActionButton.vue";
 
 const props = withDefaults(
   defineProps<{
+    /** 可见状态；由宿主通过 v-model 控制，强制关闭不经过 beforeClose。 */
     modelValue: boolean;
     /** 关闭前检查；返回 false 保持可见，支持异步未保存确认。外部强制 v-model=false 不经过此守卫。 */
     beforeClose?: () => boolean | Promise<boolean>;
+    /** 对话框标题，也是默认可访问名称；title 插槽可覆盖视觉内容。 */
     title: string;
+    /** 宽度，数字单位 px；默认 720px，受 maxWidth 限制。 */
     width?: string | number;
+    /** CSS 最大宽度；默认 calc(100vw - 32px)。 */
     maxWidth?: string;
+    /** CSS 最大高度；默认 calc(100dvh - 32px)，正文超出时滚动。 */
     maxHeight?: string;
     /** 是否铺满 maxHeight；默认 false 自然高度，全屏时填满视口。 */
     fillHeight?: boolean;
+    /** 非全屏时距视口顶部的 CSS 距离；默认 16px。 */
     top?: string;
+    /** 是否传送到 body；默认 true，避免被父布局裁切。 */
     appendToBody?: boolean;
+    /** 关闭动画完成后是否销毁内容；默认 true。 */
     destroyOnClose?: boolean;
+    /** 点击遮罩是否请求关闭；默认 false，仍经过 beforeClose。 */
     closeOnClickModal?: boolean;
+    /** Esc 是否请求关闭；默认 true，仍经过 beforeClose。 */
     closeOnPressEscape?: boolean;
+    /** 是否允许桌面拖动；默认 true，窄屏和全屏下禁用。 */
     draggable?: boolean;
+    /** 受控全屏状态；默认 null，使用内部状态；布尔值需配合 update:fullscreen。 */
     fullscreen?: boolean | null;
+    /** 是否显示全屏切换按钮；默认 true。 */
     showFullscreen?: boolean;
+    /** 是否显示标题关闭按钮；默认 true。 */
     showClose?: boolean;
+    /** 是否显示默认操作区；默认 true，传入 footer 插槽时始终显示。 */
     showFooter?: boolean;
+    /** 默认操作区是否显示确认按钮；默认 true，不自动关闭或保存。 */
     showConfirm?: boolean;
+    /** 默认操作区是否显示取消按钮；默认 true。 */
     showCancel?: boolean;
+    /** 正文加载遮罩；默认 false，不自动禁止关闭。 */
     loading?: boolean;
+    /** 确认按钮加载态；默认 false，加载期间阻止重复点击。 */
     confirmLoading?: boolean;
+    /** 是否禁用确认；默认 false。 */
     confirmDisabled?: boolean;
+    /** 禁用确认的原因；默认无，非空时禁用并展示提示。 */
     confirmDisabledReason?: string;
+    /** 确认按钮文本；默认“确定”。 */
     confirmText?: string;
+    /** 取消按钮文本；默认“取消”。 */
     cancelText?: string;
   }>(),
   {
@@ -159,40 +182,58 @@ const props = withDefaults(
 const emit = defineEmits<{
   /**
    * 对话框开关状态（v-model）。
-   * @example `<MyDialog v-model="visible" title="客户详情" />`
+   * @example
+   * `<MyDialog v-model="visible" title="客户详情" />`
    */
   "update:modelValue": [value: boolean];
   /**
    * 受控全屏状态变更；未传 fullscreen 时组件也维护内部状态。
-   * @example `<MyDialog v-model:fullscreen="fullscreen" ... />`
+   * @example
+   * `<MyDialog v-model:fullscreen="fullscreen" ... />`
    */
   "update:fullscreen": [value: boolean];
   /**
    * 用户点击确认；组件不自行提交数据，宿主负责保存。
-   * @example `<MyDialog @confirm="save" />`
+   * @example
+   * `<MyDialog @confirm="save" />`
    */
   confirm: [];
   /**
-   * 用户取消或点击关闭；事件后组件将 v-model 设为 false。
-   * @example `<MyDialog @cancel="discard" />`
+   * 默认取消按钮或公开 close 方法通过守卫后触发；标题关闭和 Esc 沿用 close 事件。
+   * @example
+   * `<MyDialog @cancel="discard" />`
    */
   cancel: [];
+  /** 开始打开时触发。 */
   open: [];
+  /** 打开动画结束后触发，可用于聚焦内容。 */
   opened: [];
+  /** 开始关闭时触发；不要在此执行需确认的关闭检查。 */
   close: [];
+  /** 关闭动画完成且拖动位置复位后触发。 */
   closed: [];
 }>();
 defineSlots<{
+  /** 自定义标题，仍须传 title 作为默认名称。 */
   title?: () => unknown;
+  /** 可滚动正文内容。 */
   default?: () => unknown;
+  /** 追加标题操作，close 经过关闭守卫。 */
   actions?: (props: {
+    /** 请求关闭，仍经过 beforeClose。 */
     close: () => void;
+    /** 当前实际全屏状态。 */
     fullscreen: boolean;
+    /** 切换全屏并发出 update:fullscreen。 */
     toggleFullscreen: () => void;
   }) => unknown;
+  /** 替换默认操作区，宿主负责提交和禁用状态。 */
   footer?: (props: {
+    /** 请求关闭，仍经过 beforeClose。 */
     close: () => void;
+    /** 当前实际全屏状态。 */
     fullscreen: boolean;
+    /** 切换全屏并发出 update:fullscreen。 */
     toggleFullscreen: () => void;
   }) => unknown;
 }>();
@@ -329,7 +370,7 @@ defineExpose({
     background: var(--el-fill-color-light);
   }
   &:focus-visible {
-    outline: 2px solid var(--el-color-primary);
+    outline: var(--ui-focus-ring);
     outline-offset: 1px;
   }
 }

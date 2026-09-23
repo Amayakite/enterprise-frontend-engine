@@ -3,8 +3,8 @@ import type { ReferenceOverrides } from "../fields/reference-overrides";
 import type { BusinessPresentation } from "./presentation";
 import type { CrudLayoutOptions, CrudDetailSummary } from "./layout";
 import type { ArrayModelKey } from "./aggregate";
-import type { CrudListSlots, CrudFormSlots, CrudDetailSlots, CrudTableBinding } from "./types";
-import type { DeepReadonly, Slots, VNode, VNodeChild, UnwrapNestedRefs } from "vue";
+import type { CrudTableBinding } from "./types";
+import type { DeepReadonly, UnwrapNestedRefs } from "vue";
 import type { BusinessModuleContract, BusinessModuleConfig, List, Form, Detail } from "./module";
 import type {
   CrudNavigation,
@@ -201,11 +201,6 @@ export interface CrudDetailPageOptions<
   /** 只读详情场景。 */ view: "detail";
   /** 可选初始化钩子。 */ hooks?: CrudPageDetailHooks<T, S>;
 }
-/** 默认容器消费的公开视图端口，扩展布局仍可使用底层 bindings。 */
-export interface CrudPageShell {
-  /** 渲染当前场景；只调用一次，不自行创建第二份状态。 */ render: (slots: Slots) => VNode;
-  /** 当前操作是否忙碌，只读派生。 */ readonly busy: boolean;
-}
 /** 直接组件布局的公共环境；不触发渲染。 */
 export interface CrudViewEnvironment {
   /** 模块提示；空值时不显示提示条。 */ readonly notice: string | undefined;
@@ -220,8 +215,11 @@ export interface CrudViewEnvironment {
     | undefined;
 }
 /** 页面共同能力。 */
-export interface CrudPageBase<T extends BusinessModuleContract, S extends object>
-  extends CrudPageShell, CrudViewEnvironment {
+export interface CrudPageBase<
+  T extends BusinessModuleContract,
+  S extends object,
+> extends CrudViewEnvironment {
+  /** 当前操作是否忙碌，只读派生。 */ readonly busy: boolean;
   /** 仅编译期关联默认视图与模块类型；运行时不创建数据副本。 */
   readonly __contract?: T;
   /** 本实例响应式辅助状态，可直接修改；不复制控制器模型。 */ state: UnwrapNestedRefs<S>;
@@ -325,37 +323,3 @@ export interface CrudDetailPage<
   };
   /** 原详情控制器。 */ detail: CrudDetailController<T["Model"], T["Entity"], T["Id"]>;
 }
-
-/** 默认页面公开插槽；场景决定工具栏、字段或详情可用插槽，保留模型字段类型。 */
-export type CrudPageSlots<
-  T extends BusinessModuleContract,
-  V extends "list" | "add" | "edit" | "detail",
-> = {
-  /** 内容前扩展区；不覆盖默认工具栏，不需要自行写 CSS。 */
-  "before-content"?: () => VNodeChild;
-  /** 内容后扩展区；可放业务提示或独立组件。 */
-  "after-content"?: () => VNodeChild;
-} & (V extends "list"
-  ? CrudListSlots<T["Model"], T["Id"], T["Schema"]>
-  : V extends "detail"
-    ? {
-        /** 追加详情动作；内置编辑入口仍由模块权限及只读原因控制。 */
-        actions?: () => VNodeChild;
-        /** 详情底部扩展；接收原详情控制器。 */
-        footer?: CrudDetailSlots<T["Model"], T["Entity"], T["Id"]>["footer"];
-      } & {
-        [K in ArrayModelKey<T["Model"]> as `tab-${K}`]?: (input: {
-          /** 当前子表只读行；详情不提供编辑绑定。 */
-          rows: DeepReadonly<T["Model"][K]>;
-        }) => VNodeChild;
-      }
-    : Omit<CrudFormSlots<T["Model"], T["Entity"], T["Id"]>, `section-${string}`> & {
-        [K in ArrayModelKey<T["Model"]> as `section-${K}`]?: (input: {
-          /** 当前子表行，只读使用；回写由 binding.replace 统一处理。 */
-          rows: DeepReadonly<T["Model"][K]>;
-          /** 原表单子表端口；自定义 MyCrudChildTable 传入此值。 */
-          binding: CrudTableBinding<
-            T["Model"][K] extends readonly (infer Row extends object)[] ? Row : never
-          >;
-        }) => VNodeChild;
-      });

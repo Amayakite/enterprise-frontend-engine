@@ -104,9 +104,16 @@
       v-model="dialogState.visible"
       :title="dialogState.title"
       width="600px"
+      :before-close="() => !saving"
       @close="closeDialog"
     >
-      <el-form ref="roleFormRef" :model="formData" :rules="rules" label-width="100px">
+      <el-form
+        ref="roleFormRef"
+        :model="formData"
+        :rules="rules"
+        :disabled="saving"
+        label-width="100px"
+      >
         <el-form-item label="角色名称" prop="name">
           <el-input v-model="formData.name" placeholder="请输入角色名称" />
         </el-form-item>
@@ -160,8 +167,8 @@
       </el-form>
       <template #footer>
         <div class="dialog-footer">
-          <el-button type="primary" @click="handleSubmit">确定</el-button>
-          <el-button @click="closeDialog">取消</el-button>
+          <el-button type="primary" :loading="saving" @click="handleSubmit">确定</el-button>
+          <el-button :disabled="saving" @click="closeDialog">取消</el-button>
         </div>
       </template>
     </MyDialog>
@@ -396,20 +403,22 @@ async function handleEditClick(roleId: string): Promise<void> {
  *
  * 非自定义数据权限时丢弃部门 ID
  */
+const saving = ref(false);
 async function handleSubmit(): Promise<void> {
-  const valid = await roleFormRef.value?.validate().then(
-    () => true,
-    () => false
-  );
-  if (!valid) return;
-
-  const submitData: RoleForm = { ...formData };
-  if (submitData.dataScope !== DATA_SCOPE_CUSTOM) {
-    submitData.deptIds = undefined;
-  }
-
-  loading.value = true;
+  if (saving.value) return;
+  saving.value = true;
   try {
+    const valid = await roleFormRef.value?.validate().then(
+      () => true,
+      () => false
+    );
+    if (!valid) return;
+
+    const submitData: RoleForm = { ...formData };
+    if (submitData.dataScope !== DATA_SCOPE_CUSTOM) {
+      submitData.deptIds = undefined;
+    }
+
     const roleId = formData.id;
     if (roleId) {
       await RoleAPI.update(roleId, submitData);
@@ -419,9 +428,9 @@ async function handleSubmit(): Promise<void> {
       ElMessage.success("新增成功");
     }
     closeDialog();
-    handleResetQuery();
+    await handleResetQuery();
   } finally {
-    loading.value = false;
+    saving.value = false;
   }
 }
 

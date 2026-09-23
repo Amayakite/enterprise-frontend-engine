@@ -30,22 +30,13 @@ import type {
 } from "@/components/business/crud/crud-page";
 
 /** 共享列表装配端口，不包含自动渲染。 */
-type ListRuntime<T extends BusinessModuleContract, S extends object> = Omit<
-  CrudListPage<T, S>,
-  "render"
->;
+type ListRuntime<T extends BusinessModuleContract, S extends object> = CrudListPage<T, S>;
 /** 共享表单装配端口；子表视图按需建立，直接布局只读取 binding。 */
-type FormRuntime<T extends BusinessModuleContract, S extends object> = Omit<
-  CrudFormPage<T, S>,
-  "render"
-> & {
+type FormRuntime<T extends BusinessModuleContract, S extends object> = CrudFormPage<T, S> & {
   /** 兼容渲染器按需读取同一组子表端口。 */ childViews: () => Map<string, CrudChildRenderer>;
 };
 /** 共享详情装配端口，不创建自动渲染组件。 */
-type DetailRuntime<T extends BusinessModuleContract, S extends object> = Omit<
-  CrudDetailPage<T, S>,
-  "render"
-> & {
+type DetailRuntime<T extends BusinessModuleContract, S extends object> = CrudDetailPage<T, S> & {
   /** 仅自动布局需要子表渲染器。 */ childViews: () => Map<string, CrudChildRenderer>;
 };
 
