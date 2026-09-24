@@ -22,6 +22,7 @@
 </template>
 
 <script setup lang="ts">
+import { feedback } from "@/utils/feedback";
 import type { MeetingBudgetItem } from "@/api/task/meeting-application/types";
 import { defineFields } from "@/components/business/fields/normalize";
 import MyTable from "@/components/table/MyTable.vue";
@@ -85,7 +86,7 @@ function patchRow(event: { rowKey: string; changes: Partial<MeetingBudgetItem> }
 async function commitAndValidate() {
   if (!(await tableRef.value?.commitEdit())) return false;
   if (!model.value.length) {
-    ElMessage.warning("请至少填写一条费用预算");
+    feedback.warning("请至少填写一条费用预算");
     return false;
   }
   const result = await tableRef.value?.validate(model.value);

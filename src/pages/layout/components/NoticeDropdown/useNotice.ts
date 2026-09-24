@@ -1,3 +1,4 @@
+import { feedback } from "@/utils/feedback";
 import { computed, onMounted, ref } from "vue";
 import type { NoticeDetail, NoticeItem, NoticeQueryParams } from "@/api/system/notice";
 import NoticeAPI from "@/api/system/notice";
@@ -111,7 +112,7 @@ export function useNotice() {
     } else {
       await fetchList();
     }
-    ElMessage.success("已全部标记为已读");
+    feedback.success("已全部标记为已读");
   }
 
   /** 跳转到通知列表页 */

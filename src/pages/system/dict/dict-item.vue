@@ -162,7 +162,8 @@
 </template>
 
 <script setup lang="ts">
-import { ElMessage, ElMessageBox, type FormInstance, type FormRules } from "element-plus";
+import { feedback } from "@/utils/feedback";
+import { ElMessageBox, type FormInstance, type FormRules } from "element-plus";
 import { FullScreen, QuestionFilled, Refresh } from "@element-plus/icons-vue";
 
 import DictAPI from "@/api/system/dict";
@@ -298,10 +299,10 @@ async function handleSubmit(): Promise<void> {
 
     if (id) {
       await DictAPI.updateDictItem(dictCode.value, id, formData);
-      ElMessage.success("修改成功");
+      feedback.success("修改成功");
     } else {
       await DictAPI.createDictItem(dictCode.value, formData);
-      ElMessage.success("新增成功");
+      feedback.success("新增成功");
     }
     closeDialog();
     await handleQuery();
@@ -318,7 +319,7 @@ async function handleSubmit(): Promise<void> {
 async function handleDelete(id?: string): Promise<void> {
   const itemIds = id ?? selectedIds.value.join(",");
   if (!itemIds) {
-    ElMessage.warning("请勾选删除项");
+    feedback.warning("请勾选删除项");
     return;
   }
 
@@ -329,14 +330,14 @@ async function handleDelete(id?: string): Promise<void> {
       type: "warning",
     });
   } catch {
-    ElMessage.info("已取消删除");
+    feedback.info("已取消删除");
     return;
   }
 
   loading.value = true;
   try {
     await DictAPI.deleteDictItems(dictCode.value, itemIds);
-    ElMessage.success("删除成功");
+    feedback.success("删除成功");
     handleResetQuery();
   } finally {
     loading.value = false;

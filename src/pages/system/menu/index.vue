@@ -412,8 +412,9 @@
 </template>
 
 <script setup lang="ts">
+import { feedback } from "@/utils/feedback";
 import { useFullscreen } from "@vueuse/core";
-import { ElMessage, ElMessageBox, type FormInstance, type FormRules } from "element-plus";
+import { ElMessageBox, type FormInstance, type FormRules } from "element-plus";
 import {
   CirclePlusFilled,
   DeleteFilled,
@@ -954,7 +955,7 @@ async function handleSubmit(): Promise<void> {
 
   const menuId = formData.id;
   if (menuId && formData.parentId === menuId) {
-    ElMessage.error("父级菜单不能为当前菜单");
+    feedback.error("父级菜单不能为当前菜单");
     return;
   }
 
@@ -963,10 +964,10 @@ async function handleSubmit(): Promise<void> {
   try {
     if (menuId) {
       await MenuAPI.update(menuId, payload);
-      ElMessage.success("修改成功");
+      feedback.success("修改成功");
     } else {
       await MenuAPI.create(payload);
-      ElMessage.success("新增成功");
+      feedback.success("新增成功");
     }
     closeDialog();
     fetchData();
@@ -982,7 +983,7 @@ async function handleSubmit(): Promise<void> {
  */
 async function handleDelete(menuId: string): Promise<void> {
   if (!menuId) {
-    ElMessage.warning("请勾选删除项");
+    feedback.warning("请勾选删除项");
     return;
   }
 
@@ -993,14 +994,14 @@ async function handleDelete(menuId: string): Promise<void> {
       type: "warning",
     });
   } catch {
-    ElMessage.info("已取消删除");
+    feedback.info("已取消删除");
     return;
   }
 
   loading.value = true;
   try {
     await MenuAPI.deleteById(menuId);
-    ElMessage.success("删除成功");
+    feedback.success("删除成功");
     fetchData();
   } finally {
     loading.value = false;

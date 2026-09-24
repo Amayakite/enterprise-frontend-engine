@@ -1,5 +1,6 @@
 <template>
   <div class="form-lab">
+    <FilePreviewLab />
     <el-alert
       title="M3 场景 B · 字段、表单、查询与详情"
       description="参照沿用实验 Mock；保存仅展示 DTO，不代表后端持久化。"
@@ -87,6 +88,7 @@
 </template>
 
 <script setup lang="ts">
+import FilePreviewLab from "./FilePreviewLab.vue";
 import MyForm from "@/components/business/MyForm/index.vue";
 import MySearch from "@/components/business/MySearch.vue";
 import MyDesc from "@/components/business/MyDesc.vue";

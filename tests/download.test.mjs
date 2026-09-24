@@ -38,9 +38,7 @@ function harness({ failClick = false } = {}) {
     compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 },
   }).outputText;
   const exports = {};
-  new Function("exports", "window", "document", "ElMessage", source)(exports, window, document, {
-    error: (value) => messages.push(value),
-  });
+  new Function("exports", "window", "document", source)(exports, window, document);
   return { ...exports, links, created, revoked, messages };
 }
 
@@ -72,5 +70,5 @@ test("非法百分号文件名可回退，点击失败仍释放资源并保留�
   assert.equal(ctx.links[0].download, "report.pdf");
   assert.equal(ctx.links[0].removed, true);
   assert.equal(ctx.revoked.length, 1);
-  assert.equal(ctx.messages.length, 1);
+  assert.equal(ctx.messages.length, 0);
 });

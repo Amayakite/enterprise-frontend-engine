@@ -10,6 +10,7 @@ export const saleRows = defineMockData<SaleRecord[]>(
       name: "华东销售组织",
       active: true,
       remark: "负责华东区域客户",
+      attachments: [],
       organizationId: "org-a",
       version: 0,
     },
@@ -19,6 +20,7 @@ export const saleRows = defineMockData<SaleRecord[]>(
       name: "华南销售组织",
       active: true,
       remark: "负责华南区域客户",
+      attachments: [],
       organizationId: "org-a",
       version: 0,
     },
@@ -28,6 +30,7 @@ export const saleRows = defineMockData<SaleRecord[]>(
       name: "历史销售组织",
       active: false,
       remark: "历史记录可查看，不允许新选择",
+      attachments: [],
       organizationId: "org-a",
       version: 0,
     },
@@ -46,10 +49,25 @@ export function salePayload(value: SalePayload): SalePayload {
     value.remark.length > 300
   )
     throw new Error("状态或备注格式不正确");
+  const attachments = value.attachments ?? [];
+  if (
+    !Array.isArray(attachments) ||
+    attachments.length > 10 ||
+    attachments.some(
+      (file) =>
+        !file ||
+        typeof file.name !== "string" ||
+        !file.name.trim() ||
+        typeof file.url !== "string" ||
+        !file.url.trim()
+    )
+  )
+    throw new Error("附件格式不正确或超过10个");
   return {
     code: value.code.trim(),
     name: value.name.trim(),
     active: value.active,
     remark: value.remark.trim(),
+    attachments: attachments.map(({ name, url }) => ({ name, url })),
   };
 }

@@ -84,6 +84,7 @@
 </template>
 
 <script setup lang="ts">
+import { feedback } from "@/utils/feedback";
 import { ElMessageBox } from "element-plus";
 import ServiceApplicationAPI from "@/api/service/application";
 import type {
@@ -152,7 +153,7 @@ async function confirmed(message: string, title: string) {
 async function removeRows(ids: string[]) {
   if (!(await confirmed(`确定删除选中的 ${ids.length} 张服务申请吗？`, "删除确认"))) return;
   await ServiceApplicationAPI.remove(ids);
-  ElMessage.success("删除成功");
+  feedback.success("删除成功");
   refreshAfterMutation();
 }
 async function runBatch(action: "approve" | "revoke") {
@@ -160,7 +161,7 @@ async function runBatch(action: "approve" | "revoke") {
   const ids = [...selectedIds.value];
   if (!(await confirmed(`确定${text}选中的 ${ids.length} 张申请吗？`, `${text}确认`))) return;
   await ServiceApplicationAPI[action](ids);
-  ElMessage.success(`${text}成功`);
+  feedback.success(`${text}成功`);
   refreshAfterMutation();
 }
 function refreshAfterMutation() {

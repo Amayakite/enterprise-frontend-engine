@@ -22,6 +22,7 @@
 </template>
 
 <script setup lang="ts">
+import { feedback } from "@/utils/feedback";
 import { ComponentSize } from "@/config/ui";
 import { useAppStore } from "@/stores/app";
 
@@ -36,7 +37,7 @@ const sizeOptions = computed(() => {
 const appStore = useAppStore();
 function handleSizeChange(size: string) {
   appStore.changeSize(size);
-  ElMessage.success("切换布局大小成功！");
+  feedback.success("切换布局大小成功！");
 }
 </script>
 

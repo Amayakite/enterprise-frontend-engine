@@ -27,7 +27,7 @@ export interface FileUploadProps extends UploadOptions {
   limit?: number;
   /** 上传按钮文案；默认“上传文件”。 */
   uploadBtnText?: string;
-  /** 外层容器样式；默认宽度 300px，窄屏最多占满容器。 */
+  /** 外层容器样式；默认占满可用宽度、最大 640px；可通过 style 覆盖宽度。 */
   style?: CSSProperties;
 }
 

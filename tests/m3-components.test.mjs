@@ -1,4 +1,4 @@
-import { test } from "node:test";
+import { test, afterEach } from "node:test";
 import assert from "node:assert/strict";
 import { registerHooks } from "node:module";
 import { readFileSync } from "node:fs";
@@ -41,7 +41,8 @@ registerHooks({
           "export default { delete: async () => {}, upload: (...args) => globalThis.__m3Upload ? globalThis.__m3Upload(...args) : Promise.resolve({ name: '图片', url: '/new.png' }) };",
         shortCircuit: true,
       };
-    if (url.endsWith("MyReference/index.vue"))
+    // 本组验证上传回写与取消；预览弹窗的 DOM/解析器由浏览器交互验证。
+    if (url.endsWith("MyReference/index.vue") || url.endsWith("FilePreviewDialog.vue"))
       return { format: "module", source: "export default {};", shortCircuit: true };
     if (url.endsWith(".vue")) {
       const filename = fileURLToPath(url);
@@ -56,7 +57,8 @@ registerHooks({
     return next(url, context);
   },
 });
-globalThis.ElMessage = { success() {}, error() {}, warning() {} };
+const { feedbackNotices, clearFeedback } = await import("../src/utils/feedback.ts");
+afterEach(clearFeedback);
 const { default: MultiImageUpload } =
   await import("../src/components/common/Upload/MultiImageUpload.vue");
 const { default: FileUpload } = await import("../src/components/common/Upload/FileUpload.vue");
@@ -292,6 +294,10 @@ test("附件逐个成功回写，最后一项失败仍保留成功文件及其�
   await flush();
   assert.equal(ctx.events.length, 1);
   assert.deepEqual(original, [{ name: "原附件", url: "/old.pdf" }]);
+  assert.deepEqual(
+    feedbackNotices.value.map(({ tone, message }) => ({ tone, message })),
+    [{ tone: "success", message: "上传成功" }]
+  );
   ctx.close();
 });
 
@@ -310,11 +316,9 @@ test("三类上传在模型替换或卸载后取消请求，迟到成功不回�
       };
       const ctx = mount(component, { modelValue: initial });
       await flush();
-      const promise = ctx
-        .control()
-        .httpRequest({
-          file: Object.assign(new File(["x"], "a.png", { type: "image/png" }), { uid: 901 }),
-        });
+      const promise = ctx.control().httpRequest({
+        file: Object.assign(new File(["x"], "a.png", { type: "image/png" }), { uid: 901 }),
+      });
       if (unmount) ctx.close();
       else {
         ctx.props.modelValue = replacement;

@@ -301,6 +301,7 @@
 </template>
 
 <script lang="ts" setup>
+import { feedback } from "@/utils/feedback";
 import UserAPI from "@/api/system/user";
 import type {
   UserProfileDetail,
@@ -763,7 +764,7 @@ async function handleUnbindMobile() {
     });
     const value = getPromptValue(result);
     await UserAPI.unbindMobile({ password: value });
-    ElMessage.success("手机号解绑成功");
+    feedback.success("手机号解绑成功");
     await loadUserProfile();
   } catch {
     // ignore
@@ -783,7 +784,7 @@ async function handleUnbindEmail() {
     });
     const value = getPromptValue(result);
     await UserAPI.unbindEmail({ password: value });
-    ElMessage.success("邮箱解绑成功");
+    feedback.success("邮箱解绑成功");
     await loadUserProfile();
   } catch {
     // ignore
@@ -792,16 +793,16 @@ async function handleUnbindEmail() {
 
 function handleSendMobileCode() {
   if (!mobileUpdateForm.mobile) {
-    ElMessage.error("请输入手机号");
+    feedback.error("请输入手机号");
     return;
   }
   const reg = /^1[3-9]\d{9}$/;
   if (!reg.test(mobileUpdateForm.mobile)) {
-    ElMessage.error("手机号格式不正确");
+    feedback.error("手机号格式不正确");
     return;
   }
   UserAPI.sendMobileCode(mobileUpdateForm.mobile).then(() => {
-    ElMessage.success("验证码发送成功");
+    feedback.success("验证码发送成功");
     mobileCountdown.value = 60;
     mobileTimer.value = setInterval(() => {
       if (mobileCountdown.value > 0) {
@@ -815,17 +816,17 @@ function handleSendMobileCode() {
 
 function handleSendEmailCode() {
   if (!emailUpdateForm.email) {
-    ElMessage.error("请输入邮箱");
+    feedback.error("请输入邮箱");
     return;
   }
   const reg = /\w[-\w.+]*@([A-Za-z0-9][-A-Za-z0-9]+\.)+[A-Za-z]{2,14}/;
   if (!reg.test(emailUpdateForm.email)) {
-    ElMessage.error("邮箱格式不正确");
+    feedback.error("邮箱格式不正确");
     return;
   }
 
   UserAPI.sendEmailCode(emailUpdateForm.email).then(() => {
-    ElMessage.success("验证码发送成功");
+    feedback.success("验证码发送成功");
     emailCountdown.value = 60;
     emailTimer.value = setInterval(() => {
       if (emailCountdown.value > 0) {
@@ -844,7 +845,7 @@ const handleSubmit = async () => {
       if (!valid) return;
 
       await UserAPI.updateProfile(userProfileForm);
-      ElMessage.success("账号资料修改成功");
+      feedback.success("账号资料修改成功");
       dialogState.visible = false;
       if (userProfileForm.nickname) {
         userStore.userInfo.nickname = userProfileForm.nickname;
@@ -862,7 +863,7 @@ const handleSubmit = async () => {
       if (!valid) return;
 
       await UserAPI.bindOrChangeMobile(mobileUpdateForm);
-      ElMessage.success(userProfile.value.mobile ? "手机号更换成功" : "手机号绑定成功");
+      feedback.success(userProfile.value.mobile ? "手机号更换成功" : "手机号绑定成功");
       dialogState.visible = false;
       await loadUserProfile();
     } else if (dialogState.type === DialogType.EMAIL) {
@@ -870,7 +871,7 @@ const handleSubmit = async () => {
       if (!valid) return;
 
       await UserAPI.bindOrChangeEmail(emailUpdateForm);
-      ElMessage.success(userProfile.value.email ? "邮箱更换成功" : "邮箱绑定成功");
+      feedback.success(userProfile.value.email ? "邮箱更换成功" : "邮箱绑定成功");
       dialogState.visible = false;
       await loadUserProfile();
     }
@@ -908,7 +909,7 @@ const handleFileChange = async (event: Event) => {
     });
     userProfile.value.avatar = data.url;
     userStore.userInfo.avatar = data.url;
-    ElMessage.success("头像更新成功");
+    feedback.success("头像更新成功");
   }
   target.value = "";
 };

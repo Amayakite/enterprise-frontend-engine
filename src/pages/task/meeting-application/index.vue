@@ -89,6 +89,7 @@
 </template>
 
 <script setup lang="ts">
+import { feedback } from "@/utils/feedback";
 import { ElMessageBox } from "element-plus";
 import MeetingApplicationAPI from "@/api/task/meeting-application";
 import type {
@@ -100,18 +101,9 @@ import MyTable from "@/components/table/MyTable.vue";
 import type { TableSort } from "@/components/table/types";
 import { usePageTable } from "@/composables";
 import { viewInvalidationRevision } from "@/composables/useViewInvalidation";
-import {
-  createInitialMeetingApplicationSearch,
-  toMeetingApplicationQuery,
-} from "./adapters";
-import {
-  meetingApplicationListFields,
-  meetingApplicationSearchFields,
-} from "./fields";
-import type {
-  MeetingApplicationPageContext,
-  MeetingApplicationSearchModel,
-} from "./types";
+import { createInitialMeetingApplicationSearch, toMeetingApplicationQuery } from "./adapters";
+import { meetingApplicationListFields, meetingApplicationSearchFields } from "./fields";
+import type { MeetingApplicationPageContext, MeetingApplicationSearchModel } from "./types";
 
 defineOptions({ name: "MeetingApplication" });
 
@@ -170,7 +162,7 @@ async function confirmed(message: string, title: string) {
 async function removeRow(id: string) {
   if (!(await confirmed("确定删除这张会议申请吗？", "删除确认"))) return;
   await MeetingApplicationAPI.remove([id]);
-  ElMessage.success("删除成功");
+  feedback.success("删除成功");
   selectedIds.value = selectedIds.value.filter((item) => item !== id);
   await fetchData();
 }
@@ -186,7 +178,7 @@ async function runBatch(action: BatchAction) {
   const text = actionText[action];
   if (!(await confirmed(`确定${text}选中的 ${ids.length} 张会议申请吗？`, `${text}确认`))) return;
   await MeetingApplicationAPI[action](ids);
-  ElMessage.success(`${text}成功`);
+  feedback.success(`${text}成功`);
   selectedIds.value = [];
   await fetchData();
 }

@@ -10,9 +10,7 @@ declare global {
   const ElDatePicker: typeof import('element-plus/es').ElDatePicker
   const ElInput: typeof import('element-plus/es').ElInput
   const ElInputNumber: typeof import('element-plus/es').ElInputNumber
-  const ElMessage: typeof import('element-plus').ElMessage
   const ElMessageBox: typeof import('element-plus').ElMessageBox
-  const ElNotification: typeof import('element-plus').ElNotification
   const ElOption: typeof import('element-plus/es').ElOption
   const ElSelect: typeof import('element-plus/es').ElSelect
   const ElSwitch: typeof import('element-plus/es').ElSwitch
@@ -335,9 +333,7 @@ declare module 'vue' {
     readonly ElDatePicker: UnwrapRef<typeof import('element-plus/es')['ElDatePicker']>
     readonly ElInput: UnwrapRef<typeof import('element-plus/es')['ElInput']>
     readonly ElInputNumber: UnwrapRef<typeof import('element-plus/es')['ElInputNumber']>
-    readonly ElMessage: UnwrapRef<typeof import('element-plus')['ElMessage']>
     readonly ElMessageBox: UnwrapRef<typeof import('element-plus')['ElMessageBox']>
-    readonly ElNotification: UnwrapRef<typeof import('element-plus')['ElNotification']>
     readonly ElOption: UnwrapRef<typeof import('element-plus/es')['ElOption']>
     readonly ElSelect: UnwrapRef<typeof import('element-plus/es')['ElSelect']>
     readonly ElSwitch: UnwrapRef<typeof import('element-plus/es')['ElSwitch']>

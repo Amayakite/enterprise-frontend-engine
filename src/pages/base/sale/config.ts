@@ -35,15 +35,17 @@ export const saleModule = defineBusinessModule<SaleContract>()({
       name: "",
       active: true,
       remark: "",
+      attachments: [],
       version: 0,
     }),
-    fromRecord: (row) => row,
+    fromRecord: (row) => ({ ...row, attachments: row.attachments ?? [] }),
     getKey: (row) => row.id,
     toPayload: (model) => ({
       code: model.code.trim(),
       name: model.name.trim(),
       active: model.active,
       remark: model.remark.trim(),
+      attachments: model.attachments.map(({ name, url }) => ({ name, url })),
     }),
     updatePayload: (payload, input) => ({ ...payload, version: input.baseline.version }),
     resolveSaved: async (row) => row,
@@ -95,6 +97,13 @@ export const saleModule = defineBusinessModule<SaleContract>()({
       form: { span: 2 },
       scenes: { detail: { span: 2 } },
     },
+    {
+      key: "attachments",
+      label: "组织附件",
+      type: "files",
+      form: { span: 2 },
+      scenes: { detail: { span: 2 } },
+    },
   ],
   /** 自动派生普通/高级/关键词查询，不复制 UI schema。 */
   query: { source: "fields" },
@@ -102,7 +111,7 @@ export const saleModule = defineBusinessModule<SaleContract>()({
   children: {},
   /** 仅保留固定范围、排序、权限与草稿策略。 */
   views: {
-    /** 摘要复用详情字段，正文只保留备注，不重复名称、编码和状态。 */
+    /** 摘要复用详情字段，正文展示备注和组织附件。 */
     detail: {
       summary: { titleField: "name", descriptionFields: ["code"], statusFields: ["active"] },
     },
@@ -122,7 +131,7 @@ export const saleModule = defineBusinessModule<SaleContract>()({
       classifySaveError: classifyRequestSaveError,
       draft: {
         version: 1,
-        fields: ["code", "name", "active", "remark"],
+        fields: ["code", "name", "active", "remark", "attachments"],
         getEntityVersion: (row) => row.version,
       },
     },

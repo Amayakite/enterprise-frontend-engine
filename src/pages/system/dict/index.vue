@@ -129,8 +129,9 @@
 </template>
 
 <script setup lang="ts">
+import { feedback } from "@/utils/feedback";
 import { useFullscreen } from "@vueuse/core";
-import { ElMessage, ElMessageBox, type FormInstance, type FormRules } from "element-plus";
+import { ElMessageBox, type FormInstance, type FormRules } from "element-plus";
 import { Refresh } from "@element-plus/icons-vue";
 
 import DictAPI from "@/api/system/dict";
@@ -243,10 +244,10 @@ async function handleSubmit(): Promise<void> {
     const id = formData.id;
     if (id) {
       await DictAPI.update(id, formData);
-      ElMessage.success("修改成功");
+      feedback.success("修改成功");
     } else {
       await DictAPI.create(formData);
-      ElMessage.success("新增成功");
+      feedback.success("新增成功");
     }
     closeDialog();
     handleQuery();
@@ -263,7 +264,7 @@ async function handleSubmit(): Promise<void> {
 async function handleDelete(id?: string): Promise<void> {
   const dictIds = id ?? selectedIds.value.join(",");
   if (!dictIds) {
-    ElMessage.warning("请勾选删除项");
+    feedback.warning("请勾选删除项");
     return;
   }
 
@@ -274,14 +275,14 @@ async function handleDelete(id?: string): Promise<void> {
       type: "warning",
     });
   } catch {
-    ElMessage.info("已取消删除");
+    feedback.info("已取消删除");
     return;
   }
 
   loading.value = true;
   try {
     await DictAPI.deleteByIds(dictIds);
-    ElMessage.success("删除成功");
+    feedback.success("删除成功");
     handleResetQuery();
   } finally {
     loading.value = false;
@@ -312,13 +313,13 @@ function openDictData(row: unknown): void {
       query: { dictCode: row.dictCode, title: `【${row.name}】字典数据` },
     });
     if (route.matched.length === 0) {
-      ElMessage.error("路由未注册，请刷新页面后重试");
+      feedback.error("路由未注册，请刷新页面后重试");
       return;
     }
     router.push(route);
   } catch (error) {
     console.error("路由跳转失败:", error);
-    ElMessage.error("页面跳转失败，请刷新页面后重试");
+    feedback.error("页面跳转失败，请刷新页面后重试");
   }
 }
 

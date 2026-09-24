@@ -8,6 +8,7 @@ test("公共上传配置、FileAPI 和请求入口在实际调用处提供 TS �
     "src/components/common/Upload/useUpload.ts",
     "src/api/file/index.ts",
     "src/pages/layout/components/CommandPalette/useCommandPalette.ts",
+    "src/components/common/FilePreview/types.ts",
   ].map((file) => path.resolve(file));
   const json = ts.readConfigFile("tsconfig.json", ts.sys.readFile);
   const config = ts.parseJsonConfigFileContent(json.config, ts.sys, process.cwd());
@@ -30,6 +31,8 @@ test("公共上传配置、FileAPI 和请求入口在实际调用处提供 TS �
       [files[1], "request<unknown", 0],
       [files[2], "collectSearchItems(permission", 0],
       [files[2], "createMenuSearch(items", 0],
+      [files[1], "FileAPI.read(url)", "FileAPI.".length],
+      [files[3], "name: string", 0],
     ]) {
       const source = ts.sys.readFile(file);
       const position = source.indexOf(needle);

@@ -29,6 +29,7 @@
 </template>
 
 <script setup lang="ts">
+import { feedback } from "@/utils/feedback";
 import type { AttendeeCandidate, OrganizationScope } from "@/api/master-data/types";
 import type { MeetingAttendeeItem } from "@/api/task/meeting-application/types";
 import MyReference from "@/components/business/MyReference/index.vue";
@@ -105,17 +106,17 @@ function removeSelected() {
 }
 async function commitAndValidate() {
   if (!model.value.length) {
-    ElMessage.warning("请至少选择一名参会人员");
+    feedback.warning("请至少选择一名参会人员");
     return false;
   }
   const keys = model.value.map((row) => row.candidateId ?? `${row.name}:${row.mobile}`);
   if (new Set(keys).size !== keys.length) {
-    ElMessage.warning("参会人员不能重复");
+    feedback.warning("参会人员不能重复");
     return false;
   }
   const availability = await referenceRef.value?.validateSelection();
   if (!availability?.allowed) {
-    ElMessage.warning(availability?.reason ?? "参会人员已失效，请重新选择");
+    feedback.warning(availability?.reason ?? "参会人员已失效，请重新选择");
     return false;
   }
   return true;

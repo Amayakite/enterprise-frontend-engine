@@ -8,7 +8,7 @@
     ]"
   >
     <div v-if="$slots.toolbar" class="crud-layout__toolbar"><slot name="toolbar" /></div>
-    <div class="crud-layout__body">
+    <div class="crud-layout__body" tabindex="0" role="region" aria-label="可滚动正文">
       <div class="crud-layout__main"><slot /></div>
       <aside v-if="$slots.aside" class="crud-layout__aside"><slot name="aside" /></aside>
     </div>
@@ -58,9 +58,29 @@ defineSlots<{
   flex: 1;
   min-height: 0;
   overflow: auto;
+  /* 为滚动条保留位置；内容增多时不挤动表单，明暗主题下都能发现滚动入口。 */
+  scrollbar-gutter: stable;
+  scrollbar-width: auto;
+  scrollbar-color: var(--el-text-color-placeholder) var(--el-fill-color-light);
   overscroll-behavior-y: contain;
   display: flex;
   gap: 16px;
+}
+.crud-layout__body::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+.crud-layout__body::-webkit-scrollbar-thumb {
+  background: var(--el-text-color-placeholder);
+  border: 2px solid var(--el-fill-color-light);
+  border-radius: 6px;
+}
+.crud-layout__body::-webkit-scrollbar-track {
+  background: var(--el-fill-color-light);
+}
+.crud-layout__body:focus-visible {
+  outline: 2px solid var(--el-color-primary);
+  outline-offset: 2px;
 }
 .crud-layout__main {
   flex: 1;
@@ -71,6 +91,11 @@ defineSlots<{
 }
 .crud-layout__aside {
   flex: 0 0 260px;
+}
+/* 表单按实际内容撑开主列，由正文统一滚动；避免长附件列表溢出被压缩的 flex 主列。 */
+.crud-layout--simple .crud-layout__main,
+.crud-layout--structured .crud-layout__main {
+  min-height: min-content;
 }
 .crud-layout__footer {
   display: flex;

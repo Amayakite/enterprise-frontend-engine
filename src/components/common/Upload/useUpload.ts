@@ -1,3 +1,4 @@
+import { feedback } from "@/utils/feedback";
 import { onBeforeUnmount } from "vue";
 import { CanceledError } from "axios";
 import type { UploadRawFile, UploadRequestOptions } from "element-plus";
@@ -66,7 +67,7 @@ export function useUpload(
   /** 按配置检查大小和文件类型，失败时提示并阻止请求。 */
   function beforeUpload(file: UploadRawFile) {
     const error = validateUpload(file, options());
-    if (error) ElMessage.warning(error);
+    if (error) feedback.warning(error);
     return error === null;
   }
   /** 为单个文件建立可取消请求，回传上传进度和成功文件信息；过期请求不继续更新。 */

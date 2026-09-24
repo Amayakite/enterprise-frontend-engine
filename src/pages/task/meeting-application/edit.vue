@@ -72,6 +72,7 @@
 </template>
 
 <script setup lang="ts">
+import { feedback } from "@/utils/feedback";
 import { ElMessageBox } from "element-plus";
 import MeetingApplicationAPI from "@/api/task/meeting-application";
 import MyForm from "@/components/business/MyForm/index.vue";
@@ -140,7 +141,7 @@ watch(
         ? toMeetingApplicationForm(await MeetingApplicationAPI.getDetail(value))
         : createInitialMeetingApplicationForm();
       if (value && next.status !== "draft" && next.status !== "rejected") {
-        ElMessage.warning("当前状态不能编辑");
+        feedback.warning("当前状态不能编辑");
         allowLeave.value = true;
         await router.replace(`/task/meeting-application/detail/${value}`);
         return;
@@ -174,11 +175,11 @@ async function save() {
     if (
       form.value.budgets.some((item) => toDecimal(item.estimatedAmount || 0).lessThanOrEqualTo(0))
     ) {
-      ElMessage.warning("费用预算金额必须大于 0");
+      feedback.warning("费用预算金额必须大于 0");
       return;
     }
     if (toDecimal(form.value.amount || 0).lessThan(toDecimal(budgetTotal.value))) {
-      ElMessage.warning("申请金额不能小于费用预算合计");
+      feedback.warning("申请金额不能小于费用预算合计");
       formRef.value?.focusField("amount");
       return;
     }
@@ -186,7 +187,7 @@ async function save() {
       form.value.controlLocation &&
       (!form.value.longitude.trim() || !form.value.latitude.trim())
     ) {
-      ElMessage.warning("请填写签到经纬度");
+      feedback.warning("请填写签到经纬度");
       formRef.value?.focusField("longitude");
       return;
     }
@@ -195,7 +196,7 @@ async function save() {
     const result = id.value
       ? await MeetingApplicationAPI.update(id.value, { ...payload, version: form.value.version })
       : await MeetingApplicationAPI.create(payload);
-    ElMessage.success("会议申请保存成功");
+    feedback.success("会议申请保存成功");
     invalidateView("meeting-application");
     allowLeave.value = true;
     await router.replace(`/task/meeting-application/detail/${result.id}`);
@@ -245,8 +246,7 @@ onBeforeUnmount(() => {
   window.removeEventListener("beforeunload", beforeUnload);
 });
 onBeforeRouteLeave(async () => {
-  if (viewKeepAlive && tagsViewStore.cachedViews.includes(viewFullPath))
-    return true;
+  if (viewKeepAlive && tagsViewStore.cachedViews.includes(viewFullPath)) return true;
   return canLeavePage();
 });
 </script>

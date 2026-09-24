@@ -679,9 +679,21 @@ views: {
 提供；不要把“重试写入”的回调放进全局提示。请求采用 `errorPresentation: "local"` 时，
 调用者必须接住并显示错误；未迁移接口保留全局兜底，会话失效仍由认证入口处理。
 
-当前标准 CRUD、Customer、Sale、费用保存及请求/认证入口已接入；历史系统页面、上传等
-直接调用 Element Plus 的独立提示暂不批量替换，后续按模块迁移到同一入口，避免一次改动
-所有业务的确认和异常处理语义。
+#### 强制要求
+
+- 所有页面、组件、composable 和工具的轻提示必须显式导入 `@/utils/feedback`，调用
+  `feedback.success/info/warning/error`；需要同次操作替换或撤销提示时使用该模块的
+  `notifyFeedback/dismissFeedback`。不得绕过此入口另建 Toast/Notification 容器。
+- 禁止直接调用、导入、别名导入或自动导入 `ElMessage/ElNotification`，也禁止通过命名空间、
+  `$message/$notify` 或 Element Plus 子路径规避。Vite 不提供这两个 API 的自动导入。
+- 当前页持续状态与可恢复错误使用 `MyFeedback`；禁止用临时成功提示代替尚未完成的操作。
+- 同一次失败只由一个层级提示：请求层已处理的全局错误，组件不得重复提示；
+  `errorPresentation: "local"` 和下载工具抛出的本地错误必须由调用方接住并反馈。
+  主动取消、卸载后的迟到结果不弹错误，上传进度达到 100% 不等于上传成功。
+- `ElMessageBox.confirm/prompt` 用于用户确认和输入，保留其返回值及取消语义，
+  不得机械替换成轻提示；不能借此为普通操作新增确认步骤。
+- 修改提示相关代码后必须运行 `node --test tests/feedback-entry.test.mjs`，并验证实际操作
+  只出现一条顶部居中的统一提示。检查覆盖全量手写源码，历史页面同样适用。
 
 ### 新增、编辑、详情的统一展示与跨模块打开
 

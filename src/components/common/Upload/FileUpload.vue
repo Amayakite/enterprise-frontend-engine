@@ -11,44 +11,45 @@
       :on-exceed="handleExceed"
       :accept="props.accept"
       :limit="props.limit"
+      :show-file-list="false"
       multiple
     >
       <el-button type="primary" :disabled="fileList.length >= props.limit">
         {{ props.uploadBtnText }}
       </el-button>
-      <template #file="{ file }">
-        <div class="file-upload__item">
-          <template v-if="file.status === 'success'">
-            <el-button link class="file-upload__name" @click="handleDownload(file)">
-              <el-icon><Document /></el-icon>
-              <span>{{ file.name }}</span>
-            </el-button>
-            <el-button
-              link
-              type="danger"
-              :aria-label="`删除文件 ${file.name}`"
-              :loading="file.url ? deleting.has(file.url) : false"
-              @click="handleRemove(file)"
-            >
-              删除
-            </el-button>
-          </template>
-          <template v-else>
-            <span class="file-upload__name">{{ file.name }}</span>
-            <el-progress class="file-upload__progress" :percentage="file.percentage ?? 0" />
-          </template>
+      <template #tip>
+        <div class="file-upload__hint">
+          最多 {{ props.limit }} 个文件，单个不超过 {{ props.maxFileSize }} MB · 点击文件名预览
         </div>
       </template>
     </el-upload>
+    <ul v-if="fileList.length" class="file-upload__list" aria-label="已选附件">
+      <li v-for="file in fileList" :key="file.uid">
+        <FileAttachment
+          :name="file.name"
+          :pending="file.status !== 'success'"
+          :progress="file.percentage ?? 0"
+          removable
+          :removing="file.url ? deleting.has(file.url) : false"
+          @preview="handlePreview(file)"
+          @download="handleDownload(file)"
+          @remove="handleRemove(file)"
+        />
+      </li>
+    </ul>
+    <FilePreviewDialog v-model="previewVisible" :files="modelValue" :initial-index="previewIndex" />
   </div>
 </template>
 <script setup lang="ts">
+import { feedback } from "@/utils/feedback";
+import FileAttachment from "@/components/common/FilePreview/FileAttachment.vue";
 import { genFileId } from "element-plus";
 import type { UploadFile, UploadInstance, UploadUserFile } from "element-plus";
 import FileAPI from "@/api/file";
 import type { FileInfo } from "@/api/file";
 import type { FileUploadProps } from "./types";
 import { useUpload } from "./useUpload";
+import FilePreviewDialog from "@/components/common/FilePreview/FilePreviewDialog.vue";
 
 const props = withDefaults(defineProps<FileUploadProps>(), {
   data: () => ({}),
@@ -57,12 +58,22 @@ const props = withDefaults(defineProps<FileUploadProps>(), {
   maxFileSize: 10,
   accept: "*",
   uploadBtnText: "上传文件",
-  style: () => ({ width: "300px" }),
+  style: () => ({ width: "100%" }),
 });
 /** 成功文件列表；父页面替换模型会取消进行中的上传，默认空数组。 */
 const modelValue = defineModel<FileInfo[]>({ default: () => [] });
 /** 上传控件中的本地文件项，包含进度和状态；对外模型只保存成功上传的文件信息。 */
 const fileList = ref<UploadUserFile[]>([]);
+/** 当前附件组的预览位置；文件名打开预览，下载使用独立按钮。 */
+const previewVisible = ref(false);
+const previewIndex = ref(0);
+/** 只预览已成功上传、仍存在于模型中的文件。 */
+function handlePreview(file: UploadUserFile) {
+  const index = modelValue.value.findIndex((item) => item.url === file.url);
+  if (index < 0) return;
+  previewIndex.value = index;
+  previewVisible.value = true;
+}
 /** 上传组件公开实例，外部整体替换文件列表时用它取消旧上传。 */
 const uploadRef = ref<UploadInstance>();
 /** 正在删除的文件 URL 集合，防止同一文件重复发起删除请求。 */
@@ -126,7 +137,7 @@ function handleSuccess(info: FileInfo, file: UploadFile) {
       entry.status === "success" && entry.url ? [{ name: entry.name, url: entry.url }] : []
     )
   );
-  ElMessage.success("上传成功");
+  feedback.success("上传成功");
 }
 /** 上传错误已由公共请求处理；此处不重复弹出消息，主动取消也保持安静。 */
 function handleError(_error: unknown) {
@@ -134,7 +145,7 @@ function handleError(_error: unknown) {
 }
 /** 选择数量超过配置上限时提示用户，不继续加入文件。 */
 function handleExceed() {
-  ElMessage.warning(`最多只能上传 ${props.limit} 个文件`);
+  feedback.warning(`最多只能上传 ${props.limit} 个文件`);
 }
 /** 先请求删除服务端文件，成功且模型版本未变才移除本地项；失败保留文件供重试。 */
 async function handleRemove(file: UploadUserFile) {
@@ -159,29 +170,30 @@ async function handleDownload(file: UploadUserFile) {
   try {
     await FileAPI.download(file.url, file.name);
   } catch {
-    // 请求层或下载工具已提示，保留文件列表供重试。
+    feedback.error("文件下载失败，请重试。");
   }
 }
 </script>
 <style scoped>
 .file-upload {
-  max-width: 100%;
-}
-.file-upload__item {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 4px 0;
-}
-.file-upload__name {
+  width: 100%;
+  max-width: 640px;
   min-width: 0;
-  flex: 1;
-  justify-content: flex-start;
-  white-space: normal;
-  overflow-wrap: anywhere;
 }
-.file-upload__progress {
-  width: 100px;
-  flex-shrink: 0;
+.file-upload__hint {
+  color: var(--el-text-color-secondary);
+  font-size: 12px;
+  line-height: 1.6;
+  margin-top: 6px;
+}
+.file-upload__list {
+  display: grid;
+  gap: 8px;
+  list-style: none;
+  margin: 12px 0 0;
+  padding: 0;
+}
+.file-upload__list > li {
+  min-width: 0;
 }
 </style>

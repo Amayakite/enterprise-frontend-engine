@@ -1,6 +1,7 @@
 import request from "@/utils/request";
 import type { FileInfo } from "./types";
 import { downloadFile } from "@/utils/download";
+import { resolveFileUrl } from "./url";
 
 const FileAPI = {
   /**
@@ -51,13 +52,41 @@ const FileAPI = {
     });
   },
 
-  /** 下载文件 */
+  /**
+   * 读取附件原始字节，供预览与下载复用；不触发保存到磁盘。
+   * @param url 站内绝对路径或 HTTP(S) 地址；站内及配置的 API 域使用现有认证，外域不携带 Token/Cookie。
+   * @param signal 可选取消信号，关闭预览时传入以终止旧读取。
+   * @returns 保留响应头的 Blob 响应；外域需要服务器允许 CORS。
+   * @remarks 不缓存文件；错误由预览或下载调用方展示，不重复全局提示。
+   * @example
+   * `const response = await FileAPI.read(file.url, controller.signal)`
+   */
+  async read(url: string, signal?: AbortSignal) {
+    const target = resolveFileUrl(url, window.location.origin, import.meta.env.VITE_APP_BASE_API);
+    if (target.authenticated) {
+      return request({
+        url,
+        method: "get",
+        responseType: "blob",
+        signal,
+        errorPresentation: "local",
+      });
+    }
+    const response = await fetch(target.url, {
+      signal,
+      credentials: "omit",
+      referrerPolicy: "no-referrer",
+    });
+    if (!response.ok) throw new Error(`文件读取失败（HTTP ${response.status}）`);
+    return {
+      data: await response.blob(),
+      headers: { "content-disposition": response.headers.get("content-disposition") },
+    };
+  },
+
+  /** 下载原文件，读取策略与预览一致；错误由调用方提示。 */
   download(url: string, fileName?: string) {
-    return request({
-      url,
-      method: "get",
-      responseType: "blob",
-    }).then((res) => downloadFile(res, fileName));
+    return FileAPI.read(url).then((res) => downloadFile(res, fileName));
   },
 };
 

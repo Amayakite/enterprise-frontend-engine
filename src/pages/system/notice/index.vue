@@ -280,7 +280,8 @@
 </template>
 
 <script setup lang="ts">
-import { ElMessage, ElMessageBox, type FormInstance, type FormRules } from "element-plus";
+import { feedback } from "@/utils/feedback";
+import { ElMessageBox, type FormInstance, type FormRules } from "element-plus";
 import { FullScreen, Refresh } from "@element-plus/icons-vue";
 
 import NoticeAPI from "@/api/system/notice";
@@ -482,10 +483,10 @@ async function handleSubmit(): Promise<void> {
     const id = formData.id;
     if (id) {
       await NoticeAPI.update(id, payload);
-      ElMessage.success("修改成功");
+      feedback.success("修改成功");
     } else {
       await NoticeAPI.create(payload);
-      ElMessage.success("新增成功");
+      feedback.success("新增成功");
     }
     closeDialog();
     handleResetQuery();
@@ -501,7 +502,7 @@ async function handleSubmit(): Promise<void> {
  */
 async function handlePublish(id: string): Promise<void> {
   await NoticeAPI.publish(id);
-  ElMessage.success("发布成功");
+  feedback.success("发布成功");
   fetchData();
 }
 
@@ -512,7 +513,7 @@ async function handlePublish(id: string): Promise<void> {
  */
 async function handleRevoke(id: string): Promise<void> {
   await NoticeAPI.revoke(id);
-  ElMessage.success("撤回成功");
+  feedback.success("撤回成功");
   fetchData();
 }
 
@@ -524,7 +525,7 @@ async function handleRevoke(id: string): Promise<void> {
 async function handleDelete(id?: string): Promise<void> {
   const deleteIds = id ?? selectedIds.value.join(",");
   if (!deleteIds) {
-    ElMessage.warning("请勾选删除项");
+    feedback.warning("请勾选删除项");
     return;
   }
 
@@ -535,14 +536,14 @@ async function handleDelete(id?: string): Promise<void> {
       type: "warning",
     });
   } catch {
-    ElMessage.info("已取消删除");
+    feedback.info("已取消删除");
     return;
   }
 
   loading.value = true;
   try {
     await NoticeAPI.deleteByIds(deleteIds);
-    ElMessage.success("删除成功");
+    feedback.success("删除成功");
     handleResetQuery();
   } finally {
     loading.value = false;

@@ -94,7 +94,8 @@
 </template>
 
 <script lang="ts" setup>
-import { ElMessage, type UploadUserFile } from "element-plus";
+import { feedback } from "@/utils/feedback";
+import { type UploadUserFile } from "element-plus";
 import UserAPI from "@/api/system/user";
 import { ApiCodeEnum } from "@/config/api-codes";
 import { downloadFile } from "@/utils/download";
@@ -144,16 +145,20 @@ watch(visible, (newValue) => {
  * 文件超出个数限制
  */
 function handleFileExceed(): void {
-  ElMessage.warning("只能上传一个文件");
+  feedback.warning("只能上传一个文件");
 }
 
 /**
  * 下载导入模板
  */
-function downloadTemplate(): void {
-  UserAPI.downloadTemplate().then((response) => {
+async function downloadTemplate(): Promise<void> {
+  // 请求错误由请求层提示；本地下载错误只由这里提示一次。
+  const response = await UserAPI.downloadTemplate();
+  try {
     downloadFile(response);
-  });
+  } catch {
+    feedback.error("文件下载失败，请重试");
+  }
 }
 
 /**
@@ -163,7 +168,7 @@ async function handleUpload(): Promise<void> {
   if (uploading.value) return;
   const file = importFormData.files[0]?.raw;
   if (!file) {
-    ElMessage.warning("请选择文件");
+    feedback.warning("请选择文件");
     return;
   }
 
@@ -171,11 +176,11 @@ async function handleUpload(): Promise<void> {
   try {
     const result = await UserAPI.import(file);
     if (result.code === ApiCodeEnum.SUCCESS && result.invalidCount === 0) {
-      ElMessage.success("导入成功，导入数据：" + result.validCount + "条");
+      feedback.success("导入成功，导入数据：" + result.validCount + "条");
       emit("import-success");
       closeDialog();
     } else {
-      ElMessage.error("上传失败");
+      feedback.error("上传失败");
       resultVisible.value = true;
       resultData.value = result.messageList;
       invalidCount.value = result.invalidCount;

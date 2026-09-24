@@ -16,17 +16,21 @@
 | code / name              | 组织编码/名称；空字符串为未填写      | 必填，提交前 trim，分别最多 30/80 字       |
 | active                   | 是否允许客户新选择；新增默认 true    | 停用记录仍可历史回显，不允许新选入         |
 | remark                   | 业务说明，缺省空字符串               | 可编辑，最长 300 字                        |
+| attachments              | 组织附件，缺省空数组                 | 最多 10 个，每个 10 MB；表单与详情共用预览 |
 | version                  | 接口实体版本；新建模型初值 0         | 编辑从加载基线取值，不让用户修改           |
 | SalePayload / SaleUpdate | 创建白名单；编辑在其上增加 version   | 当前 Mock 保存返回 SaleRecord              |
 
 页面、列表、参照共用同一组字段及查询派生；新增/编辑默认抽屉、详情为页面，直接访问路由仍可打开完整页面。
-草稿只保存 code/name/active/remark，实体 id、组织和版本不从旧草稿覆盖。
+草稿保存 code/name/active/remark/attachments，实体 id、组织和版本不从旧草稿覆盖。
+附件复用 `type: "files"`：上传后点击名称预览，图片和文档统一进入公共文件预览器，按附件顺序切换。
+新增、编辑和详情均可验证；文件字节只保存在开发服务内存中，重启或热更新文件 Mock 后需重新上传，
+草稿中的附件地址不能恢复已清空的文件内容。图片裁剪等高级能力仍按公共组件 TODO 后续定制。
 后端物理表、编码唯一约束及正式并发协议待接口确认；以上描述的是当前前端与 Mock 接口约定。
 源码见 [API 类型](../src/api/base/sale/types.ts)、[模块配置](../src/pages/base/sale/config.ts)。
 
 ## 从哪个文件开始
 
-首先打开 [config.ts](../src/pages/base/sale/config.ts)：编码、名称、启用、备注仅维护一套，
+首先打开 [config.ts](../src/pages/base/sale/config.ts)：编码、名称、启用、备注、组织附件仅维护一套，
 主字段直接内联 fields 数组，通过 scenes 派生表单、列表、详情和查询。
 没有审核、批量动作、子表或演示钩子。公共接法见 [CRUD 指南](./crud-development-guide.md)。
 

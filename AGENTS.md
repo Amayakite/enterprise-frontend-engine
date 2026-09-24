@@ -16,6 +16,7 @@
 - 新模块参考 customer 的职责划分，不照抄其 Mock 组织或业务规则。默认在 `add.vue/edit.vue` 各自组合，共用 Editor 非必需。
 - 主入口 `config.ts`；每个业务子表必须有 `children/<子表>/config.ts`，父配置只汇总。当前子表仅支持 aggregate 整单保存。
 - 标准业务复用 `MyCrud* + useCrud*`；普通业务弹窗用 `MyDialog`。不读私有 ref/实例，不用业务 CSS 覆盖 `.el-*`、`:deep()` 或私有 DOM。
+- 所有轻提示必须显式导入 `@/utils/feedback`，禁止直接使用 `ElMessage/ElNotification`；页内反馈复用 `MyFeedback`。遵守[统一反馈规范](./docs/crud-development-guide.md#统一反馈与下一步操作)，改动运行 `node --test tests/feedback-entry.test.mjs`。
 - DTO 归 API，页面模型归页面，组件参数类型归组件；`import type` 显式导入。不用 any/断言掩盖结构错误；ID 保留类型，金额复用 Decimal。
 - 简单/示例模块的主 fields、links、children 注册内联 config；子表自身 config 仍独立。模块类型定义在页面 types.ts 显式继承 BusinessModuleContract。
 - business 的全部 TS 接口约定（含匿名 options、嵌套对象、联合分支、控制器/子表操作接口）逐字段写 JSDoc；变更运行 `node --test tests/business-docs.test.mjs`，不能只检查 types.ts。

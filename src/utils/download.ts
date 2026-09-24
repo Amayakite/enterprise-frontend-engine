@@ -43,6 +43,7 @@ function extractFileName(contentDisposition: string): string {
  * 下载文件
  * @param response Axios 响应对象
  * @param customFileName 自定义文件名（可选）
+ * @throws 创建链接或触发下载失败时保留原异常；调用方使用统一 feedback 提示一次。
  *
  * @example
  * ```ts
@@ -76,9 +77,6 @@ export function downloadFile(response: DownloadResponse, customFileName?: string
     // 触发下载
     document.body.appendChild(link);
     link.click();
-  } catch (error) {
-    ElMessage.error("文件下载失败，请重试");
-    throw error;
   } finally {
     link?.remove();
     if (downloadUrl) window.URL.revokeObjectURL(downloadUrl);

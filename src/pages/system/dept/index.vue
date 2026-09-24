@@ -163,7 +163,8 @@
 </template>
 
 <script setup lang="ts">
-import { ElMessage, ElMessageBox, type FormInstance, type FormRules } from "element-plus";
+import { feedback } from "@/utils/feedback";
+import { ElMessageBox, type FormInstance, type FormRules } from "element-plus";
 import { Refresh, FullScreen } from "@element-plus/icons-vue";
 
 import DeptAPI from "@/api/system/dept";
@@ -295,10 +296,10 @@ async function handleSubmit(): Promise<void> {
     const deptId = formData.id;
     if (deptId) {
       await DeptAPI.update(deptId, formData);
-      ElMessage.success("修改成功");
+      feedback.success("修改成功");
     } else {
       await DeptAPI.create(formData);
-      ElMessage.success("新增成功");
+      feedback.success("新增成功");
     }
     closeDialog();
     fetchData();
@@ -315,7 +316,7 @@ async function handleSubmit(): Promise<void> {
 async function handleDelete(deptId?: string): Promise<void> {
   const deptIds = deptId ?? selectedIds.value.join(",");
   if (!deptIds) {
-    ElMessage.warning("请勾选删除项");
+    feedback.warning("请勾选删除项");
     return;
   }
 
@@ -326,14 +327,14 @@ async function handleDelete(deptId?: string): Promise<void> {
       type: "warning",
     });
   } catch {
-    ElMessage.info("已取消删除");
+    feedback.info("已取消删除");
     return;
   }
 
   loading.value = true;
   try {
     await DeptAPI.deleteByIds(deptIds);
-    ElMessage.success("删除成功");
+    feedback.success("删除成功");
     handleResetQuery();
   } finally {
     loading.value = false;

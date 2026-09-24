@@ -5,8 +5,8 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "vite",
-    "build": "vue-tsc --noEmit && vite build",
+    "dev": "node scripts/prepare-file-preview.mjs && vite",
+    "build": "node scripts/prepare-file-preview.mjs && vue-tsc --noEmit && vite build",
     "preview": "vite preview",
     "type-check": "vue-tsc --noEmit",
     "test": "node scripts/run-tests.mjs all",
@@ -17,6 +17,8 @@
   },
   "dependencies": {
     "@element-plus/icons-vue": "^2.3.2",
+    "@open-file-viewer/core": "0.1.48",
+    "@open-file-viewer/vue": "0.1.48",
     "@vueuse/core": "^14.3.0",
     "@wangeditor-next/editor": "^5.7.13",
     "@wangeditor-next/editor-for-vue": "^5.1.14",
@@ -34,6 +36,7 @@
     "nprogress": "^0.2.0",
     "path-browserify": "^1.0.1",
     "path-to-regexp": "^8.4.2",
+    "pdfjs-dist": "6.1.200",
     "pinia": "^3.0.4",
     "qs": "^6.15.2",
     "reka-ui": "^2.10.5",

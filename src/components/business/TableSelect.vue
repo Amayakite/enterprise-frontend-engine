@@ -165,6 +165,7 @@
 </template>
 
 <script lang="ts" setup generic="Row extends object = Record<string, unknown>">
+import { feedback } from "@/utils/feedback";
 import { ref, shallowRef, reactive, computed } from "vue";
 import { useResizeObserver } from "@vueuse/core";
 import type { FormInstance, PopoverProps, TableInstance } from "element-plus";
@@ -358,7 +359,7 @@ function handleShow() {
 // 确定
 function handleConfirm() {
   if (selectedItems.value.length === 0) {
-    ElMessage.error("请选择数据");
+    feedback.error("请选择数据");
     return;
   }
   popoverVisible.value = false;

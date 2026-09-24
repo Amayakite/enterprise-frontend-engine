@@ -49,6 +49,8 @@
   />
 </template>
 <script setup lang="ts">
+// TODO(image-customization): 按业务需要增加图片排序、逐张裁剪和批量处理；images 保持独立缩略图语义。
+import { feedback } from "@/utils/feedback";
 import { genFileId } from "element-plus";
 import type { UploadInstance, UploadUserFile } from "element-plus";
 import FileAPI from "@/api/file";
@@ -144,7 +146,7 @@ async function handleRemove(file: UploadUserFile) {
 }
 /** 选择数量超过配置上限时提示用户，不继续加入文件。 */
 function handleExceed() {
-  ElMessage.warning(`最多只能上传 ${props.limit} 张图片`);
+  feedback.warning(`最多只能上传 ${props.limit} 张图片`);
 }
 /** 只接收仍在列表中的上传项，更新地址和状态后发布全部成功文件。 */
 function handleSuccess(info: FileInfo, uploaded: UploadUserFile) {
@@ -155,7 +157,7 @@ function handleSuccess(info: FileInfo, uploaded: UploadUserFile) {
   publish(
     fileList.value.flatMap((file) => (file.status === "success" && file.url ? [file.url] : []))
   );
-  ElMessage.success("上传成功");
+  feedback.success("上传成功");
 }
 /** 上传错误已由公共请求处理；此处不重复弹出消息，主动取消也保持安静。 */
 function handleError(_error: unknown) {

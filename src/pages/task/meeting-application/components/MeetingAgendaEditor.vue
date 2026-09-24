@@ -21,6 +21,7 @@
 </template>
 
 <script setup lang="ts">
+import { feedback } from "@/utils/feedback";
 import type { MeetingAgendaItem } from "@/api/task/meeting-application/types";
 import { defineFields } from "@/components/business/fields/normalize";
 import MyTable from "@/components/table/MyTable.vue";
@@ -100,11 +101,10 @@ async function commitAndValidate() {
   const validated = await tableRef.value?.validate(model.value);
   if (!validated?.valid) return false;
   if (model.value.some((row) => row.startTime >= row.endTime)) {
-    ElMessage.warning("会议议程的结束时间必须晚于开始时间");
+    feedback.warning("会议议程的结束时间必须晚于开始时间");
     return false;
   }
   return true;
 }
 defineExpose({ commitAndValidate });
 </script>
-

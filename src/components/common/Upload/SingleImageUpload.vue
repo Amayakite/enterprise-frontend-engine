@@ -40,6 +40,9 @@
   </div>
 </template>
 <script setup lang="ts">
+// TODO(image-customization): 在上传前组合头像裁剪、固定比例及压缩；取消处理应保留原图片。
+// 当前 image 仅提供单图上传、展示和预览，不把图片编辑能力耦合到附件预览器。
+import { feedback } from "@/utils/feedback";
 import type { UploadRequestOptions } from "element-plus";
 import type { SingleImageUploadProps } from "./types";
 import { useUpload } from "./useUpload";
@@ -82,7 +85,7 @@ async function handleUpload(options: UploadRequestOptions) {
     const info = await uploader.upload(options);
     published = info.url;
     modelValue.value = info.url;
-    ElMessage.success("上传成功");
+    feedback.success("上传成功");
     return info;
   } finally {
     if (current === version) busy.value = false;

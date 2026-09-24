@@ -34,6 +34,7 @@
 </template>
 
 <script setup lang="ts">
+import { feedback } from "@/utils/feedback";
 import MyForm from "@/components/business/MyForm/index.vue";
 import ServiceApplicationAPI from "@/api/service/application";
 import type { MyFormExpose } from "@/components/business/fields/types";
@@ -80,7 +81,7 @@ async function submit() {
     if (props.id)
       await ServiceApplicationAPI.update(props.id, { ...payload, version: form.value.version });
     else await ServiceApplicationAPI.create(payload);
-    ElMessage.success("服务申请保存成功");
+    feedback.success("服务申请保存成功");
     visible.value = false;
     emit("saved");
   } finally {

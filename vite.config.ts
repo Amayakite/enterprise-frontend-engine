@@ -7,6 +7,7 @@ import Components from "unplugin-vue-components/vite";
 import { ElementPlusResolver } from "unplugin-vue-components/resolvers";
 import { mockDevServerPlugin } from "vite-plugin-mock-dev-server";
 import { fileURLToPath } from "node:url";
+import { randomUUID } from "node:crypto";
 import { readdirSync, existsSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { name, version } from "./package.json";
@@ -84,7 +85,17 @@ export default defineConfig(({ command, mode }) => {
       // 仅开发期提供组件树、更新时间线和路由检查，不进入生产构建。
       ...(useVueDevTools ? [VueDevTools()] : []),
       UnoCSS(),
-      ...(useMock ? [mockDevServerPlugin()] : []),
+      ...(useMock
+        ? [
+            mockDevServerPlugin({
+              // 临时上传使用唯一名称，避免原文件名覆盖其他临时文件。
+              formidableOptions: {
+                filename: () => `efe-upload-${randomUUID()}`,
+                maxFileSize: 20 * 1024 * 1024,
+              },
+            }),
+          ]
+        : []),
       // 按实际使用自动导入框架 API；项目自己的 API、工具和 composables 仍需显式导入。
       AutoImport({
         imports: [
@@ -92,7 +103,7 @@ export default defineConfig(({ command, mode }) => {
           "@vueuse/core",
           "pinia",
           "vue-router",
-          { "element-plus": ["ElMessage", "ElMessageBox", "ElNotification"] },
+          { "element-plus": ["ElMessageBox"] },
         ],
         // Element Plus API 的自动导入按需带上 Sass 样式，与下方组件解析器保持一致。
         resolvers: [ElementPlusResolver({ importStyle: "sass" })],
@@ -109,6 +120,8 @@ export default defineConfig(({ command, mode }) => {
       }),
     ],
     optimizeDeps: {
+      // emf-converter 的 Node 分支引用原生 Canvas；浏览器使用 DOM Canvas，不能打包 .node 二进制。
+      exclude: ["@napi-rs/canvas"],
       // 开发期依赖预构建，不是生产打包分包配置，也不代表这些库全部进入首屏。
       // 保留基础依赖及 Element Plus 样式入口，变更后验证冷启动与动态页面跳转。
       include: [
@@ -131,7 +144,10 @@ export default defineConfig(({ command, mode }) => {
       ],
     },
     // 仅调整 chunk 大小警告阈值（kB）；不限制包大小，也不执行拆包或性能优化。
-    build: { chunkSizeWarningLimit: 1200 },
+    build: {
+      chunkSizeWarningLimit: 1200,
+      rolldownOptions: { external: ["@napi-rs/canvas"] },
+    },
     // 编译时替换的全局常量：config/app.ts 消费，类型在 types/env.d.ts 声明。
     // JSON.stringify 生成合法的 JS 字面量；只暴露界面需要的包名和版本。
     define: { __APP_INFO__: JSON.stringify({ pkg: { name, version } }) },

@@ -22,15 +22,14 @@
     />
   </div>
   <div v-else-if="field.type === 'files'" class="field-files">
-    <a
+    <FileAttachment
       v-for="file in files"
       :key="file.url"
-      :href="safeUrl(file.url)"
-      target="_blank"
-      rel="noopener noreferrer"
-    >
-      {{ file.name }}
-    </a>
+      :name="file.name"
+      @preview="previewFile(file)"
+      @download="downloadAttachment(file)"
+    />
+    <FilePreviewDialog v-model="previewVisible" :files="files" :initial-index="previewIndex" />
   </div>
   <div
     v-else-if="
@@ -43,12 +42,17 @@
 </template>
 
 <script setup lang="ts" generic="M extends object, C">
+import { feedback } from "@/utils/feedback";
 import { richTextContent, sanitizeRichText } from "./rich-text";
 import DictTag from "@/components/business/DictTag.vue";
 import { formatDate, formatDateTime, formatMonth, formatYear } from "@/utils/date";
 import { formatMoney } from "@/utils/decimal";
 import { isEmptyValue } from "@/utils/validate";
-import type { FileInfo } from "@/api/file/types";
+import FileAttachment from "@/components/common/FilePreview/FileAttachment.vue";
+import FilePreviewDialog from "@/components/common/FilePreview/FilePreviewDialog.vue";
+import { toPreviewFiles } from "@/components/common/FilePreview/file-kind";
+import type { FilePreviewItem } from "@/components/common/FilePreview/types";
+import FileAPI from "@/api/file";
 import type { FieldDefinition, FieldEnvironment } from "./types";
 const props = defineProps<{
   /**
@@ -109,7 +113,24 @@ const imageUrls = computed(() =>
   )
 );
 /** 附件字段的展示列表，非数组值按空列表处理。 */
-const files = computed(() => (Array.isArray(value.value) ? (value.value as FileInfo[]) : []));
+const files = computed(() => toPreviewFiles(value.value));
+/** 当前只读附件的预览状态，不回写业务字段。 */
+const previewVisible = ref(false);
+const previewIndex = ref(0);
+/** 以当前字段的文件组打开预览，图片与文档按附件顺序切换。 */
+function previewFile(file: FilePreviewItem) {
+  previewIndex.value = files.value.indexOf(file);
+  previewVisible.value = true;
+}
+/** 只读附件也保留独立下载，文件传输沿用公共 FileAPI。 */
+async function downloadAttachment(file: FilePreviewItem) {
+  if (!file.url) return;
+  try {
+    await FileAPI.download(file.url, file.name);
+  } catch {
+    feedback.error("文件下载失败，请重试。");
+  }
+}
 /** 只允许 HTTP(S) 和站内绝对路径，避免附件或图片使用脚本等不安全地址。 */
 function safeUrl(url: string) {
   return /^(https?:\/\/|\/[^/])/i.test(url) ? url : undefined;
@@ -159,12 +180,11 @@ const displayText = computed(() => {
   }
 }
 .field-files {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  a {
-    color: var(--el-color-primary);
-  }
+  display: grid;
+  gap: 8px;
+  width: 100%;
+  max-width: 640px;
+  min-width: 0;
 }
 </style>
 

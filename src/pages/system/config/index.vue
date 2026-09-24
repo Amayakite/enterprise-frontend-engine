@@ -136,7 +136,8 @@
 </template>
 
 <script setup lang="ts">
-import { ElMessage, ElMessageBox, type FormInstance, type FormRules } from "element-plus";
+import { feedback } from "@/utils/feedback";
+import { ElMessageBox, type FormInstance, type FormRules } from "element-plus";
 import { Refresh, FullScreen } from "@element-plus/icons-vue";
 
 import ConfigAPI from "@/api/system/config";
@@ -202,7 +203,7 @@ async function openDialog(id?: string): Promise<void> {
 // 刷新缓存。
 const refreshCache = useDebounceFn(async () => {
   await ConfigAPI.refreshCache();
-  ElMessage.success("刷新成功");
+  feedback.success("刷新成功");
 }, 1000);
 
 /**
@@ -217,10 +218,10 @@ async function handleSubmit(): Promise<void> {
     const id = formData.id;
     if (id) {
       await ConfigAPI.update(id, formData);
-      ElMessage.success("修改成功");
+      feedback.success("修改成功");
     } else {
       await ConfigAPI.create(formData);
-      ElMessage.success("新增成功");
+      feedback.success("新增成功");
     }
     closeDialog();
     handleResetQuery();
@@ -251,7 +252,7 @@ async function handleDelete(id: string): Promise<void> {
   loading.value = true;
   try {
     await ConfigAPI.deleteById(id);
-    ElMessage.success("删除成功");
+    feedback.success("删除成功");
     handleResetQuery();
   } finally {
     loading.value = false;

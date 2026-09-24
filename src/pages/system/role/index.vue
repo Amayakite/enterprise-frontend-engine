@@ -238,9 +238,9 @@
 </template>
 
 <script setup lang="ts">
+import { feedback } from "@/utils/feedback";
 import { useFullscreen } from "@vueuse/core";
 import {
-  ElMessage,
   ElMessageBox,
   type FormInstance,
   type FormRules,
@@ -422,10 +422,10 @@ async function handleSubmit(): Promise<void> {
     const roleId = formData.id;
     if (roleId) {
       await RoleAPI.update(roleId, submitData);
-      ElMessage.success("修改成功");
+      feedback.success("修改成功");
     } else {
       await RoleAPI.create(submitData);
-      ElMessage.success("新增成功");
+      feedback.success("新增成功");
     }
     closeDialog();
     await handleResetQuery();
@@ -442,7 +442,7 @@ async function handleSubmit(): Promise<void> {
 async function handleDelete(roleId?: string): Promise<void> {
   const roleIds = roleId ?? selectedIds.value.join(",");
   if (!roleIds) {
-    ElMessage.warning("请勾选删除项");
+    feedback.warning("请勾选删除项");
     return;
   }
 
@@ -453,14 +453,14 @@ async function handleDelete(roleId?: string): Promise<void> {
       type: "warning",
     });
   } catch {
-    ElMessage.info("已取消删除");
+    feedback.info("已取消删除");
     return;
   }
 
   loading.value = true;
   try {
     await RoleAPI.deleteByIds(roleIds);
-    ElMessage.success("删除成功");
+    feedback.success("删除成功");
     handleResetQuery();
   } finally {
     loading.value = false;
@@ -521,7 +521,7 @@ async function handleAssignPermSubmit(): Promise<void> {
   loading.value = true;
   try {
     await RoleAPI.updateRoleMenus(roleId, checkedMenuIds);
-    ElMessage.success("分配权限成功");
+    feedback.success("分配权限成功");
     assignPermDialogVisible.value = false;
     handleResetQuery();
   } finally {

@@ -328,7 +328,8 @@
 </template>
 
 <script setup lang="ts">
-import { ElMessage, ElMessageBox, type FormInstance, type FormRules } from "element-plus";
+import { feedback } from "@/utils/feedback";
+import { ElMessageBox, type FormInstance, type FormRules } from "element-plus";
 
 import UserAPI from "@/api/system/user";
 import DeptAPI from "@/api/system/dept";
@@ -515,10 +516,10 @@ const handleSubmit = useDebounceFn(async () => {
   try {
     if (formData.id) {
       await UserAPI.update(formData.id, formData);
-      ElMessage.success("修改用户成功");
+      feedback.success("修改用户成功");
     } else {
       await UserAPI.create(formData);
-      ElMessage.success("新增用户成功");
+      feedback.success("新增用户成功");
     }
     closeDialog();
     handleQuery();
@@ -537,7 +538,7 @@ const handleSubmit = useDebounceFn(async () => {
 async function handleDelete(id?: string): Promise<void> {
   const userIds = id ?? selectedIds.value.join(",");
   if (!userIds) {
-    ElMessage.warning("请勾选删除项");
+    feedback.warning("请勾选删除项");
     return;
   }
 
@@ -548,7 +549,7 @@ async function handleDelete(id?: string): Promise<void> {
       ? id === currentUserId
       : selectedIds.value.some((selectedId) => String(selectedId) === currentUserId);
     if (isCurrentUserInList) {
-      ElMessage.error("不能删除当前登录用户");
+      feedback.error("不能删除当前登录用户");
       return;
     }
   }
@@ -560,14 +561,14 @@ async function handleDelete(id?: string): Promise<void> {
       type: "warning",
     });
   } catch {
-    ElMessage.info("已取消删除");
+    feedback.info("已取消删除");
     return;
   }
 
   loading.value = true;
   try {
     await UserAPI.deleteByIds(userIds);
-    ElMessage.success("删除成功");
+    feedback.success("删除成功");
     handleQuery();
   } finally {
     loading.value = false;
@@ -579,8 +580,12 @@ async function handleDelete(id?: string): Promise<void> {
  */
 async function handleExport(): Promise<void> {
   const response = await UserAPI.export(params);
-  downloadFile(response);
-  ElMessage.success("导出成功");
+  try {
+    downloadFile(response);
+    feedback.success("导出成功");
+  } catch {
+    feedback.error("文件下载失败，请重试");
+  }
 }
 
 /**
@@ -638,7 +643,7 @@ const handleResetPasswordSubmit = useDebounceFn(async () => {
   resetPasswordSubmitting.value = true;
   try {
     await UserAPI.resetPassword(resetPasswordDialog.userId, resetPasswordForm.password);
-    ElMessage.success("密码重置成功");
+    feedback.success("密码重置成功");
     closeResetPasswordDialog();
   } finally {
     resetPasswordSubmitting.value = false;
