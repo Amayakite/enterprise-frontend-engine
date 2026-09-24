@@ -388,12 +388,20 @@ function keyOf(row: EngineRow): Key {
   return row.businessKey;
 }
 /** 将 VXE 的单击事件转换为业务行和原始 ID，再通知上层。 */
-const onCellClick: VxeTableEvents.CellClick<EngineRow> = ({ row }) => {
-  emit("row-click", { row: row.record, rowKey: row.businessKey });
+const onCellClick: VxeTableEvents.CellClick<EngineRow> = ({ row, $event }) => {
+  emit("row-click", {
+    row: row.record,
+    rowKey: row.businessKey,
+    originalEvent: $event instanceof MouseEvent ? $event : undefined,
+  });
 };
 /** 将 VXE 的双击事件转换为业务行和原始 ID，供上层打开详情或编辑。 */
-const onCellDblclick: VxeTableEvents.CellDblclick<EngineRow> = ({ row }) => {
-  emit("row-dblclick", { row: row.record, rowKey: row.businessKey });
+const onCellDblclick: VxeTableEvents.CellDblclick<EngineRow> = ({ row, $event }) => {
+  emit("row-dblclick", {
+    row: row.record,
+    rowKey: row.businessKey,
+    originalEvent: $event instanceof MouseEvent ? $event : undefined,
+  });
 };
 /** 将底层 record.* 字段名还原为业务列 key，只发布已声明业务列的宽度变化。 */
 const onResizableChange: VxeTableEvents.ResizableChange<EngineRow> = ({ column, resizeWidth }) => {

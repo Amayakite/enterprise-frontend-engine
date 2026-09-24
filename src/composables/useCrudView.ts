@@ -304,8 +304,8 @@ export function useCrudView<
       )
         await navigation.edit?.(cloneReadonlyModel<T["Id"]>(detail.state.id));
     };
-    /** 为详情组件准备字段、页签、布局及按钮操作，读取时使用最新权限。 */
-    const detailBinding = () => ({
+    /** 缓存详情组件的参数；上下文、记录或权限变化时重算，工具栏和状态读取共用结果。 */
+    const detailBinding = computed(() => ({
       controller: detail,
       fields: config.detail.fields,
       tabs: config.detail.tabs,
@@ -322,7 +322,7 @@ export function useCrudView<
       editReason: detail.state.model
         ? config.form.readonlyReason?.(detail.state.model, context.value)
         : undefined,
-    });
+    }));
     /** 供独立 MyDesc 使用的只读模型；未加载时不提供描述区绑定。 */
     const descriptionModel = computed(() =>
       detail.state.model ? cloneReadonlyModel<T["Model"]>(detail.state.model) : undefined
@@ -336,10 +336,10 @@ export function useCrudView<
         notice: base.notice,
         invalidReason: id === null ? "详情缺少记录 ID，请返回列表重新打开" : undefined,
         get canEdit() {
-          return detailBinding().canEdit;
+          return detailBinding.value.canEdit;
         },
         get editReason() {
-          return detailBinding().editReason;
+          return detailBinding.value.editReason;
         },
       }),
       actions: {
@@ -354,23 +354,23 @@ export function useCrudView<
       },
       bindings: {
         get detail() {
-          return detailBinding();
+          return detailBinding.value;
         },
         get toolbar() {
-          const { controller, actions, back } = detailBinding();
+          const { controller, actions, back } = detailBinding.value;
           return {
             controller,
             actions,
             back,
             edit: edit,
-            canEdit: detailBinding().canEdit,
-            editReason: detailBinding().editReason,
+            canEdit: detailBinding.value.canEdit,
+            editReason: detailBinding.value.editReason,
           };
         },
         feedback: { controller: detail },
         get description() {
           if (!detail.state.model) return undefined;
-          const { fields, context, columns } = detailBinding();
+          const { fields, context, columns } = detailBinding.value;
           return {
             fields,
             context,
@@ -555,8 +555,10 @@ export function useCrudView<
   };
   /** 优先提示字段联动失败或进行中，再使用表单通用保存限制。 */
   const saveDisabledReason = () =>
-    changes.error.value ||
-    (changes.pending.value ? "字段变化处理中" : crudFormDisabledReason(form));
+    crudFormDisabledReason(form, undefined, {
+      changeError: changes.error.value,
+      changePending: changes.pending.value,
+    });
 
   return {
     state: projectState(() => form.state, {

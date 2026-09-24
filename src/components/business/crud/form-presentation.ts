@@ -61,21 +61,46 @@ export type CrudFormProps<Model extends object, Entity, Id extends string | numb
 };
 
 /**
- * 读取原控制器的交互禁用原因，不创建状态副本；undefined 表示可以开始编辑/校验。
+ * 读取模型回写限制，供子表确认输入使用；不把 committing/validating 当作禁止内部回写。
+ * @param controller 原表单控制器，权限、草稿和流程状态均从这里读取。
+ * @param reason 页面额外的只读原因，省略则采用控制器说明。
+ * @returns undefined 表示允许内部编辑；外部控件仍须使用 busy 限制用户操作。
+ */
+export function crudFormEditReason<M, E, I extends string | number>(
+  controller: CrudFormController<M, E, I>,
+  reason?: string
+): string | undefined {
+  if (!controller.savePermission) return "无保存权限";
+  if (reason || controller.readonlyReason) return reason || controller.readonlyReason;
+  if (["checking", "available", "conflict", "unsafe"].includes(controller.draft?.state.phase ?? ""))
+    return "请先处理本机草稿";
+  const activity = crudFormActivity(controller.state);
+  return activity.canPatch ? undefined : activity.saveDisabledReason;
+}
+
+/**
+ * 读取原控制器的保存禁用原因，不创建状态副本；供按钮、快捷键和页面状态共同使用。
  * @param controller 当前表单控制器。
  * @param reason 可选弹窗容器只读原因，覆盖控制器只读文案。
+ * @param changes 可选字段联动状态；失败或进行中仅阻止保存，不阻止用户继续修改。
  * @returns 给用户显示的原因；保存仍执行控制器内的权限、校验及并发保护。
  */
 export function crudFormDisabledReason<M, E, I extends string | number>(
   controller: CrudFormController<M, E, I>,
-  reason?: string
+  reason?: string,
+  changes?: {
+    /** 字段联动正在等待异步结果，默认 false。 */
+    changePending?: boolean;
+    /** 最近联动的错误；省略或 null 表示没有错误。 */
+    changeError?: string | null;
+  }
 ): string | undefined {
+  if (changes?.changeError) return changes.changeError;
+  if (changes?.changePending) return "字段变化处理中";
   if (controller.busy) return "正在处理，请稍后";
-  if (!controller.savePermission) return "无保存权限";
-  if (reason || controller.readonlyReason) return reason || controller.readonlyReason;
+  const editReason = crudFormEditReason(controller, reason);
+  if (editReason) return editReason;
   if (controller.childrenReady === false) return "子表正在准备";
-  if (["checking", "available", "conflict", "unsafe"].includes(controller.draft?.state.phase ?? ""))
-    return "请先处理本机草稿";
   return crudFormActivity(controller.state).saveDisabledReason;
 }
 

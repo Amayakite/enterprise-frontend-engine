@@ -67,7 +67,12 @@
       </div>
     </template>
 
-    <div v-loading="loading" class="my-dialog__body" :aria-busy="loading">
+    <div
+      v-loading="loading"
+      class="my-dialog__body"
+      :class="{ 'my-dialog__body--content-scroll': bodyScroll === 'content' }"
+      :aria-busy="loading"
+    >
       <slot />
     </div>
 
@@ -119,6 +124,8 @@ const props = withDefaults(
     maxHeight?: string;
     /** 是否铺满 maxHeight；默认 false 自然高度，全屏时填满视口。 */
     fillHeight?: boolean;
+    /** 正文滚动方式：默认 body 由弹窗滚动；content 由内容分配高度并自行滚动，通常搭配 fillHeight。 */
+    bodyScroll?: "body" | "content";
     /** 非全屏时距视口顶部的 CSS 距离；默认 16px。 */
     top?: string;
     /** 是否传送到 body；默认 true，避免被父布局裁切。 */
@@ -392,6 +399,11 @@ defineExpose({
   min-height: 0;
   padding: 16px;
   overflow: auto;
+}
+.my-dialog__body--content-scroll {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
 }
 .my-dialog__footer {
   display: flex;

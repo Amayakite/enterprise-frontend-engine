@@ -424,6 +424,11 @@ export interface ReferenceInputProps<
    * `<MyReference :clearable="false" ... />`
    */
   clearable?: boolean;
+  /** 单选弹窗双击记录后直接确认，默认 true；false 时仍需点击确认。多选双击只选入该行。
+   * @example
+   * `<MyReference :confirm-on-double-click="false" ... />`
+   */
+  confirmOnDoubleClick?: boolean;
   /**
    * 输入框为空时的提示文字。
    * @example

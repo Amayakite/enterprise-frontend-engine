@@ -299,6 +299,16 @@ async function validateFields(keys: readonly FieldKey<M>[]): Promise<FieldValida
   result.valid = result.errors.length === 0;
   return result;
 }
+/** 展示调用方已经校验过的当前模型错误；取消旧校验结果，避免重复运行异步规则。 */
+function setErrors(value: FieldValidationResult<M>["errors"]) {
+  clearValidate();
+  const visible = new Set(visibleFields.value.map((entry) => entry.field.key));
+  const next: Record<string, string> = {};
+  for (const issue of value) {
+    if (visible.has(issue.field)) next[issue.field] = issue.message;
+  }
+  errors.value = next;
+}
 /** 滚动到目标字段并尝试聚焦输入；只读字段没有输入框时也能定位到它的位置。 */
 function focusField(key: FieldKey<M>) {
   const wrapper = Array.from(
@@ -321,6 +331,7 @@ defineExpose<MyFormExpose<M>>({
   validate: () => validateFields(visibleFields.value.map((entry) => entry.field.key)),
   validateFields,
   clearValidate,
+  setErrors,
   focusField,
 });
 /** 把字段名转换为 field-*，供页面替换某个字段的输入内容。 */

@@ -120,12 +120,7 @@ async function onFormKeydown(event: KeyboardEvent) {
   if (event.repeat) return;
   if (event.target instanceof HTMLElement) event.target.blur();
   await nextTick();
-  if (
-    props.changePending ||
-    props.changeError ||
-    crudFormDisabledReason(props.controller, props.readonlyReason)
-  )
-    return;
+  if (crudFormDisabledReason(props.controller, props.readonlyReason, props)) return;
   await props.controller.save();
 }
 /** 表单正文元素，用于点击分区导航后滚动到对应子表并设置焦点。 */

@@ -193,29 +193,87 @@
     <slot v-else-if="state.selected.value" name="selected" :row="state.selected.value" />
     <MyDialog
       :model-value="active && state.visible.value"
-      v-model:fullscreen="dialogFullscreen"
+      :fullscreen="narrowDialog || dialogFullscreen"
+      :show-fullscreen="!narrowDialog"
+      @update:fullscreen="dialogFullscreen = $event"
+      fill-height
+      body-scroll="content"
+      max-height="min(760px, calc(100dvh - 32px))"
       :title="`选择${source.title}`"
       width="960px"
       class="my-reference-dialog"
       :confirm-loading="state.guarding.value"
       :confirm-disabled-reason="confirmDisabledReason"
       @update:model-value="closeDialog"
-      @confirm="state.commitIds(state.draftIds.value)"
+      @confirm="confirmSelection"
       @closed="focus"
     >
       <div ref="dialogContent" class="my-reference__dialog-content">
-        <div v-if="source.query" class="my-reference__query-panel">
-          <QueryPanel
-            ref="queryPanel"
-            compact
-            :schema="source.query.schema"
-            :model-value="state.queryApplied.value"
-            :scope-key="scopeKey"
-            :loading="state.searching.value"
-            @apply="state.applyQuery"
-            @refresh="state.search"
-          >
-            <template #commands-end>
+        <div class="my-reference__filters">
+          <div v-if="source.query" class="my-reference__query-panel">
+            <QueryPanel
+              ref="queryPanel"
+              compact
+              :schema="source.query.schema"
+              :model-value="state.queryApplied.value"
+              :scope-key="scopeKey"
+              :loading="state.searching.value"
+              @apply="state.applyQuery"
+              @refresh="state.search"
+            >
+              <template #commands-end>
+                <el-button
+                  v-if="navigation?.create && !readonly"
+                  class="my-reference__command"
+                  plain
+                  type="primary"
+                  :icon="TopRight"
+                  :loading="navigator.busy.value"
+                  @click="createRelated"
+                >
+                  {{ createLabel }}
+                </el-button>
+              </template>
+            </QueryPanel>
+          </div>
+          <div v-else class="my-reference__query">
+            <el-input
+              ref="dialogInput"
+              v-model="state.dialogKeyword.value"
+              :aria-label="`${source.title}弹窗关键字`"
+              placeholder="输入名称或编码"
+              clearable
+              @keyup.enter="query"
+            />
+            <div class="my-reference__query-actions">
+              <el-button
+                class="my-reference__command"
+                type="primary"
+                :loading="state.searching.value"
+                @click="query"
+              >
+                查询
+              </el-button>
+              <el-button class="my-reference__command" @click="state.resetSearch">重置</el-button>
+              <el-popover
+                v-if="source.searchFields?.length"
+                trigger="click"
+                placement="bottom-start"
+                :width="300"
+              >
+                <template #reference>
+                  <el-button class="my-reference__command">筛选</el-button>
+                </template>
+                <div class="my-reference__filter-popover">
+                  <ReferenceSearchFields
+                    v-model="state.conditionValues.value"
+                    :fields="source.searchFields"
+                  />
+                  <el-button type="primary" :loading="state.searching.value" @click="query">
+                    查询
+                  </el-button>
+                </div>
+              </el-popover>
               <el-button
                 v-if="navigation?.create && !readonly"
                 class="my-reference__command"
@@ -227,130 +285,96 @@
               >
                 {{ createLabel }}
               </el-button>
-            </template>
-          </QueryPanel>
-        </div>
-        <div v-else class="my-reference__query">
-          <el-input
-            ref="dialogInput"
-            v-model="state.dialogKeyword.value"
-            :aria-label="`${source.title}弹窗关键字`"
-            placeholder="输入名称或编码"
-            clearable
-            @keyup.enter="query"
-          />
-          <div class="my-reference__query-actions">
-            <el-button
-              class="my-reference__command"
-              type="primary"
-              :loading="state.searching.value"
-              @click="query"
-            >
-              查询
-            </el-button>
-            <el-button class="my-reference__command" @click="state.resetSearch">重置</el-button>
-            <el-button
-              v-if="navigation?.create && !readonly"
-              class="my-reference__command"
-              plain
-              type="primary"
-              :icon="TopRight"
-              :loading="navigator.busy.value"
-              @click="createRelated"
-            >
-              {{ createLabel }}
-            </el-button>
+            </div>
           </div>
         </div>
-        <ReferenceSearchFields
-          v-if="!source.query"
-          v-model="state.conditionValues.value"
-          :fields="source.searchFields ?? []"
-        />
-        <p v-if="navigator.error.value" role="status">{{ navigator.error.value }}</p>
-        <div v-if="state.searchError.value" role="alert" class="my-reference__error">
-          {{ state.searchError.value }}
-          <el-button link type="primary" @click="state.search">重试查询</el-button>
-        </div>
-        <div
-          class="my-reference__body"
-          :class="{ 'has-selection': multiple }"
-          :style="{ '--reference-table-height': tableHeight + 'px' }"
-        >
+        <div class="my-reference__body" :class="{ 'has-selection': multiple }">
           <div class="my-reference__results">
-            <TableView
-              :rows="state.rows.value"
-              :columns="columns"
-              :get-row-key="source.getKey"
-              :loading="state.searching.value"
-              :current-row-key="state.draft.value ? source.getKey(state.draft.value) : null"
-              :height="tableHeight"
-              size="small"
-              @row-click="state.chooseDraft($event.row)"
+            <div
+              ref="resultRegion"
+              class="my-reference__table"
+              tabindex="0"
+              role="region"
+              :aria-label="`${source.title}候选列表，方向键移动，${multiple ? '空格勾选' : '回车确认'}`"
+              @keydown="onResultKeydown"
             >
-              <template #empty>
-                <div v-if="state.searchError.value">加载失败，请重试查询。</div>
-                <div v-else-if="!state.searching.value" class="my-reference__empty">
-                  <p>当前范围没有匹配记录，请调整搜索条件。</p>
-                  <el-button link type="primary" @click="adjustSearch">调整搜索</el-button>
-                  <el-button link @click="state.resetSearch">清除搜索条件</el-button>
-                </div>
-              </template>
-              <template v-for="column in source.columns" #[`header-${column.key}`]>
-                <el-checkbox
-                  v-if="multiple && column === source.columns[0]"
-                  :model-value="state.pageAll.value"
-                  :indeterminate="state.pageSome.value"
-                  :disabled="
-                    state.guarding.value || state.searching.value || !state.pageIds.value.length
-                  "
-                  @change="state.togglePage"
-                >
-                  全选当前页
-                </el-checkbox>
-                <span v-else>{{ column.label }}</span>
-              </template>
-              <template v-for="column in source.columns" #[`column-${column.key}`]="{ row }">
-                <el-button
-                  v-if="!multiple && column === source.columns[0]"
-                  link
-                  type="primary"
-                  :disabled="!state.eligible(row).allowed"
-                  :aria-label="`暂选${source.getLabel(row)} ${source.getDescription?.(row) ?? ''}`"
-                  @click.stop="state.chooseDraft(row)"
-                >
-                  <slot :name="`column-${column.key}`" :row="row">
-                    {{ column.format ? column.format(row) : row[column.key] }}
-                  </slot>
-                </el-button>
-                <span v-else-if="multiple && column === source.columns[0]" @click.stop>
+              <TableView
+                ref="resultTable"
+                :rows="state.rows.value"
+                :columns="columns"
+                :get-row-key="source.getKey"
+                :loading="state.searching.value"
+                :current-row-key="activeRowKey"
+                height="100%"
+                size="small"
+                @row-click="chooseRow"
+                @row-dblclick="quickChooseRow"
+              >
+                <template #empty>
+                  <div v-if="state.searchError.value">加载失败，请重试查询。</div>
+                  <div v-else-if="!state.searching.value" class="my-reference__empty">
+                    <p>当前范围没有匹配记录，请调整搜索条件。</p>
+                    <el-button link type="primary" @click="adjustSearch">调整搜索</el-button>
+                    <el-button link @click="state.resetSearch">清除搜索条件</el-button>
+                  </div>
+                </template>
+                <template v-for="column in source.columns" #[`header-${column.key}`]>
                   <el-checkbox
-                    :model-value="state.isSelected(row, true)"
-                    :disabled="state.guarding.value || !state.choiceAvailability(row, true).allowed"
+                    v-if="multiple && column === source.columns[0]"
+                    :model-value="state.pageAll.value"
+                    :indeterminate="state.pageSome.value"
+                    :disabled="
+                      state.guarding.value || state.searching.value || !state.pageIds.value.length
+                    "
+                    @change="state.togglePage"
+                  >
+                    全选当前页
+                  </el-checkbox>
+                  <span v-else>{{ column.label }}</span>
+                </template>
+                <template v-for="column in source.columns" #[`column-${column.key}`]="{ row }">
+                  <el-button
+                    v-if="!multiple && column === source.columns[0]"
+                    link
+                    type="primary"
+                    :disabled="!state.eligible(row).allowed"
                     :aria-label="`暂选${source.getLabel(row)} ${source.getDescription?.(row) ?? ''}`"
-                    @change="state.chooseDraft(row)"
+                    @click.stop="chooseCandidate(row)"
+                    @dblclick.stop="quickChoose(row)"
                   >
                     <slot :name="`column-${column.key}`" :row="row">
                       {{ column.format ? column.format(row) : row[column.key] }}
                     </slot>
-                  </el-checkbox>
-                </span>
-                <slot v-else :name="`column-${column.key}`" :row="row">
-                  {{ column.format ? column.format(row) : row[column.key] }}
-                </slot>
-                <small v-if="column === source.columns[0] && !state.eligible(row).allowed">
-                  （{{ state.eligible(row).reason ?? "不可选择" }}）
-                </small>
-              </template>
-            </TableView>
-            <Pagination
-              v-model:page="state.page.value"
-              v-model:limit="state.limit.value"
-              :total="state.total.value"
-              :disabled="state.searching.value"
-              layout="total, prev, pager, next"
-              @pagination="state.search"
-            />
+                  </el-button>
+                  <span
+                    v-else-if="multiple && column === source.columns[0]"
+                    @click.stop="onSelectionClick"
+                    @dblclick.stop="quickChoose(row)"
+                  >
+                    <el-checkbox
+                      :model-value="state.isSelected(row, true)"
+                      :disabled="
+                        state.guarding.value ||
+                        state.searching.value ||
+                        !state.choiceAvailability(row, true).allowed
+                      "
+                      :aria-label="`暂选${source.getLabel(row)} ${source.getDescription?.(row) ?? ''}`"
+                      @change="chooseCandidate(row)"
+                    >
+                      <slot :name="`column-${column.key}`" :row="row">
+                        {{ column.format ? column.format(row) : row[column.key] }}
+                      </slot>
+                    </el-checkbox>
+                  </span>
+                  <slot v-else :name="`column-${column.key}`" :row="row">
+                    {{ column.format ? column.format(row) : row[column.key] }}
+                  </slot>
+                  <small v-if="column === source.columns[0] && !state.eligible(row).allowed">
+                    （{{ state.eligible(row).reason ?? "不可选择" }}）
+                  </small>
+                </template>
+              </TableView>
+            </div>
           </div>
           <details v-if="multiple" class="my-reference__chosen" :open="dialogWidth >= 768">
             <summary>
@@ -393,17 +417,54 @@
             </ul>
           </details>
         </div>
-        <p v-if="!multiple" role="status">
-          {{
-            state.draft.value
-              ? `待确认：${source.getLabel(state.draft.value)} ${source.getDescription?.(state.draft.value) ?? ""}`
-              : "请选择一条记录，再点击确定"
-          }}
-        </p>
-        <p v-if="state.guardError.value" role="alert" class="my-reference__error">
-          {{ state.guardError.value }}
-        </p>
       </div>
+      <template #footer>
+        <div class="my-reference__footer">
+          <!-- 反馈浮在工具栏上方，不新增布局行；长内容可悬停查看。 -->
+          <div v-if="footerNotice" class="my-reference__feedback" aria-live="polite">
+            <el-tooltip :content="footerNotice" placement="top" :show-after="300">
+              <span
+                class="my-reference__feedback-text"
+                :class="{ 'my-reference__error': hasFeedbackError }"
+                :role="hasFeedbackError ? 'alert' : 'status'"
+                tabindex="0"
+              >
+                {{ footerNotice }}
+              </span>
+            </el-tooltip>
+            <el-button v-if="state.searchError.value" link type="primary" @click="state.search">
+              重试查询
+            </el-button>
+          </div>
+          <Pagination
+            class="my-reference__pager"
+            v-model:page="state.page.value"
+            v-model:limit="state.limit.value"
+            compact
+            :total="state.total.value"
+            :disabled="state.searching.value || state.guarding.value"
+            :layout="dialogWidth < 760 ? 'prev, slot, next' : 'total, sizes, prev, pager, next'"
+            :auto-scroll="false"
+            @pagination="state.search"
+          >
+            <span
+              class="my-reference__page-count"
+              :aria-label="'第 ' + state.page.value + ' 页，共 ' + pageCount + ' 页'"
+            >
+              {{ state.page.value }} / {{ pageCount }}
+            </span>
+          </Pagination>
+          <el-button :disabled="state.guarding.value" @click="state.close">取消</el-button>
+          <ActionButton
+            :label="multiple ? '确认（' + state.draftIds.value.length + '）' : '确认选择'"
+            tone="primary"
+            :link="false"
+            :loading="state.guarding.value"
+            :disabled-reason="confirmDisabledReason"
+            @click="confirmSelection"
+          />
+        </div>
+      </template>
     </MyDialog>
   </div>
 </template>
@@ -418,11 +479,11 @@
     Multiple extends boolean = false
   "
 >
-import { ref, useId, watch, nextTick, onActivated, onDeactivated } from "vue";
+import { ref, shallowRef, useId, watch, nextTick, onActivated, onDeactivated } from "vue";
 import { useBusinessNavigation } from "@/composables/useBusinessNavigation";
 import { getBusinessTarget } from "@/router/business-targets";
 import { Close, MoreFilled, TopRight } from "@element-plus/icons-vue";
-import { useElementSize } from "@vueuse/core";
+import { useElementSize, useMediaQuery } from "@vueuse/core";
 import type { InputInstance } from "element-plus";
 import type {
   ReferenceInputProps,
@@ -433,6 +494,8 @@ import type {
 } from "./types";
 import { useReference } from "./useReference";
 import { serializeStableKey } from "@/utils/identity";
+import type { TableViewRowEvent } from "@/components/table/types";
+import ActionButton from "@/components/business/ActionButton.vue";
 import TableView from "@/components/table/TableView.vue";
 import ReferenceSearchFields from "./ReferenceSearchFields.vue";
 import Pagination from "@/components/common/Pagination.vue";
@@ -440,6 +503,7 @@ import MyDialog from "@/components/common/MyDialog.vue";
 import QueryPanel from "@/components/business/search/QueryPanel.vue";
 const props = withDefaults(defineProps<ReferenceInputProps<Row, Id, F, Multiple>>(), {
   clearable: true,
+  confirmOnDoubleClick: true,
 });
 const emit = defineEmits<ReferenceEmits<Row, Id, Multiple>>();
 defineSlots<
@@ -527,15 +591,9 @@ const columns = computed(() =>
       : { ...column, minWidth: column.minWidth ?? 100 }
   )
 );
-/** 窄弹窗采用较矮的候选列表，宽弹窗固定高度，避免结果数量变化时界面跳动。 */
-const tableHeight = computed(() => {
-  if (dialogWidth.value < 768) return 200;
-  // 候选区不随结果条数伸缩；极矮窗口由 MyDialog 的公共滚动容器兜底。
-  // 不监听全局窗口 resize，TableView 继续通过自身 ResizeObserver 测量可用区域。
-  return 360;
-});
 /** 说明为什么暂时不能确认，例如单选未选择、正在回显或查询失败。 */
 const confirmDisabledReason = computed(() => {
+  if (state.searching.value) return "正在查询，请稍后";
   if (!props.multiple && !state.draftIds.value.length) return "请先选择一条记录";
   if (state.resolving.value) return "正在校验已选记录";
   if (state.searchError.value) return "请先处理查询错误";
@@ -553,6 +611,122 @@ const state = useReference(props, {
   error: (value) => emit("error", value),
   open: (value) => emit("open-change", value),
 });
+/** 错误和跨页已选提示不参与高度分配，避免挤动列表或分页。 */
+const hasFeedbackError = computed(
+  () => !!(state.guardError.value || state.searchError.value || navigator.error.value)
+);
+/** 当前已选记录离开本页时补充名称；本页选择直接通过高亮表达。 */
+const footerNotice = computed(() => {
+  const error = state.guardError.value || state.searchError.value || navigator.error.value;
+  if (error) return error;
+  const selected = state.draft.value;
+  return !props.multiple &&
+    selected &&
+    !state.rows.value.some((row) => props.source.getKey(row) === props.source.getKey(selected))
+    ? "已选：" + props.source.getLabel(selected)
+    : "";
+});
+/** 紧凑分页仍显示当前页和总页数，空结果按一页展示。 */
+const pageCount = computed(() => Math.max(1, Math.ceil(state.total.value / state.limit.value)));
+/** 窄屏使用全屏，避免分页和操作栏被屏幕边缘裁切。 */
+const narrowDialog = useMediaQuery("(max-width: 767px)");
+/** 列表独立获得键盘焦点，输入框及按钮仍保留各自的键盘操作。 */
+const resultRegion = ref<HTMLElement>();
+/** 仅通过表格公开方法滚动到键盘高亮行。 */
+const resultTable = ref<{
+  scrollToCell: (key: Id, field: Extract<keyof Row, string>) => Promise<void>;
+}>();
+/** 当前页键盘或鼠标定位的行；它与多选勾选集合相互独立。 */
+const activeRowKey = shallowRef<Id | null>(null);
+watch([state.rows, state.visible], () => {
+  const selected = state.rows.value.find((row) => state.isSelected(row, true));
+  activeRowKey.value = selected ? props.source.getKey(selected) : null;
+});
+/** 点击控件时不叠加整行选择；第二次 click 留给双击处理，避免多选反复切换。 */
+function chooseRow(event: TableViewRowEvent<Row, Id>) {
+  if (
+    event.originalEvent &&
+    (event.originalEvent.detail > 1 || isInteractive(event.originalEvent.target))
+  )
+    return;
+  chooseCandidate(event.row);
+  resultRegion.value?.focus({ preventScroll: true });
+}
+/** 输入、按钮和自定义链接负责自己的交互，列表不接管它们。 */
+function isInteractive(target: EventTarget | null) {
+  return (
+    target instanceof Element &&
+    !!target.closest(
+      'button, a, input, select, textarea, [role="button"], [role="checkbox"], [contenteditable="true"]'
+    )
+  );
+}
+/** 第二次点击不再次切换复选框，双击最终确保选中当前行。 */
+function onSelectionClick(event: MouseEvent) {
+  if (event.detail > 1) event.preventDefault();
+}
+/** 暂选当前行；查询或提交中不接受新选择。 */
+function chooseCandidate(row: Readonly<Row>) {
+  if (state.searching.value || state.guarding.value) return;
+  activeRowKey.value = props.source.getKey(row);
+  state.chooseDraft(row);
+}
+/** 表格双击入口；自定义控件上的双击不触发行操作。 */
+function quickChooseRow(event: TableViewRowEvent<Row, Id>) {
+  if (event.originalEvent && isInteractive(event.originalEvent.target)) return;
+  quickChoose(event.row);
+}
+/** 单选快速确认，多选确保选中而不关闭；所有确认仍复用原有业务校验。 */
+function quickChoose(row: Readonly<Row>) {
+  if (state.searching.value || state.guarding.value) return;
+  if (!props.multiple) {
+    chooseCandidate(row);
+    if (props.confirmOnDoubleClick && state.choiceAvailability(row, true).allowed)
+      void confirmSelection();
+  } else if (!state.isSelected(row, true)) chooseCandidate(row);
+}
+/** 按钮、回车和双击使用同一确认入口，失败后保留弹窗和暂选结果。 */
+function confirmSelection() {
+  if (confirmDisabledReason.value || state.guarding.value) return;
+  return state.commitIds(state.draftIds.value);
+}
+/** 仅处理列表区域自身的按键，不抢占查询框、复选框和按钮的操作。 */
+function onResultKeydown(event: KeyboardEvent) {
+  if (
+    event.target !== resultRegion.value ||
+    event.isComposing ||
+    state.searching.value ||
+    state.guarding.value
+  )
+    return;
+  const rows = state.rows.value;
+  if (!rows.length) return;
+  const index = rows.findIndex((row) => props.source.getKey(row) === activeRowKey.value);
+  if (event.key === "ArrowDown" || event.key === "ArrowUp") {
+    event.preventDefault();
+    const next =
+      index < 0
+        ? event.key === "ArrowDown"
+          ? 0
+          : rows.length - 1
+        : Math.max(0, Math.min(rows.length - 1, index + (event.key === "ArrowDown" ? 1 : -1)));
+    const row = rows[next]!;
+    activeRowKey.value = props.source.getKey(row);
+    const field = props.source.columns[0]?.key;
+    if (field) void resultTable.value?.scrollToCell(activeRowKey.value, field);
+  } else if (
+    index >= 0 &&
+    ((props.multiple && event.key === " ") || (!props.multiple && event.key === "Enter"))
+  ) {
+    event.preventDefault();
+    const row = rows[index]!;
+    if (props.multiple) chooseCandidate(row);
+    else if (state.choiceAvailability(row, true).allowed) {
+      chooseCandidate(row);
+      void confirmSelection();
+    }
+  }
+}
 /** 键盘高亮项变化后，等待候选 DOM 更新，再把它滚动到可见位置。 */
 watch(state.activeIndex, async (index) => {
   await nextTick();
@@ -658,16 +832,95 @@ defineExpose<ReferenceExpose>({
     display: grid;
     grid-template-columns: minmax(0, 1fr) 240px;
     gap: 16px;
-    height: calc(var(--reference-table-height) + 56px);
+
     align-items: stretch;
   }
   &__dialog-content {
+    display: flex;
+    flex: 1;
+    flex-direction: column;
+    min-height: 0;
     min-width: 0;
     container-type: inline-size;
   }
+  &__filters {
+    flex: 0 0 64px;
+    min-height: 0;
+    overflow: auto;
+  }
+  &__filter-popover {
+    max-height: min(360px, 50dvh);
+    overflow: auto;
+  }
+  &__body {
+    flex: 1;
+    min-height: 0;
+    position: relative;
+  }
   &__results {
+    display: grid;
+    grid-template-rows: minmax(0, 1fr);
+    height: 100%;
+    min-height: 0;
     min-width: 0;
   }
+  &__table {
+    min-height: 0;
+    overflow: hidden;
+  }
+  &__table:focus-visible {
+    outline: var(--ui-focus-ring);
+    outline-offset: -2px;
+  }
+  &__feedback {
+    position: absolute;
+    bottom: calc(100% + 12px);
+    left: 0;
+    right: 0;
+    z-index: 4;
+    box-sizing: border-box;
+    padding: 6px 10px;
+    background: var(--el-bg-color-overlay);
+    border: 1px solid var(--el-border-color-light);
+    border-radius: var(--el-border-radius-base);
+    box-shadow: var(--el-box-shadow-light);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    min-height: 34px;
+    min-width: 0;
+    overflow: hidden;
+    text-align: left;
+  }
+  &__feedback-text {
+    flex: 1;
+    min-width: 0;
+    line-height: 20px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    color: var(--el-text-color-secondary);
+  }
+  &__feedback-text.my-reference__error {
+    color: var(--el-color-danger);
+  }
+  &__footer {
+    position: relative;
+    height: 36px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  &__pager {
+    flex: 1;
+    min-width: 0;
+  }
+  &__page-count {
+    white-space: nowrap;
+    font-size: 12px;
+    color: var(--el-text-color-secondary);
+  }
+
   &__tags {
     display: flex;
     flex-wrap: wrap;
@@ -707,16 +960,32 @@ defineExpose<ReferenceExpose>({
     }
   }
   @container (max-width: 767px) {
+    &__filters {
+      flex-basis: 112px;
+    }
     &__body.has-selection {
       grid-template-columns: minmax(0, 1fr);
-      height: auto;
+      grid-template-rows: minmax(0, 1fr) 36px;
+      gap: 8px;
     }
     &__chosen {
-      height: auto;
-      max-height: 260px;
+      height: 36px;
+      padding: 6px 10px;
+    }
+    &__chosen[open] {
+      position: absolute;
+      // 分页已移入底部工具栏；清单只覆盖列表，不改变表格高度。
+      bottom: 0;
+      left: 0;
+      right: 0;
+      height: 180px;
+      max-height: 100%;
+      background: var(--el-bg-color);
+      z-index: 3;
+      box-shadow: var(--el-box-shadow-light);
     }
     &__chosen ul {
-      max-height: 170px;
+      max-height: 100px;
     }
     &__query {
       flex-wrap: wrap;

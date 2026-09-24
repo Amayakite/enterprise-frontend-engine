@@ -605,9 +605,12 @@ async function focusCell(key: Key, field: FieldKey<Row>) {
 }
 /** 确认当前行输入；失败则保留草稿并定位第一项错误。 */
 async function commitEdit() {
+  const current = draft.session.value;
   const success = await draft.commitEdit();
-  const first = draft.errors.value[0];
-  if (!success && first) await focusCell(first.rowKey, first.field);
+  // 只定位本轮仍在编辑的行；其他行的历史错误不能触发切行和再次确认。
+  const first = draft.errors.value.find((error) => error.rowKey === current?.key);
+  if (!success && current && draft.session.value === current && first)
+    await focusCell(first.rowKey, first.field);
   return success;
 }
 /** 先确认上一行，再编辑目标行；根据配置打开弹层或聚焦行内字段。 */
@@ -626,11 +629,11 @@ async function startEdit(key: Key, field?: FieldKey<Row>, located = false) {
     draft.errors.value = previousErrors;
   }
   const target = field ?? resolvedColumns.value.find((column) => editableField(column.key))?.key;
-  // 按行编辑展示方式打开弹层或定位单元格，弹层要等表单挂载后再校验和聚焦。
+  // 弹层挂载后显示行校验的已有结果，不为展示错误再次执行规则或参照请求。
   if (overlayEdit.value) {
     dialogOpen.value = true;
     await nextTick();
-    if (draft.errors.value.some((error) => error.rowKey === key)) await rowForm.value?.validate();
+    rowForm.value?.setErrors(draft.errors.value.filter((error) => error.rowKey === key));
     if (target) rowForm.value?.focusField(target);
   } else if (target) await locateTableCell(key, target);
   return true;
@@ -654,15 +657,8 @@ function updateDialogVisible(value: boolean) {
   dialogOpen.value = value;
   if (!value && draft.session.value) draft.cancelEdit();
 }
-/** 先校验弹层表单，再确认行草稿；只有两者通过才关闭编辑窗口。 */
+/** 弹层与行内编辑共用一次草稿校验；失败由 commitEdit 定位并同步字段错误。 */
 async function commitDialog() {
-  const formResult = await rowForm.value?.validate();
-  if (formResult && !formResult.valid) {
-    await draft.validate(draft.session.value ? [draft.session.value.draft] : []);
-    const first = formResult.errors[0];
-    if (first) rowForm.value?.focusField(first.field);
-    return false;
-  }
   const success = await commitEdit();
   if (success) dialogOpen.value = false;
   return success;

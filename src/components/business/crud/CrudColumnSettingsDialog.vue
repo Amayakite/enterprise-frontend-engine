@@ -514,7 +514,12 @@ import type {
   CrudColumnDensity,
   CrudColumnFixed,
   CrudColumnPreference,
-} from "@/composables/useCrudColumns";
+} from "@/components/table/column-preferences";
+
+import {
+  groupColumnPreferences,
+  applyColumnPreference,
+} from "@/components/table/column-preferences";
 
 type VisibilityFilter = "all" | "visible" | "hidden";
 interface ColumnUnit {
@@ -625,10 +630,6 @@ const visible = computed({
 const columnsByKey = computed(
   () => new Map(props.columns.map((column) => [column.key as string, column]))
 );
-/** 记录业务配置中的原始列顺序，同组列加载草稿时按此顺序排列。 */
-const sourceOrder = computed(
-  () => new Map(props.columns.map((column, index) => [column.key as string, index]))
-);
 /** 按左、中、右顺序合并所有列组，用于统一搜索和预览。 */
 const allUnits = computed(() => [zoneUnits.left, zoneUnits.none, zoneUnits.right].flat());
 /** 展开所有组得到临时列设置列表，统计数量和应用配置时使用。 */
@@ -688,33 +689,10 @@ function cloneItems(items: readonly CrudColumnPreference[]) {
 }
 /** 把列偏好按表头组和固定位置整理为可拖动草稿，并重置搜索、选择和拖动状态。 */
 function loadDraft(items: readonly CrudColumnPreference[], density: CrudColumnDensity) {
-  const next = cloneItems(items);
-  const units: ColumnUnit[] = [];
-  const collectedGroups = new Set<string>();
-  for (const item of next) {
-    const headerGroup = headerGroupOf(item);
-    if (!headerGroup) {
-      units.push({ key: unitKey(item), items: [item] });
-      continue;
-    }
-    if (collectedGroups.has(headerGroup.key)) continue;
-    collectedGroups.add(headerGroup.key);
-    const members = next
-      .filter((candidate) => headerGroupOf(candidate)?.key === headerGroup.key)
-      .sort(
-        (left, right) =>
-          (sourceOrder.value.get(left.key) ?? Number.MAX_SAFE_INTEGER) -
-          (sourceOrder.value.get(right.key) ?? Number.MAX_SAFE_INTEGER)
-      );
-    const anchor = members[0] ?? item;
-    const fixed = anchor.fixed;
-    const groupAlign = anchor.groupAlign ?? headerGroup.align ?? "center";
-    for (const member of members) {
-      member.fixed = fixed;
-      member.groupAlign = groupAlign;
-    }
-    units.push({ key: unitKey(item), group: headerGroup, items: members });
-  }
+  const units: ColumnUnit[] = groupColumnPreferences(props.columns, items).map((unit) => ({
+    ...unit,
+    key: unitKey(unit.items[0]!),
+  }));
   for (const zone of groupDefinitions)
     zoneUnits[zone.fixed] = units.filter((unit) => unit.items[0]?.fixed === zone.fixed);
   draftDensity.value = density;
@@ -900,21 +878,7 @@ function restoreHeaderGroup(key: string) {
 }
 /** 把临时偏好合并到原始列生成预览配置，隐藏列不进入预览。 */
 function draftColumn(item: CrudColumnPreference): TableColumn<Row> | undefined {
-  const column = columnOf(item.key);
-  if (!column || !item.visible) return undefined;
-  return {
-    ...column,
-    width: item.width,
-    fixed: item.fixed === "none" ? undefined : item.fixed,
-    align: item.align,
-    headerGroup: column.headerGroup
-      ? {
-          ...column.headerGroup,
-          fixed: item.fixed === "none" ? undefined : item.fixed,
-          align: item.groupAlign ?? column.headerGroup.align ?? "center",
-        }
-      : undefined,
-  };
+  return applyColumnPreference(columnOf(item.key), item);
 }
 /** 按拖动单元预先生成可见预览列，结构和属性面板共用。 */
 const previewColumns = computed(

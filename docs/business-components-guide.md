@@ -294,6 +294,17 @@ function onSaleCommit(event: ReferenceCommit<SaleRecord, string, false>) {
 | `multiple` | `true` 开启多选，同时将值改为数组               | 默认单选，不在运行时切换              |
 | `readonly` | `true` 只显示已选内容                           | 默认允许选择                          |
 
+### 参照弹窗的布局与选择操作
+
+参照弹窗仅保留查询区、候选列表和底部工具栏。分页与取消、确认放在同一行，候选列表与已选清单各自滚动。选择记录不会改变表格高度；仅调整窗口尺寸时重新分配高度。错误及单选跨页后的已选名称在工具栏上方浮出，不额外占一行。窄屏自动全屏，分页仅显示前后翻页和当前页数，多选清单可展开查看。
+
+- 单选：单击暂选，双击确认当前行；也可点击“确认选择”。传入 `:confirm-on-double-click="false"` 可关闭双击确认。
+- 多选：单击或勾选增减，双击保持该行选中且不关闭；翻页和查询保留暂选集合，取消不回写原字段。
+- 列表区域获得焦点后，上下键移动高亮行；单选 Enter 确认，多选 Space 勾选。查询框 Enter 仍然查询，Esc 取消弹窗。
+- 所有确认方式都复用记录有效性检查和 `beforeCommit`；查询或提交期间禁止快速确认，失败提示在底部显示，暂选保留。
+
+普通业务弹窗默认仍由正文滚动。如果内容需要固定分页等区域，可使用 `<MyDialog fill-height body-scroll="content">`，由内容通过 flex/grid 分配剩余高度并管理内部滚动；不要覆盖 Element Plus 私有样式。
+
 ### 单独显示已选参照
 
 沿用上例的导入、saleId 和父页面参数，替换为以下模板即可按 ID 显示只读内容：
@@ -468,7 +479,7 @@ const fields = defineFields<Model, Context>()([
 const createInitialModel = (): Model => ({ title: "", quantity: 0 });
 ```
 
-把 fields、context、createInitialModel 与 v-model 传给 MyForm，显式提供 mode="add" 或 "edit"。MyDesc 接收相同 fields、context、model-value，按 detail 展示。MyForm 方法类型为 `MyFormExpose<Model>`，实体加载用 hydrate(model)，恢复用 reset()；applyPatch(patch, reason) 用于普通变更，不能替代实体 hydrate。validate/validateFields 返回 `{ valid, stale?, errors }`，页面只有 valid 才提交。clearValidate 与 focusField 用于清理、定位错误。
+把 fields、context、createInitialModel 与 v-model 传给 MyForm，显式提供 mode="add" 或 "edit"。MyDesc 接收相同 fields、context、model-value，按 detail 展示。MyForm 方法类型为 `MyFormExpose<Model>`，实体加载用 hydrate(model)，恢复用 reset()；applyPatch(patch, reason) 用于普通变更，不能替代实体 hydrate。validate/validateFields 返回 `{ valid, stale?, errors }`，页面只有 valid 才提交。clearValidate 与 focusField 用于清理、定位错误。如果外层已经校验过当前模型，可调用 `setErrors(result.errors)` 展示结果，避免重复执行异步规则；它只展示当前可见字段的错误，传空数组会清空提示。调用方需要先排除过期结果，模型发生变化后应重新校验。
 
 隐藏字段保留值但不参与可见表单校验；只读与必填依据当前模式/context 展开。后端仍须鉴权。快照支持普通对象、数组、Date 与原始值，禁止函数、组件实例或循环结构。自定义字段插槽使用 setValue，避免直接修改父模型。
 

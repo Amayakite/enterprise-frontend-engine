@@ -22,23 +22,24 @@ export interface CrudColumnIdentity {
   scope?: string;
 }
 
-export type CrudColumnFixed = "left" | "none" | "right";
-export type CrudColumnDensity = "compact" | "comfortable";
-export type CrudColumnAlign = "left" | "center" | "right";
-export interface CrudColumnPreference {
-  /** 对应 TableColumn.key，只允许保存当前模块声明的列。 */
-  key: string;
-  /** 该列是否显示；应用设置后必须至少保留一列可见。 */
-  visible: boolean;
-  /** 列宽，单位像素；允许 64–1000，省略时沿用列配置的宽度。 */
-  width?: number;
-  /** 固定区域：left 左侧、right 右侧、none 不固定；同一分组保持一致。 */
-  fixed: CrudColumnFixed;
-  /** 单元格对齐方式：left、center 或 right，默认取模块配置或 left。 */
-  align: CrudColumnAlign;
-  /** 仅分组叶子列存在；同组成员在归一化时保持一致。 */
-  groupAlign?: CrudColumnAlign;
-}
+// 保留原类型导入入口；纯列规则由表格目录维护，避免设置面板依赖存储 hook。
+export type {
+  CrudColumnFixed,
+  CrudColumnDensity,
+  CrudColumnAlign,
+  CrudColumnPreference,
+} from "@/components/table/column-preferences";
+import type {
+  CrudColumnDensity,
+  CrudColumnAlign,
+  CrudColumnPreference,
+} from "@/components/table/column-preferences";
+import {
+  groupColumnPreferences,
+  normalizeColumnPreferences,
+  applyColumnPreference,
+  validColumnWidth,
+} from "@/components/table/column-preferences";
 
 /**
  * 管理列表列顺序、可见性、宽度、冻结和密度偏好。
@@ -55,48 +56,9 @@ export function useCrudColumns<Row>(
   columns: readonly TableColumn<Row>[],
   identity: () => CrudColumnIdentity
 ) {
-  /** 读取字段所属的分组表头 key，无分组返回 undefined。 */
-  const headerGroupKey = (key: string) =>
-    columns.find((column) => column.key === key)?.headerGroup?.key;
-  /** 模块声明的原始列顺序，用于保持同组字段的排列关系。 */
-  const sourceOrder = new Map(columns.map((column, index) => [column.key as string, index]));
-  /** 分组表头是配置结构：偏好只能移动整组，不能把叶子列拆到不同位置或固定区。 */
-  const arrange = (value: readonly CrudColumnPreference[]) => {
-    const fixedOrder = (["left", "none", "right"] as const).flatMap((fixed) =>
-      value.filter((item) => item.fixed === fixed)
-    );
-    const units: CrudColumnPreference[][] = [];
-    const collectedGroups = new Set<string>();
-    for (const item of fixedOrder) {
-      const groupKey = headerGroupKey(item.key);
-      if (!groupKey) {
-        units.push([item]);
-        continue;
-      }
-      if (collectedGroups.has(groupKey)) continue;
-      collectedGroups.add(groupKey);
-      const orderedMembers = fixedOrder
-        .filter((candidate) => headerGroupKey(candidate.key) === groupKey)
-        .sort(
-          (left, right) =>
-            (sourceOrder.get(left.key) ?? Number.MAX_SAFE_INTEGER) -
-            (sourceOrder.get(right.key) ?? Number.MAX_SAFE_INTEGER)
-        );
-      const anchor = orderedMembers[0] ?? item;
-      const members = orderedMembers.map((member) => ({
-        ...member,
-        fixed: anchor.fixed,
-        groupAlign:
-          anchor.groupAlign ??
-          columns.find((column) => column.key === anchor.key)?.headerGroup?.align ??
-          "center",
-      }));
-      units.push(members);
-    }
-    return (["left", "none", "right"] as const).flatMap((fixed) =>
-      units.filter((unit) => unit[0]?.fixed === fixed).flat()
-    );
-  };
+  /** 存储恢复、用户提交和弹窗预览共用分组顺序及固定区规则。 */
+  const arrange = (value: readonly CrudColumnPreference[]) =>
+    groupColumnPreferences(columns, value).flatMap((unit) => unit.items);
   /** 根据当前列配置生成全新默认偏好，并把同组字段放在一起。 */
   const defaults = (): CrudColumnPreference[] =>
     arrange(
@@ -198,51 +160,8 @@ export function useCrudColumns<Row>(
     if (!saved || typeof saved !== "object") return;
     const list: unknown = Reflect.get(saved, "columns");
     if (!Array.isArray(list)) return;
-    const allowed = new Map(columns.map((column) => [column.key as string, column]));
-    const parsed: CrudColumnPreference[] = [];
-    // 存储内容按不可信旧数据处理：仅接受现有列，过滤重复项，并逐项校验外观值。
-    for (const item of list) {
-      if (!item || typeof item !== "object") continue;
-      const name: unknown = Reflect.get(item, "key"),
-        width: unknown = Reflect.get(item, "width"),
-        savedFixed: unknown = Reflect.get(item, "fixed"),
-        savedAlign: unknown = Reflect.get(item, "align"),
-        savedGroupAlign: unknown = Reflect.get(item, "groupAlign");
-      if (
-        typeof name !== "string" ||
-        !allowed.has(name) ||
-        parsed.some((entry) => entry.key === name)
-      )
-        continue;
-      parsed.push({
-        key: name,
-        visible: Reflect.get(item, "visible") !== false,
-        width:
-          typeof width === "number" && Number.isFinite(width) && width >= 64 && width <= 1000
-            ? width
-            : allowed.get(name)?.width,
-        fixed:
-          savedFixed === "left" || savedFixed === "right" || savedFixed === "none"
-            ? savedFixed
-            : (allowed.get(name)?.fixed ?? "none"),
-        align:
-          savedAlign === "left" || savedAlign === "center" || savedAlign === "right"
-            ? savedAlign
-            : (allowed.get(name)?.align ?? "left"),
-        groupAlign: allowed.get(name)?.headerGroup
-          ? savedGroupAlign === "left" ||
-            savedGroupAlign === "center" ||
-            savedGroupAlign === "right"
-            ? savedGroupAlign
-            : (allowed.get(name)?.headerGroup?.align ?? "center")
-          : undefined,
-      });
-    }
-    // 旧设置里没有的新列补上默认值，随后恢复分组关系，避免升级后字段永远不显示。
-    items.value = arrange([
-      ...parsed,
-      ...defaults().filter((item) => !parsed.some((entry) => entry.key === item.key)),
-    ]);
+    // 读取损坏数据时容错；缺少的列从模块默认设置补齐。
+    items.value = arrange(normalizeColumnPreferences(columns, list, defaults(), "storage"));
     if (!items.value.some((item) => item.visible)) items.value = defaults();
     density.value = Reflect.get(saved, "density") === "comfortable" ? "comfortable" : "compact";
   }
@@ -386,11 +305,7 @@ export function useCrudColumns<Row>(
       align?: CrudColumnAlign;
     }
   ) {
-    if (
-      patch.width !== undefined &&
-      (!Number.isFinite(patch.width) || patch.width < 64 || patch.width > 1000)
-    )
-      return;
+    if (patch.width !== undefined && !validColumnWidth(patch.width)) return;
     if (patch.align !== undefined && !["left", "center", "right"].includes(patch.align)) return;
     const next = items.value.map((item) => (item.key === key ? { ...item, ...patch } : item));
     if (!next.some((item) => item.visible)) return;
@@ -399,33 +314,7 @@ export function useCrudColumns<Row>(
   }
   /** 接收设置面板确认的整份偏好，清理无效字段后应用并保存；全隐藏返回 false。 */
   function apply(nextItems: readonly CrudColumnPreference[], nextDensity: CrudColumnDensity) {
-    const allowed = new Map(columns.map((column) => [column.key as string, column]));
-    const next: CrudColumnPreference[] = [];
-    for (const item of nextItems) {
-      const source = allowed.get(item.key);
-      if (!source || next.some((entry) => entry.key === item.key)) continue;
-      next.push({
-        key: item.key,
-        visible: item.visible !== false,
-        width:
-          item.width === undefined ||
-          (Number.isFinite(item.width) && item.width >= 64 && item.width <= 1000)
-            ? item.width
-            : source.width,
-        fixed: ["left", "none", "right"].includes(item.fixed)
-          ? item.fixed
-          : (source.fixed ?? "none"),
-        align: ["left", "center", "right"].includes(item.align)
-          ? item.align
-          : (source.align ?? "left"),
-        groupAlign: source.headerGroup
-          ? item.groupAlign && ["left", "center", "right"].includes(item.groupAlign)
-            ? item.groupAlign
-            : (source.headerGroup.align ?? "center")
-          : undefined,
-      });
-    }
-    next.push(...defaults().filter((item) => !next.some((entry) => entry.key === item.key)));
+    const next = normalizeColumnPreferences(columns, nextItems, defaults(), "editor");
     if (!next.some((item) => item.visible)) return false;
     items.value = arrange(next);
     density.value = nextDensity === "comfortable" ? "comfortable" : "compact";
@@ -445,26 +334,13 @@ export function useCrudColumns<Row>(
   }
   /** 将用户偏好合入模块列配置，生成实际传给表格的可见列。 */
   const visibleColumns = computed(() =>
-    items.value.flatMap((item) => {
-      const column = columns.find((entry) => entry.key === item.key);
-      return item.visible && column
-        ? [
-            {
-              ...column,
-              width: item.width,
-              fixed: item.fixed === "none" ? undefined : item.fixed,
-              align: item.align,
-              headerGroup: column.headerGroup
-                ? {
-                    ...column.headerGroup,
-                    fixed: item.fixed === "none" ? undefined : item.fixed,
-                    align: item.groupAlign ?? column.headerGroup.align ?? "center",
-                  }
-                : undefined,
-            },
-          ]
-        : [];
-    })
+    items.value.flatMap(
+      (item) =>
+        applyColumnPreference(
+          columns.find((column) => column.key === item.key),
+          item
+        ) ?? []
+    )
   );
   return {
     items,

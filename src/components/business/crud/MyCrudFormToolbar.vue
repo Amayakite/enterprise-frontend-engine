@@ -38,8 +38,8 @@
         label="保存"
         tone="primary"
         :link="false"
-        :disabled="blocked || changePending || !!changeError"
-        :disabled-reason="changeError || (changePending ? '字段变化处理中' : readonlyReason)"
+        :disabled="blocked"
+        :disabled-reason="readonlyReason"
         :loading="busy"
         @click="controller.save"
       />
@@ -72,7 +72,7 @@ const busy = computed(() => props.controller.busy);
 const permitted = computed(() => props.controller.savePermission);
 /** 汇总表单、字段异步处理等禁止保存的原因，供按钮旁提示用户。 */
 const readonlyReason = computed(() =>
-  crudFormDisabledReason(props.controller, props.readonlyReason)
+  crudFormDisabledReason(props.controller, props.readonlyReason, props)
 );
 /** 有禁止保存的原因时禁用按钮，保持按钮状态和提示一致。 */
 const blocked = computed(() => !!readonlyReason.value);

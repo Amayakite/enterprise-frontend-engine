@@ -1,4 +1,5 @@
 import type { FieldKey, FieldLink } from "@/components/business/fields/types";
+import type { DeepReadonly } from "vue";
 
 export interface TableColumn<Row> extends TableViewColumn<Row> {
   /** 是否允许点击表头排序，默认 false；后端必须验证排序 key。 */
@@ -62,7 +63,10 @@ export interface MyTableExpose<Row, Key> {
   startEdit: (key: Key, field?: FieldKey<Row>) => Promise<boolean>;
   commitEdit: () => Promise<boolean>;
   cancelEdit: () => void;
-  validate: (rows?: readonly Row[]) => Promise<TableValidation<Row, Key>>;
+  /** 接受普通行或整单的深只读快照；校验器内部复制一次，调用前无需另建可变副本。 */
+  validate: (
+    rows?: readonly Row[] | DeepReadonly<readonly Row[]>
+  ) => Promise<TableValidation<Row, Key>>;
   focusCell: (key: Key, field: FieldKey<Row>) => Promise<void>;
   addRow: () => Promise<boolean>;
   removeRow: (key: Key) => Promise<boolean>;
@@ -117,8 +121,12 @@ export interface TableViewColumnBand<Row> {
 }
 
 export interface TableViewRowEvent<Row, Key extends string | number> {
+  /** 触发行事件的只读业务记录。 */
   row: Readonly<Row>;
+  /** 记录稳定 ID，保留数字或字符串类型。 */
   rowKey: Key;
+  /** 原生鼠标事件；可判断点击次数和控件来源，程序触发时可能省略。 */
+  originalEvent?: MouseEvent;
 }
 
 /** MyTable 的公开事件参数说明，供模板事件悬停和调用方适配使用。 */

@@ -371,3 +371,48 @@ test("清理登录会话后迟到远端数据不能回写仍待卸载的页面",
   view.close();
   userDataStore.setRemoteAdapter();
 });
+
+test("列设置共用规则保留清除宽度语义，并保持分组预览与应用一致", async () => {
+  const { normalizeColumnPreferences, groupColumnPreferences, applyColumnPreference } =
+    await import("../src/components/table/column-preferences.ts");
+  const columns = [
+    { key: "a", width: 120, headerGroup: { key: "group", label: "分组", align: "right" } },
+    { key: "b", width: 160, headerGroup: { key: "group", label: "分组", align: "right" } },
+  ];
+  const defaults = columns.map((column) => ({
+    key: column.key,
+    visible: true,
+    width: column.width,
+    fixed: "none",
+    align: "left",
+  }));
+  const input = [
+    { key: "b", visible: false, fixed: "right" },
+    { key: "a", fixed: "left" },
+    { key: "a", width: 999 },
+    { key: "unknown" },
+  ];
+  const before = structuredClone(input);
+  const editor = normalizeColumnPreferences(columns, input, defaults, "editor");
+  const stored = normalizeColumnPreferences(columns, input, defaults, "storage");
+  assert.deepEqual(
+    editor.map((item) => item.key),
+    ["b", "a"]
+  );
+  assert.equal(editor[0].width, undefined);
+  assert.equal(stored[0].width, 160);
+  const groups = groupColumnPreferences(columns, editor);
+  assert.equal(groups.length, 1);
+  assert.deepEqual(
+    groups[0].items.map((item) => item.key),
+    ["a", "b"]
+  );
+  assert.ok(groups[0].items.every((item) => item.fixed === "left" && item.groupAlign === "right"));
+  assert.equal(applyColumnPreference(columns[1], groups[0].items[1]), undefined);
+  const applied = applyColumnPreference(columns[0], groups[0].items[0]);
+  assert.equal(applied.fixed, "left");
+  assert.equal(applied.headerGroup.fixed, "left");
+  assert.equal(applied.width, undefined);
+  assert.deepEqual(input, before);
+  assert.equal(columns[0].width, 120);
+});

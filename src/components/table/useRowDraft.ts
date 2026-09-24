@@ -1,5 +1,6 @@
 import { computed, shallowRef, watch, onBeforeUnmount } from "vue";
-import { cloneModel, sameModelValue } from "@/components/business/fields/model";
+import { cloneModel, cloneReadonlyModel, sameModelValue } from "@/components/business/fields/model";
+import type { DeepReadonly } from "vue";
 import { compileLinks } from "@/components/business/fields/links";
 import { normalizeFields } from "@/components/business/fields/normalize";
 import { serializeStableKey } from "@/utils/identity";
@@ -130,7 +131,7 @@ export function useRowDraft<Row extends object, Key extends string | number, C>(
   }
   /** 检查指定行集合，共享本轮参照校验请求；数据或校验轮次变化后丢弃结果。 */
   async function validate(
-    rows: readonly Row[] = props.rows,
+    rows: readonly Row[] | DeepReadonly<readonly Row[]> = props.rows,
     replaceErrors = true
   ): Promise<TableValidation<Row, Key>> {
     const run = version;
@@ -139,7 +140,8 @@ export function useRowDraft<Row extends object, Key extends string | number, C>(
     validationController = new AbortController();
     // 本轮所有行共享参照校验批次，同一数据源的校验可合并请求。
     const batch = createReferenceValidationBatch(validationController.signal);
-    const snapshot = cloneModel(rows);
+    // 在真正执行规则的边界创建一次独立副本；中间适配层可直接传递整单只读快照。
+    const snapshot = cloneReadonlyModel<readonly Row[]>(rows);
     const checks = await Promise.all(
       snapshot.map(async (row) => {
         const result = await validateFieldModel(

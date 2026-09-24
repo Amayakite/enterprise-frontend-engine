@@ -1,5 +1,5 @@
 import { ref } from "vue";
-import { cloneReadonlyModel } from "@/components/business/fields/model";
+import { crudFormEditReason } from "@/components/business/crud/form-presentation";
 import type { DeepReadonly } from "vue";
 import type { FieldKey } from "@/components/business/fields/types";
 import type { CrudFormController, CrudTableBinding } from "@/components/business/crud/types";
@@ -47,18 +47,7 @@ export function useCrudTableChild<
       return locked.value || controller.busy;
     },
     get readonly() {
-      return (
-        locked.value ||
-        !!controller.readonlyReason ||
-        !controller.savePermission ||
-        ["checking", "available", "conflict", "unsafe"].includes(
-          controller.draft?.state.phase ?? ""
-        ) ||
-        ["loading", "saving", "resolving", "committed-needs-sync"].includes(
-          controller.state.phase
-        ) ||
-        controller.state.mutationOutcome === "unknown"
-      );
+      return locked.value || !!crudFormEditReason(controller);
     },
     replace(rows) {
       if (!binding.readonly) controller.patch({ [key]: rows } as Partial<Model>);
@@ -66,7 +55,6 @@ export function useCrudTableChild<
     register(port) {
       return controller.registerChild({
         key,
-        draftVersion: options?.draft?.version,
         snapshotDraft:
           options?.draft && port.snapshotDraft
             ? () => ({
@@ -97,7 +85,8 @@ export function useCrudTableChild<
         },
         cancelDraft: port.cancel,
         async validate(rows) {
-          const checked = await port.validate(cloneReadonlyModel<Model[K]>(rows) as Row[]);
+          // K 已限定为对象数组；只恢复条件类型中的行结构，保持深只读，不为类型转换复制数据。
+          const checked = await port.validate(rows as DeepReadonly<readonly Row[]>);
           return checked.valid
             ? { valid: true }
             : {

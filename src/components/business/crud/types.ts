@@ -966,11 +966,6 @@ export interface CrudDetailController<Model, Entity, Id extends string | number>
 /** 子模块只操作整单中的某个字段；唯一已提交值仍归主表单。 */
 export interface CrudChildModule<Model, K extends FieldKey<Model>> {
   /**
-   * 子表草稿结构版本；不兼容变更时递增，不能静默套用旧快照。
-   */
-  draftVersion?: number;
-
-  /**
    * 导出可恢复的子表编辑草稿；仅包含白名单业务数据，不保存组件实例或函数。
    */
   snapshotDraft?: () => unknown;
@@ -1113,7 +1108,7 @@ export interface CrudTableBinding<Row extends object> {
     /**
      * 运行校验并返回结果；不把校验当作保存，也不应在校验内写入服务端。
      */
-    validate: (rows: readonly Row[]) => Promise<{
+    validate: (rows: readonly Row[] | DeepReadonly<readonly Row[]>) => Promise<{
       /**
        * 校验是否通过；false 时读取对应 issues/errors，不把网络失败视为通过。
        */

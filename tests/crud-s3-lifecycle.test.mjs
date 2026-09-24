@@ -1123,3 +1123,37 @@ test("查询前守卫可阻止请求，详情前后钩子按有效加载顺序�
   assert.equal(detail.state.state.phase, "ready");
   detail.close();
 });
+
+test("保存准备允许子表内部回写，但所有保存入口保持禁用", async () => {
+  const { crudFormEditReason, crudFormDisabledReason } =
+    await import("../src/components/business/crud/form-presentation.ts");
+  const controller = {
+    savePermission: true,
+    busy: false,
+    childrenReady: true,
+    state: { phase: "ready", mutationOutcome: "none" },
+  };
+  assert.equal(crudFormEditReason(controller), undefined);
+  assert.equal(crudFormDisabledReason(controller), undefined);
+  for (const phase of ["committing", "validating"]) {
+    controller.state.phase = phase;
+    assert.equal(crudFormEditReason(controller), undefined);
+    assert.ok(crudFormDisabledReason(controller));
+  }
+  for (const phase of ["loading", "saving", "resolving", "committed-needs-sync"]) {
+    controller.state.phase = phase;
+    assert.ok(crudFormEditReason(controller));
+    assert.ok(crudFormDisabledReason(controller));
+  }
+  controller.state.phase = "ready";
+  controller.state.mutationOutcome = "unknown";
+  assert.ok(crudFormEditReason(controller));
+  controller.state.mutationOutcome = "none";
+  assert.equal(crudFormEditReason(controller), undefined);
+  assert.equal(
+    crudFormDisabledReason(controller, undefined, { changePending: true }),
+    "字段变化处理中"
+  );
+  controller.draft = { state: { phase: "available" } };
+  assert.equal(crudFormEditReason(controller), "请先处理本机草稿");
+});

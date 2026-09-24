@@ -953,6 +953,13 @@ export interface MyFormExpose<M> {
   validateFields: (keys: readonly FieldKey<M>[]) => Promise<FieldValidationResult<M>>;
   /** 清除全部或指定字段的 UI 校验状态。 */
   clearValidate: (keys?: readonly FieldKey<M>[]) => void;
+  /**
+   * 显示当前模型已完成的外部校验错误，替换原提示，不再次执行规则或请求。
+   * 调用方须保证结果未过期；隐藏/不存在的字段被忽略，传空数组清空。
+   * @example
+   * `formRef.value?.setErrors(result.errors);`
+   */
+  setErrors: (errors: FieldValidationResult<M>["errors"]) => void;
   /** 将焦点定位到指定字段的第一个可交互控件。 */
   focusField: (key: FieldKey<M>) => void;
 }

@@ -1,5 +1,10 @@
 <template>
-  <nav v-show="!hidden" class="pagination" aria-label="分页导航">
+  <nav
+    v-show="!hidden"
+    class="pagination"
+    :class="{ 'pagination--compact': compact }"
+    aria-label="分页导航"
+  >
     <el-pagination
       :current-page="currentPage"
       :page-size="pageSize"
@@ -11,7 +16,9 @@
       :disabled="disabled"
       @update:page-size="handleSizeChange"
       @update:current-page="handleCurrentChange"
-    />
+    >
+      <slot />
+    </el-pagination>
   </nav>
 </template>
 
@@ -44,6 +51,8 @@ const props = defineProps({
     default: false,
   },
   disabled: { type: Boolean, default: false },
+  /** 紧凑工具栏模式，默认 false；取消上下留白并左对齐，适合与确认按钮共用一行。 */
+  compact: { type: Boolean, default: false },
 });
 
 const emit = defineEmits<{
@@ -120,6 +129,10 @@ function handleCurrentChange(val: number) {
 
 <style lang="scss" scoped>
 .pagination {
+  &.pagination--compact {
+    padding: 0;
+    justify-content: flex-start;
+  }
   display: flex;
   justify-content: flex-end;
   width: 100%;
