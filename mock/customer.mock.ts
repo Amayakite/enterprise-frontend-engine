@@ -1,4 +1,9 @@
-import type { CustomerAction, CustomerSavePayload } from "../src/api/base/customer/types";
+import type {
+  CustomerAction,
+  CustomerSavePayload,
+  CustomerSaleChange,
+} from "../src/api/base/customer/types";
+import { saleRows } from "./sale-data";
 import { defineMock } from "./base";
 import { runCustomerBatch } from "./customer-batch";
 import { failure, pageResult, success } from "./pilot-document-utils";
@@ -13,6 +18,35 @@ let rows = createCustomerSeeds();
 let sequence = rows.length + 1;
 
 export default defineMock([
+  {
+    url: "pilot/customers/sales",
+    method: ["POST"],
+    body({ body }: { body: { organizationId: string; items: CustomerSaleChange[] } }) {
+      if (body?.organizationId !== "org-a") return failure("当前组织不支持此操作");
+      if (!Array.isArray(body.items) || !body.items.length) return failure("请选择需要修改的客户");
+      const updates = new Map<string, { saleId: string; saleName: string }>();
+      // 先检查整批，任何一行不满足条件时都不写入，避免只改了一部分客户。
+      for (const item of body.items) {
+        const row = rows.find((row) => row.id === item?.id);
+        if (!row) return failure("客户不存在或已被删除");
+        if (updates.has(row.id)) return failure("同一客户不能重复提交");
+        if (row.version !== item.version)
+          return failure(`${row.customerName}已更新，请关闭后重新打开`);
+        if (row.status === "approved") return failure(`${row.customerName}已审核，请先撤销审核`);
+        const sale = saleRows.find(
+          (sale) => sale.id === item.saleId && sale.organizationId === body.organizationId
+        );
+        if (!sale?.active) return failure("请选择当前组织下已启用的销售组织");
+        updates.set(row.id, { saleId: sale.id, saleName: sale.name });
+      }
+      const updatedTime = new Date().toISOString();
+      rows = rows.map((row) => {
+        const change = updates.get(row.id);
+        return change ? { ...row, ...change, version: row.version + 1, updatedTime } : row;
+      });
+      return success(rows.filter((row) => updates.has(row.id)));
+    },
+  },
   {
     url: "pilot/batch",
     method: ["POST"],

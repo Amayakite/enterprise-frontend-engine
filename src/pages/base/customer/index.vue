@@ -22,6 +22,13 @@
         </span>
       </template>
       <template #toolbar-left>
+        <ActionButton
+          v-if="crudPermission('base:customer:update')"
+          label="批量修改销售组织"
+          :disabled="state.busy"
+          :disabled-reason="selectedCustomers.length ? undefined : '请先勾选客户'"
+          @click="openSaleDialog"
+        />
         <router-link v-if="development" to="/component-lab/custom-crud/add">
           定制布局示例
         </router-link>
@@ -40,6 +47,14 @@
         />
       </template>
     </MyCrudList>
+
+    <CustomerSaleDialog
+      v-if="saleDialogOpen"
+      v-model="saleDialogOpen"
+      :customers="saleCustomers"
+      :context="bindings.list.context"
+      @saved="actions.refresh()"
+    />
 
     <MyDialog
       v-model="state.custom.summaryOpen"
@@ -64,7 +79,11 @@
 </template>
 
 <script setup lang="ts">
-import { computed } from "vue";
+import { computed, ref, shallowRef } from "vue";
+import type { DeepReadonly } from "vue";
+import CustomerSaleDialog from "./CustomerSaleDialog.vue";
+import type { CustomerFormModel } from "./types";
+import { crudPermission } from "@/composables/useCrudActions";
 import MyDialog from "@/components/common/MyDialog.vue";
 import MyFeedback from "@/components/business/feedback/MyFeedback.vue";
 import { View, CircleClose, Delete } from "@element-plus/icons-vue";
@@ -128,6 +147,17 @@ const selectedCustomers = computed(() => {
   const selected = new Set(state.selectedKeys);
   return state.rows.filter((row) => selected.has(row.id));
 });
+
+/** 每次打开固定本次选中的客户，避免后台列表刷新改变弹窗编辑对象。 */
+const saleCustomers = shallowRef<DeepReadonly<CustomerFormModel[]>>([]);
+const saleDialogOpen = ref(false);
+/** 工具栏入口只操作当前页勾选客户；组件挂载时创建独立副本。 */
+function openSaleDialog() {
+  if (state.busy || !selectedCustomers.value.length || !crudPermission("base:customer:update"))
+    return;
+  saleCustomers.value = selectedCustomers.value;
+  saleDialogOpen.value = true;
+}
 
 /** 打开本页只读摘要，不额外查询，不持久化选中行副本。 */
 function openSelectionSummary() {

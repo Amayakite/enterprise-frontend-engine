@@ -19,6 +19,16 @@ export type CustomerType = "distributor" | "chain" | "hospital";
 export type CustomerStatus = "pending" | "approved";
 export type CustomerAction = "approve" | "revoke" | "enable" | "disable";
 
+/** 批量调整销售组织的单行请求；只提交有改动的客户，不携带主子表资料。 */
+export interface CustomerSaleChange {
+  /** 客户字符串 ID。 */
+  id: string;
+  /** 打开弹窗时的版本，防止覆盖其他页面的新修改。 */
+  version: number;
+  /** 新销售组织 ID；必须属于当前组织且处于启用状态。 */
+  saleId: string;
+}
+
 /**
  * 客户联系人子行；随客户整单保存，没有独立保存端点。
  * @remarks id 是当前 Mock 的稳定行键；正式后端的生成/映射策略待联调。

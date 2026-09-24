@@ -2,6 +2,7 @@ import request from "@/utils/request";
 import type { PageResult } from "@/types/http";
 import type {
   CustomerAction,
+  CustomerSaleChange,
   CustomerQueryParams,
   CustomerRecord,
   CustomerSavePayload,
@@ -11,6 +12,15 @@ import type {
 const base = "/api/v1/pilot/customers";
 
 export default {
+  /** 一次提交多位客户各自的销售组织；当前为开发 Mock，整批校验后写入。 */
+  changeSales(items: CustomerSaleChange[], organizationId: string) {
+    return request<unknown, CustomerRecord[]>({
+      url: `${base}/sales`,
+      method: "post",
+      data: { items, organizationId },
+      errorPresentation: "local",
+    });
+  },
   search(data: CustomerSearchRequest, signal?: AbortSignal) {
     return request<unknown, PageResult<CustomerRecord>>({
       url: `${base}/search`,
