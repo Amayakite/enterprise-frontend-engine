@@ -5,8 +5,8 @@ export const Layout = () => import("@/pages/layout/index.vue");
 
 // 静态路由
 export const constantRoutes: RouteRecordRaw[] = [
-  // 实验页只在开发构建注册；仍走正常登录守卫，不加入业务菜单。
-  ...(import.meta.env.DEV
+  // Word 试用可显式加入验收构建；其他实验页仍仅开发注册，均走正常登录守卫。
+  ...(import.meta.env.DEV || import.meta.env.VITE_APP_WORD_EDITOR_LAB === "true"
     ? [
         {
           path: "/component-lab",
@@ -14,53 +14,63 @@ export const constantRoutes: RouteRecordRaw[] = [
           meta: { hidden: true },
           children: [
             {
-              path: "custom-crud/add",
-              name: "CustomCrudAdd",
-              component: () => import("@/pages/component-lab/custom-crud/add.vue"),
-              meta: { title: "定制新增示例", hidden: true, keepAlive: true },
+              path: "word-editor",
+              name: "WordEditorLab",
+              component: () => import("@/pages/component-lab/word-editor/index.vue"),
+              meta: { title: "Word 合同编辑试用", hidden: true },
             },
-            {
-              path: "custom-crud/edit/:id",
-              name: "CustomCrudEdit",
-              component: () => import("@/pages/component-lab/custom-crud/edit.vue"),
-              meta: { title: "定制编辑示例", hidden: true, keepAlive: true },
-            },
-            {
-              path: "custom-crud/detail/:id",
-              name: "CustomCrudDetail",
-              component: () => import("@/pages/component-lab/custom-crud/detail.vue"),
-              meta: { title: "定制详情示例", hidden: true, keepAlive: true },
-            },
-            {
-              path: "crud",
-              name: "CrudLab",
-              component: () => import("@/pages/component-lab/crud/index.vue"),
-              meta: { title: "CRUD 装配实验", hidden: true, keepAlive: true },
-            },
-            {
-              path: "interaction",
-              name: "InteractionLab",
-              component: () => import("@/pages/component-lab/interaction/index.vue"),
-              meta: { title: "交互与查询实验", hidden: true },
-            },
-            {
-              path: "table",
-              name: "TableLab",
-              component: () => import("@/pages/component-lab/table/index.vue"),
-              meta: { title: "整单明细实验", hidden: true },
-            },
-            {
-              path: "form",
-              name: "FormLab",
-              component: () => import("@/pages/component-lab/form/index.vue"),
-              meta: { title: "字段表单实验", hidden: true },
-            },
-            {
-              path: "reference",
-              name: "ReferenceLab",
-              component: () => import("@/pages/component-lab/reference/index.vue"),
-              meta: { title: "业务组件实验", hidden: true, keepAlive: true },
-            },
+            ...(import.meta.env.DEV
+              ? [
+                  {
+                    path: "custom-crud/add",
+                    name: "CustomCrudAdd",
+                    component: () => import("@/pages/component-lab/custom-crud/add.vue"),
+                    meta: { title: "定制新增示例", hidden: true, keepAlive: true },
+                  },
+                  {
+                    path: "custom-crud/edit/:id",
+                    name: "CustomCrudEdit",
+                    component: () => import("@/pages/component-lab/custom-crud/edit.vue"),
+                    meta: { title: "定制编辑示例", hidden: true, keepAlive: true },
+                  },
+                  {
+                    path: "custom-crud/detail/:id",
+                    name: "CustomCrudDetail",
+                    component: () => import("@/pages/component-lab/custom-crud/detail.vue"),
+                    meta: { title: "定制详情示例", hidden: true, keepAlive: true },
+                  },
+                  {
+                    path: "crud",
+                    name: "CrudLab",
+                    component: () => import("@/pages/component-lab/crud/index.vue"),
+                    meta: { title: "CRUD 装配实验", hidden: true, keepAlive: true },
+                  },
+                  {
+                    path: "interaction",
+                    name: "InteractionLab",
+                    component: () => import("@/pages/component-lab/interaction/index.vue"),
+                    meta: { title: "交互与查询实验", hidden: true },
+                  },
+                  {
+                    path: "table",
+                    name: "TableLab",
+                    component: () => import("@/pages/component-lab/table/index.vue"),
+                    meta: { title: "整单明细实验", hidden: true },
+                  },
+                  {
+                    path: "form",
+                    name: "FormLab",
+                    component: () => import("@/pages/component-lab/form/index.vue"),
+                    meta: { title: "字段表单实验", hidden: true },
+                  },
+                  {
+                    path: "reference",
+                    name: "ReferenceLab",
+                    component: () => import("@/pages/component-lab/reference/index.vue"),
+                    meta: { title: "业务组件实验", hidden: true, keepAlive: true },
+                  },
+                ]
+              : []),
           ],
         },
       ]

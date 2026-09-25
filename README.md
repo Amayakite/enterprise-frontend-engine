@@ -109,6 +109,26 @@ VITE_APP_VUE_DEVTOOLS=true # 需要组件树/更新时间线排查时才开启
 
 生产构建不包含开发 Mock，`pnpm preview` 不能替代正式后端。所有 `VITE_*` 变量都可能暴露给浏览器，不要放入密钥或数据库凭据。
 
+Word 编辑对比页默认仅开发可访问：`/#/component-lab/word-editor`。需要加入验收构建时，
+设置 `VITE_APP_WORD_EDITOR_LAB=true` 后构建；此开关只开放 Word 试用页，不开放其他开发实验页，
+仍使用正常登录守卫。组件能力与限制见 [Word 合同编辑试用](./docs/business-components-guide.md#word-合同编辑试用)。
+
+### 文档静态资源与缓存
+
+`dev/build` 自动准备预览器资源和 Word 字体。`scripts/prepare-word-editor.mjs` 从锁定版本
+的字体依赖提取所需文件及许可证，放入 `public/vendor/document-fonts/<依赖版本>/`，清单与文件
+齐全时跳过复制；生成目录不提交。修改字体文件内容必须使用新版本 URL，不覆盖已经发布并长期
+缓存的文件。中文字体扩展位置在 `src/config/document-assets.ts`，不得直接分发未授权本机字体。
+
+编辑器 JS/CSS 保留 npm 引用和动态加载，由 Vite 输出带哈希的文件；HarfBuzz WASM 同样由
+Vite 输出独立哈希资源，不手工复制库内部依赖。静态字体通过 `BASE_URL` 支持子目录部署。
+public 文件原样复制到 dist；这减少转换开销，不代表它们不占部署空间，也不自动设置 HTTP 缓存。
+
+生产静态服务器需配置：带哈希的 `/assets/` 和带版本的 Word 字体目录使用
+`Cache-Control: public, max-age=31536000, immutable`；`index.html` 使用 `no-cache`
+进行更新校验。现有无版本的 PDF.js public 资源使用协商缓存，不套用不可变长缓存。
+发布时保留仍被旧页面使用的资源；部署平台/CDN 的缓存规则需单独验证，Vite 开发缓存不代表生产效果。
+
 ## 仓库维护
 
 - 提交源码、当前文档、测试、`pnpm-lock.yaml` 和安全的默认环境配置；本机覆盖使用 `.env.*.local`。

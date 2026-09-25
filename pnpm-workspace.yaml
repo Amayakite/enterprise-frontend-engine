@@ -4,3 +4,8 @@ allowBuilds:
   es5-ext: false
   # Reka UI 的间接依赖，安装时匹配本项目的 Vue 3 入口。
   vue-demi: true
+minimumReleaseAgeExclude:
+  - "@docx-editor.dev/core@2.22.0"
+  - "@docx-editor.dev/fonts@2.22.0"
+  - "@docx-editor.dev/i18n@2.22.0"
+  - "@docx-editor.dev/vue@2.22.0"

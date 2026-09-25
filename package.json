@@ -5,8 +5,8 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "node scripts/prepare-file-preview.mjs && vite",
-    "build": "node scripts/prepare-file-preview.mjs && vue-tsc --noEmit && vite build",
+    "dev": "node scripts/prepare-file-preview.mjs && node scripts/prepare-word-editor.mjs && vite",
+    "build": "node scripts/prepare-file-preview.mjs && node scripts/prepare-word-editor.mjs && vue-tsc --noEmit && vite build",
     "preview": "vite preview",
     "type-check": "vue-tsc --noEmit",
     "test": "node scripts/run-tests.mjs all",
@@ -16,7 +16,13 @@
     "format": "prettier --write ."
   },
   "dependencies": {
+    "@docx-editor.dev/core": "file:vendor\\docx-editor.dev-core-2.22.0-fixed-grid.tgz",
+    "@docx-editor.dev/fonts": "2.22.0",
+    "@docx-editor.dev/i18n": "2.22.0",
+    "@docx-editor.dev/vue": "2.22.0",
     "@element-plus/icons-vue": "^2.3.2",
+    "@hufe921/canvas-editor": "1.0.3",
+    "@hufe921/canvas-editor-plugin-docx": "1.0.0",
     "@open-file-viewer/core": "0.1.48",
     "@open-file-viewer/vue": "0.1.48",
     "@vueuse/core": "^14.3.0",
@@ -33,6 +39,7 @@
     "exceljs": "^4.4.0",
     "fuse.js": "^7.5.0",
     "gsap": "^3.15.0",
+    "jszip": "3.10.1",
     "nprogress": "^0.2.0",
     "path-browserify": "^1.0.1",
     "path-to-regexp": "^8.4.2",

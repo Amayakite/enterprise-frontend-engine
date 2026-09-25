@@ -63,3 +63,5 @@ coverage/
 *.pfx
 # PDF.js 部署资源由 prepare-file-preview.mjs 按锁定依赖生成。
 /public/vendor/file-preview/
+# Word 字体与许可证由 prepare-word-editor.mjs 按锁定版本生成。
+/public/vendor/document-fonts/
