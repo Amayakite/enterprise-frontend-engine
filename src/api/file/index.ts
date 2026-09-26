@@ -9,14 +9,21 @@ const FileAPI = {
    * @param formData 文件和附加字段；不修改传入对象。
    * @param onProgress 上传字节进度，0–100；省略不通知，不表示服务端处理完成。
    * @param signal 可选取消信号；取消不保证后端撤回已接收文件。
+   * @param errorPresentation 默认 global 使用统一轻提示；local 由调用方展示错误。
    * @returns 当前文件 API 的名称和 URL。
    * @example
    * `FileAPI.upload(formData, undefined, controller.signal)`
    */
-  upload(formData: FormData, onProgress?: (percent: number) => void, signal?: AbortSignal) {
+  upload(
+    formData: FormData,
+    onProgress?: (percent: number) => void,
+    signal?: AbortSignal,
+    errorPresentation: "global" | "local" = "global"
+  ) {
     return request<unknown, FileInfo>({
       url: "/api/v1/files",
       method: "post",
+      errorPresentation,
       data: formData,
       signal,
       headers: { "Content-Type": "multipart/form-data" },
@@ -33,14 +40,19 @@ const FileAPI = {
    * 上传单个 File，复用统一 multipart 传输。
    * @param file 当前文件，不修改其内容。
    * @param signal 可选取消信号；取消不能撤回服务端已接收的数据。
+   * @param errorPresentation 默认 global 使用统一轻提示；local 由调用方展示错误。
    * @returns 当前文件 API 的名称和 URL，仍遵循开发 Mock 协议。
    * @example
    * `FileAPI.uploadFile(file, controller.signal)`
    */
-  uploadFile(file: File, signal?: AbortSignal): Promise<FileInfo> {
+  uploadFile(
+    file: File,
+    signal?: AbortSignal,
+    errorPresentation: "global" | "local" = "global"
+  ): Promise<FileInfo> {
     const formData = new FormData();
     formData.append("file", file);
-    return FileAPI.upload(formData, undefined, signal);
+    return FileAPI.upload(formData, undefined, signal, errorPresentation);
   },
 
   /** 删除文件 */

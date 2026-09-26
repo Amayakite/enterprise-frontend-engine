@@ -1,15 +1,13 @@
 import request from "@/utils/request";
-import type { CaptchaInfo, LoginRequest, LoginResult } from "./types";
+import type { LoginRequest, LoginResult } from "./types";
 
 const AUTH_BASE_URL = "/api/v1/auth";
 
 const AuthAPI = {
   login(data: LoginRequest) {
-    const payload: Pick<LoginRequest, "username" | "password" | "captchaId" | "captchaCode"> = {
+    const payload: Pick<LoginRequest, "username" | "password"> = {
       username: data.username,
       password: data.password,
-      captchaId: data.captchaId,
-      captchaCode: data.captchaCode,
     };
 
     return request<unknown, LoginResult>({
@@ -34,13 +32,6 @@ const AuthAPI = {
     return request({
       url: `${AUTH_BASE_URL}/logout`,
       method: "delete",
-    });
-  },
-
-  getCaptcha() {
-    return request<unknown, CaptchaInfo>({
-      url: `${AUTH_BASE_URL}/captcha`,
-      method: "get",
     });
   },
 };

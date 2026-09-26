@@ -5,6 +5,8 @@
 ## 设计与独立组件入口
 
 - Word 引擎接入与试用：[Word 合同编辑试用](./business-components-guide.md#word-合同编辑试用)。
+- 公司档案和地图位置字段：[位置选择器](./business-components-guide.md#公司档案与位置选择器)。
+- 地图与 Key 数组接入：[高德与腾讯地图接入](./business-components-guide.md#高德与腾讯地图接入)。
 - 只需要一个输入或显示值：[单独使用一个字段](./business-components-guide.md#单独使用一个字段)。
 - 在特殊页面选择或显示业务记录：[独立参照](./business-components-guide.md#单独选择销售组织)。
 - 注释如何写得让人看懂：[先回答使用问题](./typescript-and-structure.md#注释先回答使用问题)。

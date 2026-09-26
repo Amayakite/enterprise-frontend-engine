@@ -13,6 +13,9 @@ export default defineMock([
         avatar: "/avatar.svg",
         roles: ["ADMIN"],
         perms: [
+          "base:company:list",
+          "base:company:create",
+          "base:company:update",
           "base:sale:list",
           "base:sale:create",
           "base:sale:update",

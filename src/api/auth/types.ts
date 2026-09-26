@@ -6,10 +6,6 @@ export interface LoginRequest {
   username: string;
   /** 密码 */
   password: string;
-  /** 验证码缓存 key */
-  captchaId?: string;
-  /** 验证码 */
-  captchaCode?: string;
   /** 记住我 */
   rememberMe?: boolean;
 }
@@ -26,14 +22,4 @@ export interface LoginResult {
   tokenType: string;
   /** 过期时间(单位:秒) */
   expiresIn: number;
-}
-
-/**
- * 验证码信息
- */
-export interface CaptchaInfo {
-  /** 验证码缓存 key */
-  captchaId: string;
-  /** 验证码图片 Base64 */
-  captchaBase64: string;
 }

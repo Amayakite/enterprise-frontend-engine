@@ -10,6 +10,7 @@ import { fileURLToPath } from "node:url";
 import { randomUUID } from "node:crypto";
 import { readdirSync, existsSync } from "node:fs";
 import { dirname, join } from "node:path";
+import { osmBoundaryDevPlugin } from "./scripts/vite-osm-boundaries";
 import { name, version } from "./package.json";
 
 /**
@@ -33,6 +34,7 @@ export default defineConfig(({ command, mode }) => {
   // mode 对应 development / production 等环境；VITE_* 的值均按字符串读取。
   // VITE_* 可暴露给浏览器，不用于保存密钥；接口目标地址和请求前缀是两个不同配置。
   const env = loadEnv(mode, process.cwd());
+  const serverEnv = loadEnv(mode, process.cwd(), "OSM_");
   const apiPrefix = env.VITE_APP_BASE_API || "/dev-api";
   // 仅开发服务且明确开启时加载 Mock 插件；即使使用 development 模式打包也不启用。
   const useMock = command === "serve" && env.VITE_MOCK_DEV_SERVER === "true";
@@ -82,6 +84,7 @@ export default defineConfig(({ command, mode }) => {
     plugins: [
       // 编译 Vue 单文件组件；UnoCSS 的规则、快捷类与 SVG 图标集合在 uno.config.ts。
       vue(),
+      osmBoundaryDevPlugin(serverEnv.OSM_OVERPASS_URL || "https://overpass-api.de/api/interpreter"),
       // 仅开发期提供组件树、更新时间线和路由检查，不进入生产构建。
       ...(useVueDevTools ? [VueDevTools()] : []),
       UnoCSS(),
@@ -146,7 +149,14 @@ export default defineConfig(({ command, mode }) => {
     // 仅调整 chunk 大小警告阈值（kB）；不限制包大小，也不执行拆包或性能优化。
     build: {
       chunkSizeWarningLimit: 1200,
-      rolldownOptions: { external: ["@napi-rs/canvas"] },
+      rolldownOptions: {
+        external: ["@napi-rs/canvas"],
+        // 地图以独立运行环境隔离各个 Key；依赖仍由 Vite 编译成带哈希的共享资源。
+        input: {
+          main: fileURLToPath(new URL("./index.html", import.meta.url)),
+          map: fileURLToPath(new URL("./map-runtime.html", import.meta.url)),
+        },
+      },
     },
     // 编译时替换的全局常量：config/app.ts 消费，类型在 types/env.d.ts 声明。
     // JSON.stringify 生成合法的 JS 字面量；只暴露界面需要的包名和版本。

@@ -12,6 +12,11 @@
 单选等已有能力继续使用 Element Plus。项目自有控件共用 `theme.scss` 的
 `--ui-control-radius`、`--ui-popover-radius` 和 `--ui-focus-ring`，颜色跟随现有明暗主题。
 
+新增交互优先级为：项目公共组件 → 已安装组件库 → 持续维护的官方/第三方实现 → 必要的自定义代码。
+引入依赖前检查维护状态、许可证、框架版本和公开 API；已有列表、滚动、空状态、绘制工具等能力不重复实现。
+自定义部分只承担现有能力的缺口，并在接入说明中写清原因。新增布局样式使用项目已有 SCSS 或 UnoCSS，
+不再为同类交互另写一套普通 CSS 控件样式；不因此批量改写无关旧样式。
+
 | 场景                     | 入口                                                     | 状态归属与选择原则                                                                                    |
 | ------------------------ | -------------------------------------------------------- | ----------------------------------------------------------------------------------------------------- |
 | 普通业务弹窗             | `src/components/common/MyDialog.vue`                     | 容器管理尺寸、桌面拖拽、全屏、复位、loading、默认动作和无障碍；业务管理内容与状态                     |
@@ -579,11 +584,11 @@ TODO(image-customization)：单图上传前的头像裁剪、固定比例、压�
 
 ## Word 合同编辑试用
 
-开发地址为 `/#/component-lab/word-editor`，登录后访问。页面并列提供 EigenPal 与
-canvas-editor，分别懒加载；切换引擎重新打开导入时的原文件，不转换另一个引擎的编辑草稿。
+开发地址为 `/#/component-lab/word-editor`，登录后访问。页面使用 EigenPal，
+导入文档后按需加载编辑器。
 支持本地 DOCX（非空、最多 10 MB）导入、基础编辑、普通文本变量插入、导出及预览上次导出。
 预览复用 `FilePreviewDialog` 和 open-file-viewer，轻提示复用 `feedback`，页内状态复用
-`MyFeedback`。没有上传、自动保存或后端模板替换；刷新、离开和切换时对未导出修改提供提醒。
+`MyFeedback`。没有上传、自动保存或后端模板替换；刷新、离开和替换文件时对未导出修改提供提醒。
 
 公共组件在 `src/components/common/WordEditor/`，接口在同目录 `types.ts`：
 
@@ -591,14 +596,13 @@ canvas-editor，分别懒加载；切换引擎重新打开导入时的原文件�
   重建组件，取消旧实例的生命周期。不要通过修改上游私有对象更新文档。
 - 收到 `ready` 后调用公开 `insertVariable('[[甲方名称]]')`、`exportDocx('合同.docx')`。
   `change` 仅通知内容改变，不在每次输入时序列化整个 DOCX；错误由宿主处理一次。
-- `exportDocx` 返回 `{ blob, downloadStarted }`。canvas-editor 官方插件在返回 Blob
-  的同时触发下载，宿主不得再次下载；EigenPal 返回字节，由宿主调用公共下载工具。
+- `exportDocx` 返回 `{ blob, downloadStarted }`。EigenPal 返回的 `downloadStarted` 为 false，
+  由宿主调用公共下载工具，并保存 Blob 供预览。
 - 引擎特有选区、格式命令与事件留在适配组件，业务页面不依赖这些内部数据格式。
 
-当前只使用免费核心：EigenPal 的 Vue/Core/i18n/fonts，以及 canvas-editor 和官方 DOCX 插件。
+当前只使用 EigenPal 的免费 Vue/Core/i18n/fonts 包。
 Core 使用仓库内固定布局表格修复包，来源、构建和升级方式见 [本地修复依赖](../vendor/README.md)。
-EigenPal 工具栏采用官方组件；canvas-editor 试用工具栏提供撤销、重做、加粗、斜体、下划线、
-对齐、字号与缩放，尚未装配完整 Office 功能。两者都不能据此宣称无损往返复杂 Word。
+EigenPal 工具栏采用官方组件，不能据此宣称无损往返复杂 Word。
 EigenPal 的上游工具栏在开发模式可能产生非函数 slot 警告；不通过屏蔽全局警告隐藏它。
 
 西文字体按锁定依赖版本准备到 public，并携带许可证；地址由
@@ -610,6 +614,206 @@ EigenPal 的上游工具栏在开发模式可能产生非函数 slot 警告；�
 片段识别占位符；图片、金额、日期等变量类型、重复变量及缺失值规则待后端协议确定。
 评估真实模板时应比较原 DOCX、编辑后 DOCX、平台预览，并在桌面 Word 核对表格、分页、
 页眉页脚和图片；平台预览结果不能单独证明 Word 保真度。
+
+## 高德与腾讯地图接入
+
+开发试用入口：`/#/component-lab/maps`，沿用登录守卫，仅开发环境注册，不加入正式业务菜单。
+组件入口为 `src/components/common/MapViewer/MapViewer.vue`，配置入口为 `src/config/maps.ts`。
+
+将根目录 `.env.maps.example` 的两项数组配置复制到未提交的 `.env.development.local`，
+填写后重启 `pnpm dev`。高德使用 Web JS Key，并配套 `securityJsCode` 或安全代理
+`serviceHost`；腾讯使用 Web JS Key，搜索还需开启 WebService API 权限。
+腾讯若启用 WebService 签名校验，应后续通过服务端代理接入，不向浏览器下发签名私钥。
+需要在厂商控制台配置当前域名白名单。
+每个数组可以放多项 `{ "key": "..." }`；高德每项携带自身安全配置。
+配置会进入浏览器，不能放服务端私钥，真实凭证不要提交到 Git。
+
+```vue
+<MapViewer :provider="provider" :credentials="credentials" @region="onRegion" />
+```
+
+`provider` 为 `amap` 或 `tencent`，`credentials` 类型为 `readonly MapCredential[]`。
+`point` 返回厂商和点击坐标；`region` 返回 `MapRegion` 草稿副本：
+
+- `provider`、`coordinateSystem: "GCJ-02"` 保留来源与坐标系。
+- `geometry.kind` 为 `polygon/rectangle/square/circle/multipolygon`；前三种使用 `points`，
+  圆形使用 `center` 和以米为单位的 `radius`；`multipolygon` 使用 `polygons`，
+  每片为 `[外环, 内环…]`。环不重复末尾闭合点，不把圆离散成多边形。
+- `source` 区分 `manual`（手绘）、`estimate`（尺寸估算）、`boundary`（候选数据原始轮廓）。
+- `boundary` 保留来源候选、原始几何、标识及链接；应用编辑后 `modified: true`，
+  几何变化写入 `geometry`，不改写来源轮廓。
+- 自动生成时携带 `place`（含可选厂商 POI ID），手绘不携带。
+
+两家都使用 GCJ-02；切换厂商会清空组件草稿，不做隐式坐标转换。
+搜索城市默认北京市，可在工具栏修改；城市空白时回退北京市。
+业务调用方需要自行清理已接收的旧结果，示例页已有演示。
+
+### 公司档案与位置选择器
+
+业务入口为“基础资料 → 公司档案”（`/#/base/company`）。维护编码、名称、联系人、电话、
+启用状态、备注和一个位置；新增、编辑沿用标准 MyCRUD 标签页，详情只读查看地图。
+API 位于 `src/api/base/company/`，目前由 `mock/company.mock.ts` 提供开发进程内数据，
+重启会恢复种子记录；正式组织权限、数据库持久化和打卡规则尚未接入。
+
+可复用组件为 `src/components/common/MapViewer/MapLocationPicker.vue`，在公司档案和地图试用页使用。
+它组合已有 `MyDialog`、`MapViewer`、Element Plus 和 `MyFeedback`；不增加新的 CRUD 字段类型。
+
+```vue
+<!-- config.fields 将 location 声明为 type: "custom"，默认值 null。 -->
+<MyCrudForm v-bind="bindings.form">
+  <template #field-location="{ value, update, commit, readonly }">
+    <MapLocationPicker
+      :model-value="value"
+      :readonly="readonly"
+      @update:model-value="value => { update(value); commit(); }"
+    />
+  </template>
+</MyCrudForm>
+```
+
+- `modelValue` 为 `MapLocation | null`，接收只读模型；点位必选，`region` 可省略。
+  位置包含 `provider / coordinateSystem / place`，区域保留原生形态与来源信息。
+- 默认只显示名称、地址、坐标、厂商与区域摘要。打开弹窗才创建 SDK；取消、关闭和切离缓存页
+  不回填临时选址，关闭即销毁地图。“使用此位置”回填字段；公司表单保存才提交整条档案。
+- 搜索支持任意关键词，也可单击地图选点后填写位置名称和详细地址。搜索失败保留已选位置。
+  明确选择新地点会清空旧区域；已有区域时先点“重新选点”再单击地图，
+  避免绘制完成的鼠标事件或查看地图时误改点位。绘制、编辑、搜索和边界查询未完成时不能提交。
+- 地图与任务面板固定分栏，地点搜索、位置确认、范围设置各自切换；只允许搜索候选列表滚动，
+  常用操作不依赖弹窗正文滚动。窄屏在地图和操作面板间切换。生成区域后展示结果，重新设置才展开工具。
+- `readonly` 只提供查看，不提供搜索、编辑或回填；详情用公开 `tab-location` 插槽组合。
+- 新位置默认厂商读取 `VITE_MAP_PROVIDER=amap|tencent`，省略为高德，也可用 `provider` prop 覆盖。
+  已存位置使用其原厂商回显；部署若移除该厂商凭证，需要先明确迁移策略，不暗中丢失原位置。
+- `loadPlaceBoundary` 可替换默认 OSM 加载器，接入已授权的厂商或自建数据服务；契约见下文。
+  凭证读取 `src/config/maps.ts`；只启用一家地图时只填写相应数组即可。
+- 底层 `MapViewer` 的 `mode` 默认为 `editor`（完整试用工具），`picker` 提供任务分栏选址，
+  `view` 只读。`initialLocation` 仅用于挂载初始化，换实体须重新挂载；`selection` 返回临时副本，
+  `busy` 用于禁用提交。`MapLocationPicker` 已负责这些生命周期，不需要访问 SDK 或私有 ref。
+
+弹窗设计约束：普通配置弹窗应让当前任务的必要输入、已选结果和确认/取消在一屏内可见。
+内容过多时优先拆分任务状态、切换面板或转为独立页面，不通过让整个弹窗滚动来容纳控件。
+搜索候选列表、Word 正文等内容本身可局部滚动；工具栏和确认区必须固定可达。
+
+### 公司合同模板字段
+
+公司档案的 `contractTemplate` 为 `FileInfo | null`，通过 `type: "custom"` 与 `field-contractTemplate`
+插槽接入 `WordTemplateField`，继续使用字段 `update/commit`、CRUD 保存、版本与草稿。
+
+- 表单点击“导入 Word 模板 / 编辑 Word 模板”，在独立大窗口中使用已有 EigenPal 编辑器。
+  导入限制为非空 DOCX、10 MB；提供常用变量、自定义变量、当前内容预览和 DOCX 导出。
+- “应用到公司档案”导出并通过现有 `FileAPI` 上传新版本，再回填 `{name,url}`；
+  不覆盖旧文件。随后保存公司档案才建立关联；取消编辑不会改写主表，未应用修改有离开确认。
+- 详情仅通过已有 open-file-viewer 预览和下载，不加载可编辑 Word 实例。
+- 本机 CRUD 草稿只存文件引用，不保存 DOCX 字节。当前文件和档案都是开发 Mock，
+  重启服务后附件可能失效；正式文件保留策略、孤立上传清理、变量替换及电子签章尚未实现。
+- Word 工具栏和应用按钮固定显示，正文按文档长度滚动，不让用户滚动正文寻找保存操作。
+
+### 依赖与职责
+
+- 高德：`@amap/amap-jsapi-loader` 加载官方 SDK，`@amap/amap-jsapi-types` 提供类型；
+  绘制使用官方 MouseTool，区域编辑使用 PolygonEditor / CircleEditor。官方类型包缺少 PlaceSearch，仅在运行目录补这一项声明。
+- 腾讯：官方 `tlbs-map-vue` 的 BaseMap、MultiMarker 管理地图和标记。
+  Vue 包的 GeometryEditor 未暴露矩形图层，使用 `map_inited` 公开参数组合原生
+  `TMap.tools.GeometryEditor`、MultiPolygon、MultiCircle、MultiRectangle，复用同一编辑器和图层。
+  原生搜索和绘制使用 `tmap-gl-types`，不读取组件私有实例。
+- 几何：按需引入 `@turf/destination`、`@turf/distance` 处理米制估算和等边约束，
+  不自写球面距离公式；GCJ-02 上的计算为局部近似，不能替代测绘。
+- OSM：`osmtogeojson` 仅在开发服务解析 Overpass 关系与面，`gcoord` 转换 WGS84 / GCJ-02；
+  API 入口为 `src/api/maps/osm.ts`。不自写坐标偏移公式或关系拼接算法。
+- 界面：Element Plus 输入、按钮、表格、滚动条、loading、空状态，以及公共 MyFeedback；
+  自有布局使用 SCSS 和主题变量。
+- 项目封装只管理 Key 数组、取消/超时、错误归类和业务数据回调。
+  `map-runtime.html` 为同源独立入口，让官方全局加载器在每个实例中独立运行。
+
+### Key 选择与资源加载
+
+- 数组清理空值并按 Key 去重；从第一项开始加载，首个完成底图加载的会话继续使用。
+- 每项的运行页和 SDK 初始化阶段各最多等待 15 秒；失败销毁容器后试下一项，每轮每项最多一次。
+- 搜索只在明确凭证/权限/额度错误时继续尝试剩余 Key；无结果和普通网络错误不会换 Key。
+- 全部失败显示页内反馈，用户可重新尝试全部项；不保存永久黑名单，避免配额恢复后仍不可用。
+- 换配置、换厂商和卸载会取消旧任务；同厂商搜索故障切换保留手绘草稿。
+- 每个会话用独立 iframe 隔离 SDK 的全局状态；同页多个实例可使用不同 Key。
+  这用于生命周期与配置隔离，不是第三方脚本的安全沙箱。
+- 官方 npm 组件和加载器按需打包，Vite 为运行页依赖生成带哈希的资源，可复用浏览器缓存。
+  底层地图 SDK 仍按厂商要求在线加载，不下载到 public；其缓存遵循厂商 HTTP 规则。
+  部署需保留 `map-runtime.html`，支持 `BASE_URL` 子目录；CSP、代理与域名白名单需按部署验证。
+
+参考 [高德加载文档](https://lbs.amap.com/api/javascript-api-v2/guide/abc/load)、
+[腾讯 GL 文档](https://lbs.qq.com/webApi/javascriptGL/glDoc/docIndexMap)。
+Key 数组仅管理当前应用有权使用的凭证，不增加账号总额度，也不代表取得商业授权。
+
+### 自动生成与多形态绘制
+
+两家提供相同业务入口；项目可只配置并使用其中一家，未选厂商不加载 SDK。
+
+1. 搜索并点击地点名称，选中后可“生成估算区域”；默认宽 400 米、高 300 米。
+   长方形使用宽高，正方形使用边长，圆形使用半径（默认 200 米），范围均为 1～10000 米。
+   多边形模式的估算入口生成长方形。修改尺寸后再次点击生成才替换草稿，不隐式修改已确认值。
+2. “绘制区域”使用官方工具：高德圆/矩形按下拖动、松开完成，多边形点击并双击完成；
+   腾讯按官方工具点击/移动并双击完成。正方形使用原生矩形交互，完成后以中心和较长边生成
+   米制近似等边区域，边长上限 10 公里。完成前保留旧草稿，取消不覆盖旧区域。
+3. 自动生成后适配视野，点击“确认区域”才向业务发出草稿；绘制和边界查询中不能确认旧区域。
+   清空、换厂商、重试和卸载取消未完成任务；同厂商 Key 故障切换恢复完成的区域形态。
+
+“编辑区域”使用官方工具拖动区域、调整控制点。矩形和正方形进入顶点编辑后按普通多边形保存，
+不继续声称矩形/等边约束。圆形保留圆心与半径。多片和带洞区域选择“编辑轮廓”，一次编辑一个
+外环或内环，应用时保留其它片区与内洞；编辑期间只显示选中轮廓，应用或取消后恢复整体。
+“取消编辑”恢复进入编辑前的草稿；“应用编辑”只更新前端草稿，仍须确认并由业务后端保存。
+
+### OSM 地点边界与大陆部署
+
+点击“查找地点边界”后，通过同源接口查询所选位置周围 1500 米内有名称的场所面，
+涵盖建筑、公司办公场所、商业、园区、医院、学校和休闲设施等常见标注，不限制医院分类。
+按名称包含关系优先排列候选，仍要求用户核对并点击“使用此边界”；不会把最近或同名对象自动
+当作所选地点。显示原始轮廓，保留多片和内洞；点要素、未闭合面、缺成员关系及超出复杂度限制
+的要素不作为可用边界。单个候选最多 100 片、10000 个坐标，最多显示 20 个候选。
+OSM 标注可能包含单栋建筑或不准确的用地，缺少名称或面轮廓的地点可能查不到，不能保证每个搜索结果都有真实边界。
+
+- **浏览器入口**：`createOsmBoundaryLoader(endpoint)` 只接受同源路径。输入地点为 GCJ-02，
+  请求前由 gcoord 转为 WGS84；返回 GeoJSON 再转换为 GCJ-02，供高德与腾讯统一显示。
+- **开发服务**：`scripts/vite-osm-boundaries.ts` 提供 `/__map-data/osm-boundaries`，
+  默认上游为公共 Overpass，`OSM_OVERPASS_URL` 可替换为自建实例。只允许固定场所面查询，
+  不接受任意查询语句或上游 URL；单并发、请求完成后间隔至少一秒、12 秒超时、响应上限 2 MB，
+  HTTP 私有缓存 10 分钟。开发服务重启会重置限流状态，仅供少量人工验证。
+- **生产配置**：设置 `VITE_OSM_BOUNDARY_URL=/api/maps/osm-boundaries` 等同源路径；
+  服务需接受 GET `lng`、`lat`（WGS84），成功返回标准 WGS84 GeoJSON FeatureCollection。
+  feature.id 为 `way/<数字>` 或 `relation/<数字>`，properties.name 为名称；
+  geometry 为 Polygon/MultiPolygon，完整保留内环。错误使用非 2xx HTTP 状态。
+  这条接口返回标准 GeoJSON，不是项目 `ApiResult`，前端用 fetch 读取并在页内呈现错误。
+- **大陆可访问性**：OSM 网站、瓦片、Overpass 是不同服务，不能用某一域名可访问推断其它服务。
+  本地一次查询成功不代表大陆各运营商稳定可用。底图继续由高德/腾讯提供，浏览器不请求 OSM
+  瓦片、海外查询接口或外部脚本。
+- **正式部署建议**：国内后端使用自建 OSM 数据库/Overpass 或具有服务保障的数据供应商，
+  接入统一鉴权、服务端限流、缓存与更新机制。仅把海外公共接口代理到国内域名并不能消除上游
+  网络故障，也不能当作生产稳定性保障。公共 Overpass 明确不建议作为商业应用的长期后端，
+  参见 [公共实例使用说明](https://dev.overpass-api.de/overpass-doc/en/preface/commons.html)。
+- **署名及来源 TODO**：按当前界面要求暂移除操作区的大段版权说明，来源标识、链接和原始几何继续保留。
+  正式分发前需补齐统一署名入口，并核对 [OSM 署名指南](https://osmfoundation.org/wiki/Licence/Attribution_Guidelines)
+  对地图来源可发现性的要求；统一页面的位置和地图入口待产品确认。
+
+开发代理会查询真实外部数据，和业务 Mock 是两回事；它没有实现生产后端或区域持久化，
+不会进入 `dist`，`pnpm preview` 不提供该接口。生产未配置同源路径时不启用 OSM 查询。
+服务不可用或无轮廓时保留当前草稿，可继续手绘与估算，不自动改成矩形。
+
+### 替换边界数据来源
+
+业务传入 `loadPlaceBoundary(request)` 即可替换 OSM，例如改为已授权的厂商 AOI 服务：
+
+- 输入 `{ provider, place, signal }`；请求应传递 signal，切换地点/厂商和卸载会取消过期结果。
+- 返回 `MapBoundaryCandidate[]`，几何必须已转换为当前地图的 GCJ-02，空数组表示没有可用边界。
+- 每个候选包含 `id/name/geometry/source`，可附 `sourceUrl`；OSM 用 `source: "osm"`，
+  厂商 AOI 用 `source: "provider"`。不返回 SDK 实例，不交给前端服务端私钥。
+- 组件最多等待 15 秒；失败保留旧草稿并允许重试；原始轮廓不转换为外接矩形。
+
+高德的 [AOI 边界查询](https://lbs.amap.com/api/webservice/guide/api-advanced/search)
+需要申请高阶权限；腾讯的 [AOI 边界查询](https://lbs.qq.com/service/webService/webServiceGuide/aoi)
+为高级付费服务，可申请试用。OSM 数据源不等于已开通这两家的商业 AOI 权限。
+
+### 当前业务边界与 TODO
+
+已提供底图、搜索、取点、四种手绘、尺寸估算、OSM 候选查询、原始多片/带洞轮廓显示、
+逐环编辑、应用/取消和确认。尚未完成全国场所覆盖率验证、跨片/洞拓扑及自交完整校验、
+精确测绘、后端持久化与打卡判定。坐标转换是库算法结果，仍需用实际业务地标核对，
+不能把社区边界或前端确认直接当作可靠打卡依据。
 
 ## MyTable 与整单保存
 

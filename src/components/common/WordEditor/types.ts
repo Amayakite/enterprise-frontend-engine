@@ -33,7 +33,7 @@ export interface WordExportResult {
   downloadStarted: boolean;
 }
 
-/** 两个 Word 适配器共用的公开操作；只在 ready 后调用。 */
+/** Word 编辑器适配器的公开操作；只在 ready 后调用。 */
 export interface WordEditorHandle {
   /** 在当前光标处插入普通文本；例如 [[甲方名称]]，不赋予后端替换或签章语义。
    * @throws 未就绪或当前位置不可编辑时抛错，由宿主统一提示。
@@ -42,7 +42,7 @@ export interface WordEditorHandle {
    */
   insertVariable: (text: string) => void;
   /** 序列化当前文档，name 需包含 .docx 后缀；失败保留编辑内容。
-   * @remarks canvas-editor 的官方插件会同时下载文件；检查返回的 downloadStarted。
+   * @remarks 当前适配器返回 Blob，由宿主根据 downloadStarted 决定是否发起下载。
    * @example
    * `const result = await editor.exportDocx('合同.docx')`
    */

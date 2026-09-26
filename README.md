@@ -27,7 +27,7 @@ pnpm install --frozen-lockfile
 pnpm dev
 ```
 
-默认地址为 `http://localhost:3000`。开发 Mock 账号：`admin / 123456`；验证码填写任意非空值即可。
+默认地址为 `http://localhost:3000`。开发 Mock 账号：`admin / 123456`。登录仅提交用户名和密码，不接入验证码。
 
 ```bash
 pnpm type-check  # TypeScript / Vue 类型检查
@@ -109,9 +109,13 @@ VITE_APP_VUE_DEVTOOLS=true # 需要组件树/更新时间线排查时才开启
 
 生产构建不包含开发 Mock，`pnpm preview` 不能替代正式后端。所有 `VITE_*` 变量都可能暴露给浏览器，不要放入密钥或数据库凭据。
 
-Word 编辑对比页默认仅开发可访问：`/#/component-lab/word-editor`。需要加入验收构建时，
+Word 编辑试用页默认仅开发可访问：`/#/component-lab/word-editor`。需要加入验收构建时，
 设置 `VITE_APP_WORD_EDITOR_LAB=true` 后构建；此开关只开放 Word 试用页，不开放其他开发实验页，
 仍使用正常登录守卫。组件能力与限制见 [Word 合同编辑试用](./docs/business-components-guide.md#word-合同编辑试用)。
+
+地图试用页仅开发可访问：`/#/component-lab/maps`，支持高德与腾讯、地点搜索、OSM 院区候选、多形态绘制及区域编辑。
+Key 数组配置示例见 `.env.maps.example`，真实值放 `.env.development.local`；接入方式与业务边界见
+[高德与腾讯地图接入](./docs/business-components-guide.md#高德与腾讯地图接入)。
 
 ### 文档静态资源与缓存
 

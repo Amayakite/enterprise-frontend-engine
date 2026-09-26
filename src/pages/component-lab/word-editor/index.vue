@@ -3,27 +3,11 @@
     <header class="word-lab__header">
       <div>
         <h1>Word 合同编辑试用</h1>
-        <p>用同一份 DOCX 对比排版、变量插入和导出结果。文件仅在本地浏览器处理。</p>
+        <p>导入 Word 合同模板，编辑内容、插入变量并导出。文件仅在本地浏览器处理。</p>
       </div>
       <el-button @click="router.push('/base/sale')">返回销售组织</el-button>
     </header>
     <div class="word-lab__tools">
-      <div class="word-lab__engines" aria-label="选择编辑器">
-        <el-button
-          :type="engine === 'eigenpal' ? 'primary' : 'default'"
-          :disabled="busy"
-          @click="selectEngine('eigenpal')"
-        >
-          EigenPal
-        </el-button>
-        <el-button
-          :type="engine === 'canvas' ? 'primary' : 'default'"
-          :disabled="busy"
-          @click="selectEngine('canvas')"
-        >
-          canvas-editor
-        </el-button>
-      </div>
       <el-button :disabled="busy" @click="input?.click()">导入 DOCX</el-button>
       <input
         ref="input"
@@ -93,11 +77,10 @@
     <div v-if="!bytes" class="word-lab__empty">
       <h2>先导入一份合同模板</h2>
       <p>支持 .docx，单个文件不超过 10 MB。选中编辑位置后，点击上方变量即可插入。</p>
-      <p>切换编辑器会重新打开原文件；需要保留修改时先导出。</p>
+      <p>编辑完成后请导出，刷新页面不会保留修改。</p>
     </div>
     <div v-else class="word-lab__editor" :aria-busy="loading">
-      <component
-        :is="activeEditor"
+      <EigenPalEditor
         :key="generation"
         ref="editor"
         :document="bytes"
@@ -124,7 +107,7 @@ import { validateDocx } from "@/components/common/WordEditor/validate-docx";
 import { feedback } from "@/utils/feedback";
 import { downloadFile } from "@/utils/download";
 
-/** 两种引擎独立懒加载，首次进入空页不加载任一编辑器。 */
+/** 编辑器按需加载，首次进入空页不加载编辑器。 */
 const EigenPalEditor = defineAsyncComponent({
   loader: () => import("@/components/common/WordEditor/EigenPalEditor.vue"),
   onError: (cause, _retry, fail) => {
@@ -132,19 +115,10 @@ const EigenPalEditor = defineAsyncComponent({
     fail();
   },
 });
-const CanvasEditor = defineAsyncComponent({
-  loader: () => import("@/components/common/WordEditor/CanvasEditor.vue"),
-  onError: (cause, _retry, fail) => {
-    onError(cause.message);
-    fail();
-  },
-});
 const router = useRouter();
-const engine = ref<"eigenpal" | "canvas">("eigenpal");
-const activeEditor = computed(() => (engine.value === "eigenpal" ? EigenPalEditor : CanvasEditor));
 const editor = shallowRef<WordEditorHandle>();
 const input = ref<HTMLInputElement>();
-/** 原始字节用于切换引擎和失败重试；编辑草稿只存在于当前编辑器实例。 */
+/** 原始字节用于预览和失败重试；编辑草稿只存在于当前编辑器实例。 */
 const bytes = shallowRef<ArrayBuffer>();
 const filename = ref("");
 const generation = ref(0);
@@ -187,11 +161,6 @@ function resetEditor() {
   lastExport.value = undefined;
   editRevision++;
   generation.value++;
-}
-async function selectEngine(value: "eigenpal" | "canvas") {
-  if (engine.value === value || busy.value || !(await canDiscard()) || disposed) return;
-  engine.value = value;
-  resetEditor();
 }
 /** 扩展名及大小先行校验；不冒充格式安全验证，解析错误由引擎报告。 */
 async function importFile(event: Event) {
@@ -256,7 +225,7 @@ async function exportDocument() {
   if (!editor.value || !ready.value || busy.value) return;
   exporting.value = true;
   const revision = editRevision;
-  const name = `${filename.value.replace(/\.docx$/i, "")}-${engine.value}.docx`;
+  const name = `${filename.value.replace(/\.docx$/i, "")}-eigenpal.docx`;
   try {
     const result = await editor.value.exportDocx(name);
     if (disposed) return;
@@ -324,8 +293,7 @@ onBeforeUnmount(() => {
   line-height: 1.6;
 }
 .word-lab__tools,
-.word-lab__variables,
-.word-lab__engines {
+.word-lab__variables {
   display: flex;
   align-items: center;
   gap: 8px;

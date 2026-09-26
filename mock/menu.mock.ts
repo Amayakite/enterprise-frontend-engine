@@ -41,6 +41,36 @@ export default defineMock([
           meta: { title: "基础资料", icon: "client", hidden: false, alwaysShow: true },
           children: [
             {
+              path: "company",
+              component: "base/company/index",
+              name: "CompanyManagement",
+              meta: {
+                title: "公司档案",
+                searchAliases: ["公司档案", "商业档案", "company"],
+                icon: "client",
+                hidden: false,
+                keepAlive: true,
+              },
+            },
+            {
+              path: "company/add",
+              component: "base/company/add",
+              name: "CompanyAdd",
+              meta: { title: "新增公司", hidden: true, keepAlive: true },
+            },
+            {
+              path: "company/edit/:id",
+              component: "base/company/edit",
+              name: "CompanyEdit",
+              meta: { title: "编辑公司", hidden: true, keepAlive: true },
+            },
+            {
+              path: "company/detail/:id",
+              component: "base/company/detail",
+              name: "CompanyDetail",
+              meta: { title: "公司详情", hidden: true, keepAlive: true },
+            },
+            {
               path: "sale",
               component: "base/sale/index",
               name: "SaleManagement",

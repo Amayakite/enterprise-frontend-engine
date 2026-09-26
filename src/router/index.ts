@@ -22,6 +22,12 @@ export const constantRoutes: RouteRecordRaw[] = [
             ...(import.meta.env.DEV
               ? [
                   {
+                    path: "maps",
+                    name: "MapLab",
+                    component: () => import("@/pages/component-lab/maps/index.vue"),
+                    meta: { title: "地图接入试用", hidden: true },
+                  },
+                  {
                     path: "custom-crud/add",
                     name: "CustomCrudAdd",
                     component: () => import("@/pages/component-lab/custom-crud/add.vue"),

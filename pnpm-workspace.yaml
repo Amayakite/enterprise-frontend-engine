@@ -2,6 +2,8 @@
 allowBuilds:
   "@parcel/watcher": false
   es5-ext: false
+  # 发布包默认已经指向 Vue 3，无需运行改写 package.json 的版本切换脚本。
+  tlbs-map-vue: false
   # Reka UI 的间接依赖，安装时匹配本项目的 Vue 3 入口。
   vue-demi: true
 minimumReleaseAgeExclude:
