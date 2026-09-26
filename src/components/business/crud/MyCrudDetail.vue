@@ -160,13 +160,13 @@ const displayFields = computed(() =>
 /** 将页签 key 转为插槽名，例如 contacts → tab-contacts，让页面在该页签内放联系人等内容。 */
 const tabSlot = (key: string) => `tab-${key}` as Exclude<keyof typeof slots, "actions" | "footer">;
 </script>
-<style scoped>
+<style scoped lang="scss">
 .crud-detail__heading {
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
   flex-wrap: wrap;
-  gap: 18px 24px;
+  gap: var(--ui-section-gap);
 }
 .crud-detail__identity {
   flex: 1 1 240px;
@@ -176,11 +176,11 @@ const tabSlot = (key: string) => `tab-${key}` as Exclude<keyof typeof slots, "ac
   display: flex;
   align-items: center;
   flex-wrap: wrap;
-  gap: 12px;
+  gap: 8px;
 }
 .crud-detail__title-row h1 {
   margin: 0;
-  font-size: 22px;
+  font-size: 20px;
   font-weight: 600;
   line-height: 1.45;
   overflow-wrap: anywhere;
@@ -195,8 +195,8 @@ const tabSlot = (key: string) => `tab-${key}` as Exclude<keyof typeof slots, "ac
 .crud-detail__subtitle {
   display: flex;
   flex-wrap: wrap;
-  gap: 8px 20px;
-  margin-top: 10px;
+  gap: 6px 12px;
+  margin-top: 6px;
   color: var(--el-text-color-secondary);
   font-size: 13px;
 }
@@ -209,6 +209,6 @@ const tabSlot = (key: string) => `tab-${key}` as Exclude<keyof typeof slots, "ac
 .crud-detail__tab-body {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: var(--ui-section-gap);
 }
 </style>

@@ -12,6 +12,30 @@
       <div class="appearance-panel__header">外观设置</div>
 
       <div class="appearance-panel__section">
+        <label class="appearance-panel__label" for="layout-density">界面密度</label>
+        <el-select
+          :teleported="false"
+          size="default"
+          id="layout-density"
+          v-model="settingsStore.density"
+          aria-label="界面密度"
+          class="appearance-density"
+        >
+          <el-option
+            v-for="item in layoutDensityOptions"
+            :key="item.value"
+            :value="item.value"
+            :label="item.label"
+          />
+        </el-select>
+        <p class="appearance-density__hint">
+          {{
+            layoutDensityOptions.find((item) => item.value === settingsStore.density)?.description
+          }}。应用于所有页面，自动保存。
+        </p>
+      </div>
+
+      <div class="appearance-panel__section">
         <div class="appearance-panel__label">显示模式</div>
         <div class="appearance-modes">
           <button
@@ -63,6 +87,7 @@
 <script setup lang="ts">
 import { Check, Monitor, Moon, Sunny } from "@element-plus/icons-vue";
 import { defaults, themeColorPresets } from "@/config/app";
+import { layoutDensityOptions } from "@/config/density";
 import { ThemeMode } from "@/config/ui";
 import { useSettingsStore } from "@/stores";
 import { startThemeModeTransition, startThemeTransition } from "@/utils/theme";
@@ -81,13 +106,10 @@ function transitionOrigin(event: MouseEvent) {
 
 async function changeTheme(theme: ThemeMode, event: MouseEvent) {
   if (settingsStore.theme === theme) return;
-  await startThemeModeTransition(
-    transitionOrigin(event),
-    async () => {
-      settingsStore.theme = theme;
-      await nextTick();
-    }
-  );
+  await startThemeModeTransition(transitionOrigin(event), async () => {
+    settingsStore.theme = theme;
+    await nextTick();
+  });
 }
 
 function changePrimaryColor(color: string, event: MouseEvent) {
@@ -98,6 +120,15 @@ function changePrimaryColor(color: string, event: MouseEvent) {
 </script>
 
 <style scoped lang="scss">
+.appearance-density {
+  width: 100%;
+}
+.appearance-density__hint {
+  margin: 8px 0 0;
+  font-size: 12px;
+  line-height: 1.6;
+  color: var(--el-text-color-secondary);
+}
 .appearance-trigger {
   display: flex;
   align-items: center;

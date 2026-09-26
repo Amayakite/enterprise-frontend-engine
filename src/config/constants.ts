@@ -12,6 +12,7 @@ export const STORAGE_KEYS = {
   DICT_CACHE: `${APP_PREFIX}:system:dict_cache`,
 
   // UI 设置
+  LAYOUT_DENSITY: `${APP_PREFIX}:ui:layout_density`,
   THEME: `${APP_PREFIX}:ui:theme`,
   THEME_PRIMARY: `${APP_PREFIX}:ui:theme_primary`,
 

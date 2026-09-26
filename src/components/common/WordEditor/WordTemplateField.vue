@@ -24,6 +24,7 @@
       v-model="visible"
       title="公司合同模板"
       width="1440px"
+      :body-padding="false"
       fill-height
       body-scroll="content"
       :before-close="canClose"
@@ -40,33 +41,56 @@
             aria-label="导入 DOCX 文件"
             @change="importFile"
           />
-          <el-divider direction="vertical" />
-          <span>插入变量</span>
-          <el-button
-            v-for="variable in variables"
-            :key="variable"
-            size="small"
-            :disabled="!ready || busy"
-            @mousedown.prevent
-            @click="insert(variable)"
+          <el-popover
+            v-model:visible="variablesOpen"
+            trigger="click"
+            placement="bottom-start"
+            :width="280"
+            :teleported="false"
+            @after-enter="variablesPanel?.focus()"
           >
-            {{ variable }}
-          </el-button>
-          <el-input
-            v-model="customVariable"
-            aria-label="自定义变量"
-            placeholder="自定义变量名"
-            maxlength="40"
-            class="word-template__variable"
-          />
-          <el-button
-            :disabled="!ready || busy || !customVariable.trim()"
-            @mousedown.prevent
-            @click="insert(`[[${customVariable.trim()}]]`)"
-          >
-            插入
-          </el-button>
-          <el-button :disabled="!ready || busy" @click="previewCurrent">预览当前内容</el-button>
+            <template #reference>
+              <el-button ref="variablesTrigger" :disabled="!ready || busy" @mousedown.prevent>
+                插入变量
+              </el-button>
+            </template>
+            <div
+              ref="variablesPanel"
+              class="word-template__variables"
+              tabindex="-1"
+              aria-label="选择合同变量"
+              @keydown.esc.stop.prevent="closeVariables"
+            >
+              <span>先在正文中定位，再选择变量</span>
+              <div class="word-template__variable-options">
+                <el-button
+                  v-for="variable in variables"
+                  :key="variable"
+                  :disabled="!ready || busy"
+                  @mousedown.prevent
+                  @click="insert(variable)"
+                >
+                  {{ variable }}
+                </el-button>
+              </div>
+              <div class="word-template__custom-variable">
+                <el-input
+                  v-model="customVariable"
+                  aria-label="自定义变量"
+                  placeholder="自定义变量名"
+                  maxlength="40"
+                />
+                <el-button
+                  :disabled="!ready || busy || !customVariable.trim()"
+                  @mousedown.prevent
+                  @click="insert(`[[${customVariable.trim()}]]`)"
+                >
+                  插入
+                </el-button>
+              </div>
+            </div>
+          </el-popover>
+          <el-button :disabled="!ready || busy" @click="previewCurrent">预览</el-button>
         </div>
         <MyFeedback v-if="error" tone="error" :message="error" />
         <div v-if="!bytes" v-loading="busy" class="word-template__welcome">
@@ -92,9 +116,9 @@
       </div>
       <template #footer>
         <div class="word-template__footer">
-          <div>
-            <strong>{{ filename || "尚未导入文档" }}</strong>
-            <p>应用后回填表单；保存公司档案后才关联模板。</p>
+          <div class="word-template__status">
+            <strong :title="filename">{{ filename || "尚未导入文档" }}</strong>
+            <span>应用后仍需保存公司档案</span>
           </div>
           <div>
             <el-button :disabled="busy" @click="close">取消</el-button>
@@ -113,6 +137,7 @@
 import {
   computed,
   defineAsyncComponent,
+  nextTick,
   onBeforeUnmount,
   onDeactivated,
   ref,
@@ -122,6 +147,7 @@ import type { DeepReadonly } from "vue";
 import { onBeforeRouteLeave } from "vue-router";
 import { Document } from "@element-plus/icons-vue";
 import { ElMessageBox } from "element-plus";
+import type { ButtonInstance } from "element-plus";
 import MyDialog from "@/components/common/MyDialog.vue";
 import MyFeedback from "@/components/business/feedback/MyFeedback.vue";
 import FileAttachment from "@/components/common/FilePreview/FileAttachment.vue";
@@ -157,6 +183,16 @@ const EigenPalEditor = defineAsyncComponent({
 const editor = shallowRef<WordEditorHandle>();
 const input = ref<HTMLInputElement>();
 const visible = ref(false);
+/** 变量面板按需展开；打开后将键盘焦点移入面板，Tab 可依次选择变量。 */
+const variablesOpen = ref(false);
+const variablesPanel = ref<HTMLElement>();
+const variablesTrigger = ref<ButtonInstance>();
+/** Esc 只收起变量面板，并将焦点交还入口，保留正文选区。 */
+async function closeVariables() {
+  variablesOpen.value = false;
+  await nextTick();
+  variablesTrigger.value?.ref?.focus();
+}
 const bytes = shallowRef<ArrayBuffer>();
 const filename = ref("");
 const generation = ref(0);
@@ -194,6 +230,7 @@ async function close() {
 }
 /** 关闭后释放二进制及 SDK，下次读取已确认的字段引用。 */
 function reset() {
+  variablesOpen.value = false;
   controller.abort();
   bytes.value = undefined;
   ready.value = false;
@@ -258,6 +295,7 @@ async function importFile(event: Event) {
 function insert(text: string) {
   try {
     editor.value?.insertVariable(text);
+    variablesOpen.value = false;
   } catch {
     error.value = "请先在正文中选择插入位置，再重试。";
   }
@@ -369,19 +407,40 @@ onBeforeUnmount(() => {
     flex-direction: column;
     height: 100%;
     min-height: 0;
-    gap: 12px;
+    gap: 0;
   }
   &__toolbar {
+    padding: 8px 16px;
+    flex-shrink: 0;
+    border-bottom: 1px solid var(--el-border-color-lighter);
     display: flex;
     align-items: center;
     gap: 8px;
     flex-wrap: wrap;
+    > * {
+      flex-shrink: 0;
+    }
   }
   &__input {
     display: none;
   }
-  &__variable {
-    width: 160px;
+  &__variables {
+    display: grid;
+    gap: 12px;
+    color: var(--el-text-color-secondary);
+    font-size: 12px;
+  }
+  &__variable-options {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px;
+    > * {
+      margin: 0;
+    }
+  }
+  &__custom-variable {
+    display: flex;
+    gap: 8px;
   }
   &__editor {
     flex: 1;
@@ -416,17 +475,28 @@ onBeforeUnmount(() => {
       display: flex;
       flex-wrap: wrap;
       gap: 8px;
-    }
-    strong {
-      overflow-wrap: anywhere;
-    }
-    p {
-      margin: 6px 0 0;
-      color: var(--el-text-color-secondary);
-      font-size: 12px;
+      > * {
+        margin: 0;
+      }
     }
     @media (max-width: 760px) {
       flex-wrap: wrap;
+    }
+  }
+  &__status {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 4px 12px;
+    font-size: 12px;
+    color: var(--el-text-color-secondary);
+    strong {
+      min-width: 0;
+      max-width: 240px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      color: var(--el-text-color-regular);
     }
   }
 }

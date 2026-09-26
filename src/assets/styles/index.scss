@@ -5,6 +5,7 @@
 // 1. 基础与主题层
 @use "./fonts";
 @use "./theme";
+@use "./density";
 @use "./reset";
 
 // 2. 第三方适配层

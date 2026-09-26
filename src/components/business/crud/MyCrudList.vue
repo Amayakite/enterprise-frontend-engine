@@ -154,11 +154,10 @@
         :context="context"
         :get-row-key="config.getKey"
         :loading="busy"
-        :wrap-cells="preferences.density.value === 'comfortable'"
+        :wrap-cells="false"
         height="100%"
         :sort="sort"
         :selection="selection"
-        :density="preferences.density.value"
         @sort-change="onSortChange"
         @selection-change="onSelectionChange"
         @column-resize="onColumnResize"
@@ -544,7 +543,7 @@ const actionMessage = computed(() => {
   display: flex;
   flex-direction: column;
   align-items: flex-start;
-  gap: 12px;
+  gap: var(--ui-section-gap);
   max-height: min(500px, 70dvh);
   overflow-y: auto;
 }
@@ -555,7 +554,7 @@ const actionMessage = computed(() => {
   display: flex;
   flex-direction: column;
   gap: 12px;
-  padding: 16px;
+  padding: var(--ui-panel-padding);
   border: 1px solid var(--card-border);
   border-radius: var(--card-radius);
   background: var(--content-bg);

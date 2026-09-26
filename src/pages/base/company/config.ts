@@ -101,14 +101,6 @@ export const companyModule = defineBusinessModule<CompanyContract>()({
       },
     },
     {
-      key: "remark",
-      label: "备注",
-      type: "textarea",
-      props: { maxlength: 300 },
-      form: { span: 2 },
-      scenes: { detail: { span: 2 } },
-    },
-    {
       key: "contactName",
       label: "联系人",
       type: "text",
@@ -123,6 +115,14 @@ export const companyModule = defineBusinessModule<CompanyContract>()({
       props: { maxlength: 40 },
       form: {},
       scenes: { list: { width: 160 }, detail: true },
+    },
+    {
+      key: "remark",
+      label: "备注",
+      type: "textarea",
+      props: { maxlength: 300 },
+      form: { span: 2 },
+      scenes: { detail: { span: 2 } },
     },
     {
       key: "location",

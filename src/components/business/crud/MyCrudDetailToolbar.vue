@@ -1,6 +1,6 @@
 <template>
   <div>
-    <div class="page-toolbar">
+    <div class="page-toolbar crud-detail-toolbar">
       <div class="page-toolbar__left">
         <template v-for="action in actionViews" :key="action.key">
           <ActionButton
@@ -73,3 +73,10 @@ async function leave() {
   }
 }
 </script>
+<style scoped lang="scss">
+.crud-detail-toolbar {
+  margin-bottom: 0;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+</style>

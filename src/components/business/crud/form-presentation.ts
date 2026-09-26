@@ -56,7 +56,7 @@ export type CrudFormProps<Model extends object, Entity, Id extends string | numb
   links?: readonly FieldLink<Model, C>[];
   /** 大屏表单列数。 */
   columns?: 1 | 2 | 3;
-  /** 表单显示密度。 */
+  /** 表单字段留白；省略跟随全局密度，compact/comfortable 仅覆盖本表单。 */
   density?: FieldDensity;
 };
 
@@ -168,6 +168,6 @@ export type CrudDetailProps<Model extends object, Entity, Id extends string | nu
   back?: () => Promise<void>;
   /** 大屏详情列数。 */
   columns?: 1 | 2 | 3;
-  /** 详情描述列表的显示密度。 */
+  /** 详情字段留白；省略跟随全局密度，compact/comfortable 仅覆盖本详情。 */
   density?: FieldDensity;
 };

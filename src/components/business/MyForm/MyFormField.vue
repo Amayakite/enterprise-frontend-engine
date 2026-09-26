@@ -8,7 +8,13 @@
     :rules="rules"
     :validate-status="error ? 'error' : 'success'"
     :data-field="field.key"
-    :style="{ '--field-span': presentation.span }"
+    :style="{
+      '--field-span': presentation.span,
+      gridColumn:
+        'span min(var(--field-span), var(--form-visible-columns, var(--form-columns, 1)))',
+      minWidth: '0',
+      marginBottom: 'var(--ui-field-gap)',
+    }"
   >
     <template #label>
       <FieldLabel :label="field.label" :help="fieldHelpText(field, env, readonly)" />
@@ -63,7 +69,7 @@ function input(value: M[FieldKey<M>], mapped: Partial<M>, reason: ChangeReason) 
   props.update(value as Value, mapped, reason);
 }
 </script>
-<style scoped>
+<style scoped lang="scss">
 .my-form-error {
   width: 100%;
   color: var(--el-color-danger);

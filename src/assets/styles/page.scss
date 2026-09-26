@@ -14,11 +14,11 @@
 
 // 标准 CRUD 页面统一间距，由全局入口加载。
 .crud-page {
-  gap: 12px;
+  gap: var(--page-gap);
 }
 
 // 新布局嵌入公共宿主时沿用宿主背景和留白，不嵌套第二层页面容器。
-.business-page-host > .crud-page:has(.crud-layout--embedded) {
+.business-page-host__content > .crud-page:has(.crud-layout--embedded) {
   padding: 0;
   background: transparent;
 }

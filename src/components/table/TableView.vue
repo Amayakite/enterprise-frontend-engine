@@ -9,7 +9,7 @@
       ref="engine"
       :data="prepared.rows"
       :height="resolvedHeight"
-      :size="size"
+      :size="size ?? globalTableSize"
       :fit="fit"
       :loading="loading"
       :stripe="stripe"
@@ -124,6 +124,7 @@
 </template>
 
 <script setup lang="ts" generic="Row extends object, Key extends string | number">
+import { useSettingsStore } from "@/stores/settings";
 import {
   computed,
   nextTick,
@@ -154,7 +155,7 @@ const props = withDefaults(
     loading?: boolean;
     stripe?: boolean;
     wrapCells?: boolean;
-    /** 紧凑浮层可单独缩小 VXE 表头与行高，普通业务表维持 medium。 */
+    /** 表格引擎尺寸；省略跟随全局密度，紧凑浮层可显式传 mini/small/medium。 */
     size?: "medium" | "small" | "mini";
     /** 关闭自动撑满，使参照列宽由 source 配置主导。 */
     fit?: boolean;
@@ -171,10 +172,19 @@ const props = withDefaults(
     height: 360,
     loading: false,
     stripe: true,
-    size: "medium",
+    size: undefined,
     fit: true,
     currentRowTopAlign: false,
   }
+);
+/** 使用引擎公开尺寸，跟随全局设置；显式 size 仍优先。 */
+const settings = useSettingsStore();
+const globalTableSize = computed(() =>
+  settings.density === "extra-compact"
+    ? "mini"
+    : settings.density === "compact"
+      ? "small"
+      : "medium"
 );
 const emit = defineEmits<{
   /**
@@ -361,7 +371,11 @@ const renderedBands = computed<RenderBand[]>(() => [
 /** 优先显示行 ID 错误，其次显示表头配置错误，避免无效数据破坏整页。 */
 const tableError = computed(() => prepared.value.error || preparedColumns.value.error);
 /** 数据、表头顺序或行高版本变化后重算布局，等待 DOM 更新再执行。 */
-watch([prepared, renderedBands, () => props.layoutRevision], recalculate, { flush: "post" });
+watch(
+  [prepared, renderedBands, () => props.layoutRevision, () => settings.density, () => props.size],
+  recalculate,
+  { flush: "post" }
+);
 
 /**
  * 业务列的 width 表示用户偏好宽度，不应在容器有剩余空间时留下大片空白。

@@ -3,13 +3,13 @@
   <section
     ref="root"
     class="my-table"
-    :class="[`my-table--${density}`, { 'my-table--single-line': !effectiveWrapCells }]"
+    :class="[density && `my-table--${density}`, { 'my-table--single-line': !effectiveWrapCells }]"
     :aria-busy="busy"
   >
     <el-alert v-if="engineError" :title="engineError" type="error" :closable="false" />
     <div
       v-if="(edit && edit.allowAdd) || $slots.title || $slots.toolbar || $slots.tools"
-      class="page-toolbar"
+      class="page-toolbar my-table__toolbar"
     >
       <div class="page-toolbar__left">
         <slot name="title" />
@@ -356,7 +356,7 @@ const props = withDefaults(
     summary?: { scope: "page" | "all"; text?: string };
     /** 表格引擎的非业务展示选项。 */
     engineOptions?: TableEngineOptions;
-    /** 表格密度，默认 compact。 */
+    /** 表格留白；省略跟随全局五档密度，显式 compact/comfortable 仅覆盖本表单元格。 */
     density?: FieldDensity;
     /** 展示组合可明确要求单行；省略保持既有编辑/参照换行规则。 */
     wrapCells?: boolean | null;
@@ -374,7 +374,7 @@ const props = withDefaults(
     sort: null,
     selection: false,
     edit: false,
-    density: "compact",
+    density: undefined,
     wrapCells: null,
   }
 );
@@ -908,11 +908,14 @@ defineExpose<MyTableExpose<Row, Key>>({
   }
 }
 .my-table-cell {
-  padding: 4px 0;
+  padding: var(--ui-table-cell-padding, 5px) 0;
   min-height: 24px;
   :deep(.el-input-number) {
     width: 100%;
   }
+}
+.my-table--compact .my-table-cell {
+  padding: 4px 0;
 }
 .my-table--comfortable .my-table-cell {
   padding: 10px 0;
@@ -1001,5 +1004,8 @@ defineExpose<MyTableExpose<Row, Key>>({
 }
 .my-table-pagination--busy {
   opacity: 0.6;
+}
+.my-table__toolbar {
+  margin-bottom: 8px;
 }
 </style>

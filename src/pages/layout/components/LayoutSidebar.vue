@@ -1,6 +1,10 @@
 <template>
   <el-menu
     :default-active="activeMenuPath"
+    :style="{
+      '--el-menu-item-height': '44px',
+      '--el-menu-sub-item-height': '44px',
+    }"
     :collapse="!appStore.sidebar.opened"
     :background-color="menuThemeProps.backgroundColor"
     :text-color="menuThemeProps.textColor"

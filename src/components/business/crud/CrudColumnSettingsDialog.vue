@@ -139,6 +139,7 @@
       <div class="column-settings__toolbar">
         <el-input
           v-model="keyword"
+          class="column-settings__search"
           clearable
           :prefix-icon="Search"
           placeholder="搜索栏目或分组"
@@ -235,7 +236,11 @@
                           {{ headerGroupVisibleCount(unit.group.key) }} / {{ unit.items.length }}
                         </small>
                         <span class="column-settings__group-lock">不可拆分</span>
-                        <el-button link @click="restoreHeaderGroup(unit.group.key)">
+                        <el-button
+                          class="column-settings__restore-group"
+                          link
+                          @click="restoreHeaderGroup(unit.group.key)"
+                        >
                           恢复本组
                         </el-button>
                       </header>
@@ -456,6 +461,7 @@
                   <label for="column-width">栏目宽度</label>
                   <el-input-number
                     id="column-width"
+                    class="column-settings__width-input"
                     v-model="selectedWidth"
                     :min="64"
                     :max="1000"
@@ -483,13 +489,7 @@
 
     <template #footer>
       <div class="column-settings__footer">
-        <div class="column-settings__density">
-          <span>表格密度</span>
-          <el-radio-group v-model="draftDensity" size="small" aria-label="表格密度">
-            <el-radio-button value="compact">紧凑</el-radio-button>
-            <el-radio-button value="comfortable">舒适</el-radio-button>
-          </el-radio-group>
-        </div>
+        <span class="column-settings__density">界面密度在右上角“外观设置”中统一调整</span>
         <div class="column-settings__footer-actions">
           <el-button v-if="hiddenCount" link type="primary" @click="showAll">全部显示</el-button>
           <el-button link type="primary" @click="restoreDraft">恢复全部默认</el-button>
@@ -941,10 +941,10 @@ function confirm() {
   display: flex;
   min-height: 0;
   flex-direction: column;
-  gap: 14px;
+  gap: 12px;
 }
 .column-settings__preview {
-  padding: 14px;
+  padding: 16px;
   background: var(--el-fill-color-extra-light);
   border: 1px solid var(--el-border-color-lighter);
   border-radius: var(--el-border-radius-base);
@@ -1106,10 +1106,11 @@ function confirm() {
 .column-settings__toolbar {
   display: flex;
   gap: 12px;
+  flex-wrap: wrap;
   align-items: center;
-  :deep(.el-input) {
-    width: 250px;
-  }
+}
+.column-settings__search {
+  width: 250px;
 }
 .column-settings__filter-hint {
   color: var(--el-text-color-secondary);
@@ -1205,13 +1206,11 @@ function confirm() {
     color: var(--el-text-color-placeholder);
     font-variant-numeric: tabular-nums;
   }
-  .el-button {
-    padding: 2px 0;
-    font-size: 12px;
-  }
-  .el-button:first-of-type {
-    margin-left: 0;
-  }
+}
+.column-settings__restore-group {
+  margin-left: 0;
+  padding: 2px 0;
+  font-size: 12px;
 }
 .column-settings__header-group-name {
   color: var(--el-text-color-primary);
@@ -1354,8 +1353,8 @@ function confirm() {
   display: flex;
   min-width: 0;
   flex-direction: column;
-  gap: 19px;
-  padding: 18px;
+  gap: 12px;
+  padding: 16px;
   height: 100%;
   overflow-y: auto;
   background: var(--el-bg-color);
@@ -1363,7 +1362,7 @@ function confirm() {
 .column-settings__inspector-empty {
   display: grid;
   height: 100%;
-  padding: 24px;
+  padding: 16px;
   color: var(--el-text-color-secondary);
   font-size: 13px;
   place-items: center;
@@ -1371,7 +1370,7 @@ function confirm() {
 .column-settings__inspector-title {
   display: grid;
   gap: 4px;
-  padding-bottom: 14px;
+  padding-bottom: 12px;
   border-bottom: 1px solid var(--el-border-color-lighter);
   span,
   small {
@@ -1420,20 +1419,15 @@ function confirm() {
 }
 .column-settings__fixed-control {
   display: flex;
-  :deep(.el-radio-button) {
-    flex: 1;
-  }
-  :deep(.el-radio-button__inner) {
-    width: 100%;
-  }
+  flex-wrap: wrap;
 }
 .column-settings__width-label {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  :deep(.el-input-number) {
-    width: 112px;
-  }
+}
+.column-settings__width-input {
+  width: 112px;
 }
 .column-settings__width-range {
   display: flex;
@@ -1450,7 +1444,7 @@ function confirm() {
 }
 .column-settings__footer {
   display: flex;
-  gap: 16px;
+  gap: 12px;
   align-items: center;
   justify-content: space-between;
 }
@@ -1460,7 +1454,7 @@ function confirm() {
   gap: 10px;
   align-items: center;
 }
-.column-settings__density > span {
+.column-settings__density {
   color: var(--el-text-color-secondary);
   font-size: 13px;
 }
@@ -1472,9 +1466,6 @@ function confirm() {
   .column-settings__groups {
     height: calc(100% - 34px);
   }
-  .column-settings__inspector {
-    gap: 16px;
-  }
 }
 @media (max-width: 767px) {
   .column-settings__preview-title,
@@ -1483,7 +1474,7 @@ function confirm() {
     align-items: stretch;
     flex-direction: column;
   }
-  .column-settings__toolbar :deep(.el-input) {
+  .column-settings__search {
     width: 100%;
   }
   .column-settings__list-head {

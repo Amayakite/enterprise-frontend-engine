@@ -1,9 +1,13 @@
 <template>
-  <el-breadcrumb class="flex-y-center">
-    <el-breadcrumb-item v-for="(item, index) in breadcrumbs" :key="item.path">
+  <el-breadcrumb class="breadcrumb">
+    <el-breadcrumb-item
+      v-for="(item, index) in breadcrumbs"
+      :key="item.path"
+      :class="{ breadcrumb__ancestor: index < breadcrumbs.length - 1 }"
+    >
       <span
         v-if="item.redirect === 'noredirect' || index === breadcrumbs.length - 1"
-        class="color-gray-400"
+        class="breadcrumb__current"
       >
         {{ item.meta.title ?? "" }}
       </span>
@@ -93,8 +97,24 @@ onBeforeMount(() => {
 </script>
 
 <style lang="scss" scoped>
-.el-breadcrumb__inner,
-.el-breadcrumb__inner a {
-  font-weight: 400 !important;
+.breadcrumb {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+  white-space: nowrap;
+}
+.breadcrumb__current {
+  color: var(--el-text-color-secondary);
+}
+@media (max-width: 767px) {
+  .breadcrumb__ancestor {
+    display: none;
+  }
+  .breadcrumb__current {
+    display: block;
+    max-width: 40vw;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
 }
 </style>

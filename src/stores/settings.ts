@@ -1,3 +1,4 @@
+import { densityComponentSize, normalizeLayoutDensity } from "@/config/density";
 import { SidebarColor, TagsViewStyle, ThemeMode } from "@/config/ui";
 import { defaults } from "@/config/app";
 import { STORAGE_KEYS } from "@/config/constants";
@@ -11,6 +12,30 @@ import {
 } from "@/utils/theme";
 
 export const useSettingsStore = defineStore("setting", () => {
+  /** 与主题一样保存在本浏览器；切换不会重建页面或清除未保存表单。 */
+  const legacySize = useStorage<string>(STORAGE_KEYS.SIZE, defaults.size);
+  const savedDensity = useStorage<string>(
+    STORAGE_KEYS.LAYOUT_DENSITY,
+    legacySize.value === "small"
+      ? "compact"
+      : legacySize.value === "large"
+        ? "comfortable"
+        : "default"
+  );
+  const density = computed({
+    get: () => normalizeLayoutDensity(savedDensity.value),
+    set: (value) => {
+      savedDensity.value = normalizeLayoutDensity(value);
+    },
+  });
+  const componentSize = computed(() => densityComponentSize(density.value));
+  watch(
+    density,
+    (value) => {
+      document.documentElement.dataset.density = value;
+    },
+    { immediate: true }
+  );
   const theme = useStorage<ThemeMode>(STORAGE_KEYS.THEME, defaults.theme);
   const primaryColor = useStorage<string>(STORAGE_KEYS.THEME_PRIMARY, defaults.themeColors.primary);
   const resolvedTheme = ref<ThemeMode>(resolveThemeMode(theme.value));
@@ -44,6 +69,8 @@ export const useSettingsStore = defineStore("setting", () => {
   onScopeDispose(() => stopWatchingSystemTheme?.());
 
   return {
+    density,
+    componentSize,
     theme,
     primaryColor,
     resolvedTheme,

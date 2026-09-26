@@ -15,14 +15,14 @@
 <script setup lang="ts">
 import { useAppStore, useSettingsStore } from "@/stores";
 import { appConfig } from "@/config/app";
-import { ThemeMode, ComponentSize } from "@/config/ui";
+import { ThemeMode } from "@/config/ui";
 import FeedbackHost from "@/components/common/FeedbackHost.vue";
 
 const appStore = useAppStore();
 const settingsStore = useSettingsStore();
 
 const locale = computed(() => appStore.locale);
-const size = computed(() => appStore.size as ComponentSize);
+const size = computed(() => settingsStore.componentSize);
 const showWatermark = computed(() => settingsStore.showWatermark);
 const watermarkContent = appConfig.name;
 

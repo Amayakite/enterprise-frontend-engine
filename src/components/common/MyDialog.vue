@@ -70,7 +70,10 @@
     <div
       v-loading="loading"
       class="my-dialog__body"
-      :class="{ 'my-dialog__body--content-scroll': bodyScroll === 'content' }"
+      :class="{
+        'my-dialog__body--content-scroll': bodyScroll === 'content',
+        'my-dialog__body--flush': !bodyPadding,
+      }"
       :aria-busy="loading"
     >
       <slot />
@@ -126,6 +129,8 @@ const props = withDefaults(
     fillHeight?: boolean;
     /** 正文滚动方式：默认 body 由弹窗滚动；content 由内容分配高度并自行滚动，通常搭配 fillHeight。 */
     bodyScroll?: "body" | "content";
+    /** 正文留白；默认 true 跟随全局密度，编辑器工作台传 false 让内容贴边。 */
+    bodyPadding?: boolean;
     /** 非全屏时距视口顶部的 CSS 距离；默认 16px。 */
     top?: string;
     /** 是否传送到 body；默认 true，避免被父布局裁切。 */
@@ -164,6 +169,7 @@ const props = withDefaults(
     cancelText?: string;
   }>(),
   {
+    bodyPadding: true,
     width: "720px",
     maxWidth: "calc(100vw - 32px)",
     maxHeight: "calc(100dvh - 32px)",
@@ -265,6 +271,7 @@ const canDrag = computed(() => props.draggable && desktop.value && !resolvedFull
 const dialogStyle = computed(
   () =>
     ({
+      "--el-dialog-padding-primary": "0px",
       "--my-dialog-max-width": props.maxWidth,
       "--my-dialog-max-height": props.maxHeight,
       height: props.fillHeight
@@ -339,22 +346,22 @@ defineExpose({
   overflow: hidden;
 }
 :global(.my-dialog > .el-dialog__footer) {
-  padding: 12px 16px;
+  padding: 8px 16px;
   border-top: 1px solid var(--el-border-color-lighter);
 }
 .my-dialog__header {
   display: flex;
-  min-height: 48px;
+  min-height: 44px;
   gap: 12px;
   align-items: center;
-  padding: 0 12px 0 16px;
+  padding: 0 16px;
   border-bottom: 1px solid var(--el-border-color-lighter);
 }
 .my-dialog__title {
   flex: 1;
   min-width: 0;
   overflow: hidden;
-  font-size: var(--el-font-size-large);
+  font-size: 15px;
   font-weight: 600;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -397,7 +404,7 @@ defineExpose({
   flex: 1;
   min-width: 0;
   min-height: 0;
-  padding: 16px;
+  padding: var(--ui-panel-padding);
   overflow: auto;
 }
 .my-dialog__body--content-scroll {
@@ -422,5 +429,14 @@ defineExpose({
   .my-dialog__body {
     padding: 12px;
   }
+}
+@media (pointer: coarse) {
+  .my-dialog__icon-button {
+    width: 44px;
+    height: 44px;
+  }
+}
+.my-dialog__body--flush {
+  padding: 0;
 }
 </style>

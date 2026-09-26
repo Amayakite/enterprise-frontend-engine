@@ -35,16 +35,16 @@ defineSlots<{
   /** 固定底部核对或操作区；省略不占空间。 */ footer?: () => unknown;
 }>();
 </script>
-<style scoped>
+<style scoped lang="scss">
 .crud-layout {
   display: flex;
   flex: 1 1 0;
   flex-direction: column;
-  gap: 16px;
+  gap: 12px;
   height: 100%;
   min-height: 0;
   overflow: hidden;
-  padding: 16px;
+  padding: var(--ui-panel-padding);
   background: var(--content-bg);
   border: 1px solid var(--card-border);
   border-radius: var(--card-radius);
@@ -64,7 +64,7 @@ defineSlots<{
   scrollbar-color: var(--el-text-color-placeholder) var(--el-fill-color-light);
   overscroll-behavior-y: contain;
   display: flex;
-  gap: 16px;
+  gap: var(--ui-section-gap);
 }
 .crud-layout__body::-webkit-scrollbar {
   width: 10px;
@@ -87,7 +87,7 @@ defineSlots<{
   min-width: 0;
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: var(--ui-section-gap);
 }
 .crud-layout__aside {
   flex: 0 0 260px;
@@ -101,35 +101,35 @@ defineSlots<{
   display: flex;
   flex-wrap: wrap;
   justify-content: flex-end;
-  gap: 10px;
+  gap: var(--ui-section-gap);
 }
 .crud-layout--simple,
 .crud-layout--structured {
-  padding: 24px 28px;
-  gap: 24px;
+  padding: var(--ui-panel-padding);
+  gap: 12px;
 }
 .crud-layout--simple .crud-layout__toolbar,
 .crud-layout--structured .crud-layout__toolbar {
-  padding-bottom: 18px;
+  padding-bottom: 8px;
   border-bottom: 1px solid var(--el-border-color-lighter);
 }
 .crud-layout--simple .crud-layout__footer,
 .crud-layout--structured .crud-layout__footer {
   display: block;
-  padding-top: 16px;
+  padding-top: 8px;
   border-top: 1px solid var(--el-border-color-lighter);
 }
 .crud-layout--embedded {
   max-width: none;
   border: 0;
   border-radius: 0;
-  padding: 4px;
+  padding: 0;
 }
 @media (max-width: 767px) {
   .crud-layout--simple,
   .crud-layout--structured {
-    padding: 16px;
-    gap: 16px;
+    padding: var(--ui-panel-padding);
+    gap: 12px;
   }
   .crud-layout--embedded {
     padding: 0;
@@ -140,7 +140,7 @@ defineSlots<{
     display: block;
   }
   .crud-layout__aside {
-    margin-top: 16px;
+    margin-top: var(--ui-section-gap);
   }
 }
 </style>

@@ -98,4 +98,9 @@ const blocked = computed(() => !!readonlyReason.value);
   font-size: 12px;
   color: var(--el-text-color-regular);
 }
+@media (max-width: 480px) {
+  .crud-form-shortcut {
+    display: none;
+  }
+}
 </style>

@@ -3,7 +3,7 @@
   <el-form
     ref="formRef"
     class="my-form"
-    :class="`my-form--${density ?? 'compact'}`"
+    :class="density && `my-form--${density}`"
     :model="state.model.value"
     label-position="top"
     :show-message="false"
@@ -127,7 +127,11 @@ const props = defineProps<{
   formKey?: string | number;
   /** 大屏表单列数，默认由布局自行决定。 */
   columns?: 1 | 2 | 3;
-  /** 表单字段的显示密度。 */
+  /**
+   * 字段间距；省略跟随全局密度，compact / comfortable 可固定本表单的紧凑 / 宽松间距。
+   * @example
+   * `<MyForm density="compact" ... />`
+   */
   density?: FieldDensity;
 }>();
 const emit = defineEmits<{
@@ -341,53 +345,34 @@ function fieldSlotName(key: string) {
 </script>
 
 <style scoped lang="scss">
-.my-form--compact :deep(.el-form-item) {
-  margin-bottom: 16px;
-}
-.my-form--comfortable :deep(.el-form-item) {
-  margin-bottom: 24px;
-}
 .my-form {
   /* 以表单宿主实际可用宽度断点；抽屉和窄弹窗不依赖浏览器视口宽度。 */
   container-type: inline-size;
 }
-.my-form :deep(.el-form-item__label) {
-  display: inline-flex;
-  align-items: center;
-  line-height: 22px;
-  height: auto;
-  margin-bottom: 6px;
+.my-form--compact {
+  --ui-field-gap: 16px;
+}
+.my-form--comfortable {
+  --ui-field-gap: 24px;
 }
 .my-form-grid {
   display: grid;
   grid-template-columns: repeat(var(--form-columns), minmax(0, 1fr));
-  gap: 0 var(--page-gap, 16px);
-  :deep(.el-form-item) {
-    grid-column: span min(var(--field-span), var(--form-columns));
-    min-width: 0;
-  }
-  :deep(.el-form-item__content > *) {
-    max-width: 100%;
-  }
-  :deep(.el-input-number),
-  :deep(.el-date-editor) {
-    width: 100%;
-  }
+  column-gap: var(--ui-field-gap);
 }
 .my-form-group {
   grid-column: 1 / -1;
-  margin: 4px 0 16px;
-  padding: 0 0 8px 10px;
-  border-left: 3px solid var(--el-color-primary);
+  margin: 0 0 var(--ui-section-gap);
+  padding-bottom: 8px;
   border-bottom: 1px solid var(--el-border-color-lighter);
+  color: var(--el-text-color-primary);
   font-size: 15px;
+  font-weight: 600;
 }
 @container (max-width: 640px) {
   .my-form-grid {
+    --form-visible-columns: 1;
     grid-template-columns: minmax(0, 1fr);
-    :deep(.el-form-item) {
-      grid-column: span 1;
-    }
   }
 }
 </style>

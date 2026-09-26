@@ -175,7 +175,7 @@ onMounted(() =>
   ])
 );
 </script>
-<style scoped>
+<style scoped lang="scss">
 .crud-form__heading h1 {
   margin: 0 0 6px;
   font-size: 20px;
@@ -189,7 +189,7 @@ onMounted(() =>
 }
 .crud-form__fields--simple {
   max-width: 840px;
-  margin-inline: auto;
+  width: 100%;
 }
 .crud-form__fields--structured {
   max-width: 1200px;
@@ -197,7 +197,7 @@ onMounted(() =>
 .crud-form__footer {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 8px;
 }
 .crud-form__checks {
   font-size: 13px;
@@ -205,29 +205,31 @@ onMounted(() =>
 .crud-form__header {
   display: flex;
   flex-direction: column;
-  gap: 12px;
-  margin-bottom: 16px;
+  gap: var(--ui-section-gap);
+  margin-bottom: var(--ui-section-gap);
 }
 .crud-form__section {
-  margin-top: 20px;
+  margin-top: var(--ui-section-gap);
 }
 .crud-form__section h2 {
+  margin: 0 0 var(--ui-section-gap);
   font-size: 15px;
-  padding: 8px 0;
+  padding: 0 0 8px;
   border-bottom: 1px solid var(--el-border-color-lighter);
 }
 .crud-form__navigation {
   display: flex;
   gap: 8px;
   overflow-x: auto;
-  margin-top: 14px;
+  margin-top: 12px;
   padding: 2px;
 }
 .crud-form__navigation button {
   flex-shrink: 0;
-  padding: 7px 10px;
+  min-height: 32px;
+  padding: 4px 10px;
   border: 1px solid var(--el-border-color-lighter);
-  border-radius: 6px;
+  border-radius: var(--ui-control-radius);
   background: var(--el-fill-color-blank);
   color: var(--el-text-color-regular);
   font: inherit;

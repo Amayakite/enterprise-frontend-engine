@@ -123,7 +123,7 @@ function cancel() {
 
 <style scoped lang="scss">
 :global(.my-drawer .el-drawer__header) {
-  min-height: 48px;
+  min-height: 44px;
   margin: 0;
   padding: 0 16px;
   border-bottom: 1px solid var(--el-border-color-lighter);
@@ -135,14 +135,14 @@ function cancel() {
   overflow: hidden;
 }
 :global(.my-drawer .el-drawer__footer) {
-  padding: 12px 16px;
+  padding: 8px 16px;
   border-top: 1px solid var(--el-border-color-lighter);
 }
 .my-drawer__body {
   flex: 1;
   min-width: 0;
   min-height: 0;
-  padding: 16px;
+  padding: var(--ui-panel-padding);
   overflow: auto;
 }
 .my-drawer__footer {

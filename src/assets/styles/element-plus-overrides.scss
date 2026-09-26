@@ -253,7 +253,8 @@
   }
 }
 
-.el-dialog {
+// 公共 MyDialog/MyDrawer 自行分配标题、正文与操作区，旧适配不能再次叠加留白。
+.el-dialog:not(.my-dialog) {
   overflow: hidden;
   border-radius: 8px;
   box-shadow: 0 18px 48px rgb(15 23 42 / 18%);
@@ -274,7 +275,7 @@
   }
 }
 
-.el-drawer {
+.el-drawer:not(.my-drawer) {
   .el-drawer__header {
     padding: 16px 20px;
     margin: 0;
@@ -334,5 +335,4 @@ html.dark {
       border-bottom-color: rgb(255 255 255 / 8%);
     }
   }
-
 }

@@ -2,18 +2,12 @@ import zhCn from "element-plus/es/locale/lang/zh-cn";
 import { store } from "@/stores";
 import { DeviceEnum, SidebarStatus } from "@/config/ui";
 import { STORAGE_KEYS } from "@/config/constants";
-import { defaults } from "@/config/app";
 
 export const useAppStore = defineStore("app", () => {
   /**
    * 当前设备类型
    */
   const device = useStorage(STORAGE_KEYS.DEVICE, DeviceEnum.DESKTOP);
-
-  /**
-   * 组件默认尺寸
-   */
-  const size = useStorage(STORAGE_KEYS.SIZE, defaults.size);
 
   /**
    * 侧边栏持久化状态
@@ -70,13 +64,6 @@ export const useAppStore = defineStore("app", () => {
   }
 
   /**
-   * 切换组件尺寸
-   */
-  function changeSize(val: string) {
-    size.value = val;
-  }
-
-  /**
    * 切换内容区全屏状态
    */
   function toggleContentFullscreen() {
@@ -87,10 +74,8 @@ export const useAppStore = defineStore("app", () => {
     device,
     sidebar,
     locale,
-    size,
     contentFullscreen,
     toggleDevice,
-    changeSize,
     toggleSidebar,
     closeSidebar,
     openSidebar,

@@ -1,0 +1,64 @@
+@use "sass:map";
+
+// 密度只缩放内容留白和数据行；导航、标题栏、按钮组等操作结构保持稳定。
+$density-scales: (
+  "extra-compact": (
+    page: 6px,
+    panel: 10px,
+    section: 8px,
+    field: 12px,
+    cell: 1px,
+  ),
+  "compact": (
+    page: 8px,
+    panel: 14px,
+    section: 10px,
+    field: 16px,
+    cell: 3px,
+  ),
+  "default": (
+    page: 12px,
+    panel: 18px,
+    section: 14px,
+    field: 20px,
+    cell: 5px,
+  ),
+  "comfortable": (
+    page: 16px,
+    panel: 24px,
+    section: 18px,
+    field: 24px,
+    cell: 8px,
+  ),
+  "extra-comfortable": (
+    page: 16px,
+    panel: 24px,
+    section: 24px,
+    field: 30px,
+    cell: 12px,
+  ),
+);
+
+@mixin density-tokens($scale) {
+  --page-padding: #{map.get($scale, page)};
+  --page-gap: #{map.get($scale, section)};
+  --ui-panel-padding: #{map.get($scale, panel)};
+  --ui-section-gap: #{map.get($scale, section)};
+  --ui-field-gap: #{map.get($scale, field)};
+  --ui-table-cell-padding: #{map.get($scale, cell)};
+}
+
+:root {
+  @include density-tokens(map.get($density-scales, "default"));
+}
+
+@each $name, $scale in $density-scales {
+  html[data-density="#{$name}"] {
+    @include density-tokens($scale);
+    // 小屏优先保留字段宽度，档位仍影响字段间距和控件尺寸。
+    @media (max-width: 767px) {
+      --page-padding: #{min(map.get($scale, page), 8px)};
+      --ui-panel-padding: #{min(map.get($scale, panel), 12px)};
+    }
+  }
+}

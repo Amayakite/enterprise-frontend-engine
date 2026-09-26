@@ -8,10 +8,6 @@
       <div class="layout-toolbar__item">
         <Fullscreen />
       </div>
-
-      <div class="layout-toolbar__item">
-        <SizeSelect />
-      </div>
     </template>
 
     <div class="layout-toolbar__item layout-toolbar__item--profile">
@@ -43,7 +39,6 @@ import { useAppStore, useSettingsStore, useUserStore } from "@/stores";
 import CommandPalette from "@/pages/layout/components/CommandPalette/index.vue";
 import Fullscreen from "@/pages/layout/components/Fullscreen.vue";
 import ThemeSwitch from "./ThemeSwitch.vue";
-import SizeSelect from "@/pages/layout/components/SizeSelect.vue";
 
 const appStore = useAppStore();
 const settingStore = useSettingsStore();

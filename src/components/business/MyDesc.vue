@@ -1,6 +1,6 @@
 <template>
   <!-- 按 fields 显示 modelValue 中的详情数据；字段需开启 detail。context 提供格式化所需的组织等信息，不需要时传 undefined。加载和按钮由页面处理。 -->
-  <div class="my-desc" :class="`my-desc--${density ?? 'compact'}`">
+  <div ref="root" class="my-desc" :class="density && `my-desc--${density}`">
     <template v-if="appearance === 'plain'">
       <section v-for="(group, index) in groups" :key="index" class="my-desc__section">
         <h2 v-if="group.title" class="my-desc__title">{{ group.title }}</h2>
@@ -43,6 +43,12 @@
           :key="entry.field.key"
           :label="entry.field.label"
           :span="narrow ? 1 : Math.min(entry.detail.span, columns ?? 2)"
+          :label-style="{
+            padding: 'calc(var(--ui-field-gap) / 2) 12px',
+            color: 'var(--el-text-color-regular)',
+            background: 'var(--el-fill-color-light)',
+          }"
+          :content-style="{ padding: 'calc(var(--ui-field-gap) / 2) 12px' }"
         >
           <template #label>
             <FieldLabel
@@ -64,6 +70,7 @@
 </template>
 
 <script setup lang="ts" generic="M extends object, C = undefined">
+import { useElementSize } from "@vueuse/core";
 import FieldDisplay from "@/components/business/fields/FieldDisplay.vue";
 import FieldLabel from "@/components/business/fields/FieldLabel.vue";
 import { fieldHelpText } from "@/components/business/fields/presentation";
@@ -92,7 +99,7 @@ const props = defineProps<{
   context: C;
   /** 大屏详情列数。 */
   columns?: 1 | 2 | 3;
-  /** 详情描述列表的显示密度。 */
+  /** 字段间距；省略跟随全局密度，compact / comfortable 可固定本详情的紧凑 / 宽松间距。 */
   density?: FieldDensity;
   /** 资料外观，默认 bordered 沿用描述表；plain 使用响应容器宽度的标签/值网格。
    * @example
@@ -106,8 +113,10 @@ const slots = defineSlots<{
     field: FieldDefinition<M, C>;
   }) => unknown;
 }>();
-/** 屏幕宽度不超过 640px 时，让带边框的详情表改为单列，字段也不再跨列；plain 外观由下方容器 CSS 处理。 */
-const narrow = useMediaQuery("(max-width: 640px)");
+/** 根据详情宿主宽度排列边框表，桌面窄抽屉也使用单列；plain 由容器 CSS 排列。 */
+const root = ref<HTMLElement>();
+const { width } = useElementSize(root);
+const narrow = computed(() => width.value <= 640);
 /** 把详情数据和额外信息传给字段格式化、提示及参照显示；edit 只是字段规则使用的模式，不会开启编辑。 */
 const environment = computed<FieldEnvironment<M, C>>(() => ({
   model: props.modelValue,
@@ -141,14 +150,14 @@ function fieldSlotName(key: string) {
   container-type: inline-size;
 }
 .my-desc__title {
-  margin: 0 0 16px;
+  margin: 0 0 12px;
   font-size: 15px;
   font-weight: 600;
 }
 .my-desc__grid {
   display: grid;
   grid-template-columns: repeat(var(--desc-columns), minmax(0, 1fr));
-  gap: 24px 32px;
+  gap: var(--ui-field-gap);
   margin: 0;
 }
 .my-desc__entry {
@@ -158,7 +167,7 @@ function fieldSlotName(key: string) {
 .my-desc__entry dt {
   color: var(--el-text-color-secondary);
   font-size: 13px;
-  margin-bottom: 8px;
+  margin-bottom: 6px;
 }
 .my-desc__entry dd {
   margin: 0;
@@ -170,7 +179,7 @@ function fieldSlotName(key: string) {
 @container (max-width: 600px) {
   .my-desc__grid {
     grid-template-columns: 1fr;
-    gap: 20px;
+    gap: var(--ui-section-gap);
   }
   .my-desc__entry {
     grid-column: span 1;
@@ -179,17 +188,13 @@ function fieldSlotName(key: string) {
 .my-desc {
   display: flex;
   flex-direction: column;
-  gap: 20px;
-
-  :deep(.el-descriptions__label.el-descriptions__cell.is-bordered-label) {
-    color: var(--el-text-color-regular);
-    background: var(--el-color-primary-light-9);
-  }
+  // 不同资料分组的间距应大于同组字段间距，紧凑档也保留分组层次。
+  gap: calc(var(--ui-field-gap) + 8px);
 }
-.my-desc--compact :deep(.el-descriptions__cell) {
-  padding: 8px 12px;
+.my-desc--compact {
+  --ui-field-gap: 16px;
 }
-.my-desc--comfortable :deep(.el-descriptions__cell) {
-  padding: 14px 16px;
+.my-desc--comfortable {
+  --ui-field-gap: 24px;
 }
 </style>

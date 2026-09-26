@@ -5,15 +5,19 @@
     :model-value="active"
     :title="current.title"
     :width="current.width"
-    v-bind="current.mode === 'dialog' ? { fillHeight: true } : {}"
+    v-bind="current.mode === 'dialog' ? { fillHeight: true, bodyScroll: 'content' } : {}"
     :before-close="presentation.canLeave"
     :destroy-on-close="false"
     :show-footer="false"
     @update:model-value="requestClose"
   >
     <div class="business-page-host" :class="`business-page-host--${current.mode}`">
-      <MyFeedback v-if="closeError" :message="closeError" />
-      <MyBusinessPageContent :key="current.key" :editor="current" :after-save="afterSave" />
+      <div v-if="closeError" class="business-page-host__feedback">
+        <MyFeedback :message="closeError" />
+      </div>
+      <div class="business-page-host__content">
+        <MyBusinessPageContent :key="current.key" :editor="current" :after-save="afterSave" />
+      </div>
     </div>
   </component>
 </template>
@@ -76,9 +80,20 @@ async function requestClose(visible: boolean) {
   }
 }
 </script>
-<style scoped>
+<style scoped lang="scss">
 .business-page-host {
+  display: flex;
+  flex-direction: column;
   height: 100%;
   min-height: 0;
+}
+.business-page-host__feedback {
+  flex-shrink: 0;
+  margin-bottom: 8px;
+}
+.business-page-host__content {
+  flex: 1;
+  min-height: 0;
+  min-width: 0;
 }
 </style>

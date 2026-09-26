@@ -1,6 +1,6 @@
 <template>
   <div class="layout-navbar">
-    <div class="flex-y-center">
+    <div class="layout-navbar__location">
       <Hamburger :is-active="appStore.sidebar.opened" @toggle-click="appStore.toggleSidebar" />
       <Breadcrumb />
     </div>
@@ -30,7 +30,14 @@ const appStore = useAppStore();
   border-bottom: 1px solid var(--card-border);
   box-shadow: 0 1px 0 rgb(15 23 42 / 3%);
 
+  &__location {
+    display: flex;
+    align-items: center;
+    min-width: 0;
+  }
+
   &__actions {
+    flex-shrink: 0;
     display: flex;
     align-items: center;
     height: 100%;
